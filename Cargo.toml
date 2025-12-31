@@ -1,0 +1,55 @@
+[package]
+name = "dynamic-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["@biface <fek2qe8i3@mozmail.com>"]
+license = "MIT"
+description = "A framework for building configurable CLI and REPL applications from YAML/JSON configuration files"
+readme = "README.md"
+repository = "https://github.com/biface/dynamic-cli"
+keywords = ["cli", "repl", "command", "interactive", "framework"]
+categories = ["command-line-interface", "command-line-utilities", "config"]
+rust-version = "1.70"
+
+[dependencies]
+# Configuration parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"  # Note: Latest stable version as of Jan 2025
+
+# Error management
+thiserror = "2.0"
+anyhow = "1.0"
+
+# REPL interface
+rustyline = "17.0"
+
+# System utilities
+dirs = "6.0"
+
+# Terminal coloring and formatting
+colored = "3.0"
+
+[dev-dependencies]
+# Testing
+criterion = { version = "0.8", features = ["html_reports"] }
+tempfile = "3.10"  # Note: Check crates.io for potential v3.12+
+assert_cmd = "2.1"
+predicates = "3.1"
+
+[features]
+default = ["colored-output"]
+colored-output = []
+
+#[[bench]]
+#name = "parsing_benchmark"
+#harness = false
+
+[lib]
+name = "dynamic_cli"
+path = "src/lib.rs"
+
+# Configuration for documentation generation
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
