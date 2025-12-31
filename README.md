@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/dynamic-cli.svg)](https://crates.io/crates/dynamic-cli)
 [![Documentation](https://docs.rs/dynamic-cli/badge.svg)](https://docs.rs/dynamic-cli)
-[![License](https://img.shields.io/crates/l/dynamic-cli.svg)](LICENSE-MIT)
+[![License](https://img.shields.io/crates/l/dynamic-cli.svg)](LICENSE)
 
 [🇫🇷 Version française](README.fr.md)
 
@@ -283,7 +283,7 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## 📄 License
 
-This project is licensed under the MIT License. See [LICENSE-MIT](LICENSE-MIT).
+This project is licensed under the MIT License. See [LICENSE-MIT](LICENSE).
 
 ## 🔗 Links
 
