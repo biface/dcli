@@ -1,0 +1,32 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+**/*.cargo
+.cargo/
+
+# IDE / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation générée
+/doc/
+
+# Couverture de tests
+tarpaulin-report.html
+cobertura.xml
+lcov.info
+
+# Benchmarks
+/target/criterion/
+
+# Fichiers temporaires
+*.tmp
+*.temp
