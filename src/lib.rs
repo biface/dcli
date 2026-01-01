@@ -81,6 +81,7 @@
 //pub mod interface;
 pub mod error;
 mod config;
+mod context;
 // Internal modules
 //mod builder;
 //mod utils;
@@ -109,7 +110,7 @@ pub use error::{DynamicCliError, Result};
 /// ```
 pub mod prelude {
 //    pub use crate::builder::{CliBuilder, CliApp};
-//    pub use crate::context::{ExecutionContext, ExecutionContextExt};
+    pub use crate::context::{ExecutionContext, downcast_ref, downcast_mut};
 //    pub use crate::executor::CommandHandler;
     pub use crate::error::{DynamicCliError, Result};
 //    pub use crate::config::schema::{CommandsConfig, ArgumentType};
