@@ -72,7 +72,6 @@
 //! See the `examples/` directory for complete usage examples.
 
 // Public modules
-//pub mod parser;
 //pub mod validator;
 //pub mod interface;
 pub mod error;
@@ -80,6 +79,7 @@ mod config;
 mod context;
 mod executor;
 mod registry;
+mod parser;
 // Internal modules
 //mod builder;
 //mod utils;
