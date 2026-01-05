@@ -42,7 +42,7 @@ default = ["colored-output"]
 colored-output = []
 
 #[[bench]]
-#name = "parsing_benchmark"
+#name = "benchmarks"
 #harness = false
 
 [lib]
