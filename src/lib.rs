@@ -72,25 +72,22 @@
 //! See the `examples/` directory for complete usage examples.
 
 // Public modules
-// pub mod config;
-// pub mod registry;
 //pub mod parser;
 //pub mod validator;
-//pub mod executor;
-//pub mod context;
 //pub mod interface;
 pub mod error;
 mod config;
 mod context;
 mod executor;
+mod registry;
 // Internal modules
 //mod builder;
 //mod utils;
 
 // Public re-exports for ease of use
 //pub use builder::{CliBuilder, CliApp};
-//pub use context::{ExecutionContext, ExecutionContextExt};
-//pub use executor::CommandHandler;
+pub use context::ExecutionContext;
+pub use executor::CommandHandler;
 pub use error::{DynamicCliError, Result};
 
 // Re-exports of common configuration types
