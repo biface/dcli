@@ -16,7 +16,7 @@
 //! ## Quick Start
 //!
 //! ```no_run
-//! use dynamic_cli::{CliBuilder, CommandHandler, ExecutionContext};
+//! use dynamic_cli::prelude::*;
 //! use std::collections::HashMap;
 //!
 //! // 1. Define the execution context
@@ -43,14 +43,22 @@
 //!     }
 //! }
 //!
-//! // 3. Build and run the application
+//! // 3. Load configuration and register commands
 //! # fn main() -> dynamic_cli::Result<()> {
-//! CliBuilder::new()
-//!     .config_file("commands.yaml")
-//!     .context(Box::new(MyContext))
-//!     .register_handler("hello_handler", Box::new(HelloCommand))
-//!     .build()?
-//!     .run()
+//! use dynamic_cli::config::loader::load_config;
+//!
+//! let config = load_config("commands.yaml")?;
+//! let mut registry = CommandRegistry::new();
+//! registry.register(config.commands[0].clone(), Box::new(HelloCommand))?;
+//!
+//! // 4. Parse and execute
+//! let parser = ReplParser::new(&registry);
+//! let parsed = parser.parse_line("hello World")?;
+//!
+//! let mut context = MyContext::default();
+//! let handler = registry.get_handler(&parsed.command_name).unwrap();
+//! handler.execute(&mut context, &parsed.arguments)?;
+//! # Ok(())
 //! # }
 //! ```
 //!
@@ -58,72 +66,164 @@
 //!
 //! The framework is organized into modules:
 //!
+//! - [`error`]: Error types and handling
 //! - [`config`]: Configuration file loading and validation
+//! - [`context`]: Execution context trait
+//! - [`executor`]: Command execution
 //! - [`registry`]: Command and handler registry
 //! - [`parser`]: CLI and REPL argument parsing
 //! - [`validator`]: Argument validation
-//! - [`executor`]: Command execution
-//! - [`context`]: Execution context trait
-//! - [`interface`]: CLI and REPL interfaces
-//! - [`error`]: Error types and handling
+//!
+//! ## Module Status
+//!
+//! - ✅ Complete: error, config, context, executor, registry, parser, validator
+//! - 🚧 In Development: interface, builder
+//! - 📋 Planned: utils, examples
 //!
 //! ## Examples
 //!
-//! See the `examples/` directory for complete usage examples.
+//! See the documentation for each module for detailed examples.
 
-// Public modules
-//pub mod validator;
-//pub mod interface;
+// ============================================================================
+// PUBLIC MODULES (Complete and ready to use)
+// ============================================================================
+
 pub mod error;
-mod config;
-mod context;
-mod executor;
-mod registry;
-mod parser;
-// Internal modules
-//mod builder;
-//mod utils;
+pub mod config;
+pub mod context;
+pub mod executor;
+pub mod registry;
+pub mod parser;
+pub mod validator;
 
-// Public re-exports for ease of use
-//pub use builder::{CliBuilder, CliApp};
-pub use context::ExecutionContext;
+// ============================================================================
+// MODULES IN DEVELOPMENT (Not yet available)
+// ============================================================================
+
+// Will be added in future sessions:
+// pub mod interface;  // Session 7 - CLI and REPL interfaces
+// pub mod builder;    // Session 8 - Builder API
+// pub mod utils;      // Session 9 - Utility functions
+
+// ============================================================================
+// PUBLIC RE-EXPORTS (For convenience)
+// ============================================================================
+
+// Core traits
+pub use context::{downcast_mut, downcast_ref, ExecutionContext};
 pub use executor::CommandHandler;
+
+// Error handling
 pub use error::{DynamicCliError, Result};
 
-// Re-exports of common configuration types
-//pub use config::schema::{
-//    CommandsConfig,
-//    CommandDefinition,
-//    ArgumentDefinition,
-//    OptionDefinition,
-//    ArgumentType,
-//};
+// Configuration types
+pub use config::schema::{
+    ArgumentDefinition,
+    ArgumentType,
+    CommandDefinition,
+    CommandsConfig,
+    Metadata,
+    OptionDefinition,
+    ValidationRule,
+};
+
+// Registry
+pub use registry::CommandRegistry;
+
+// Parser types
+pub use parser::{CliParser, ParsedCommand, ReplParser};
+
+// Validator functions
+pub use validator::{validate_file_exists, validate_file_extension, validate_range};
+
+// ============================================================================
+// PRELUDE MODULE (Quick imports)
+// ============================================================================
 
 /// Prelude module for quickly importing essential types
+///
+/// This module re-exports the most commonly used types and traits,
+/// allowing you to import everything with a single `use` statement.
 ///
 /// # Example
 ///
 /// ```
 /// use dynamic_cli::prelude::*;
+///
+/// // Now you have access to:
+/// // - ExecutionContext, downcast_ref, downcast_mut
+/// // - CommandHandler
+/// // - DynamicCliError, Result
+/// // - CommandRegistry
+/// // - ParsedCommand, CliParser, ReplParser
+/// // - validate_file_exists, validate_file_extension, validate_range
+/// // - Common config types (ArgumentType, CommandsConfig)
 /// ```
 pub mod prelude {
-//    pub use crate::builder::{CliBuilder, CliApp};
-    pub use crate::context::{ExecutionContext, downcast_ref, downcast_mut};
+    // Context management
+    pub use crate::context::{downcast_mut, downcast_ref, ExecutionContext};
+
+    // Command handling
     pub use crate::executor::CommandHandler;
+
+    // Error handling
     pub use crate::error::{DynamicCliError, Result};
-    pub use crate::config::schema::{CommandsConfig, ArgumentType};
+
+    // Configuration
+    pub use crate::config::schema::{ArgumentType, CommandsConfig};
+
+    // Registry
+    pub use crate::registry::CommandRegistry;
+
+    // Parsing
+    pub use crate::parser::{CliParser, ParsedCommand, ReplParser};
+
+    // Validation
+    pub use crate::validator::{validate_file_exists, validate_file_extension, validate_range};
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::*;
-//
-//    /// Basic test to verify imports work
-//    #[test]
-//    fn test_prelude_imports() {
-//        use crate::prelude::*;
-//
-//        // If this compiles, we're good
-//        let _builder = CliBuilder::new();
-//    }
-//}
+// ============================================================================
+// INTEGRATION TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Verify that prelude imports work correctly
+    #[test]
+    fn test_prelude_imports() {
+        use crate::prelude::*;
+
+        // If this compiles, prelude imports are working
+        let _: Option<&dyn ExecutionContext> = None;
+        let _: Option<&dyn CommandHandler> = None;
+    }
+
+    /// Verify that individual module imports work
+    #[test]
+    fn test_module_imports() {
+        use crate::config::schema::CommandsConfig;
+        use crate::registry::CommandRegistry;
+        use crate::parser::ParsedCommand;
+
+        // If this compiles, module structure is correct
+        let _config = CommandsConfig::minimal();
+        let _registry = CommandRegistry::new();
+        let _parsed = ParsedCommand {
+            command_name: "test".to_string(),
+            arguments: std::collections::HashMap::new(),
+        };
+    }
+
+    /// Verify that re-exports work
+    #[test]
+    fn test_reexports() {
+        // These should be accessible from the crate root
+        let _: Option<&dyn ExecutionContext> = None;
+        let _: Option<&dyn CommandHandler> = None;
+        let _registry = CommandRegistry::new();
+
+        // If this compiles, re-exports are working
+    }
+}

@@ -2,54 +2,94 @@
 name = "dynamic-cli"
 version = "0.1.0"
 edition = "2021"
-authors = ["@biface <fek2qe8i3@mozmail.com>"]
-license = "MIT"
+authors = ["Dynamic CLI Contributors"]
+license = "MIT OR Apache-2.0"
 description = "A framework for building configurable CLI and REPL applications from YAML/JSON configuration files"
 readme = "README.md"
-repository = "https://github.com/biface/dynamic-cli"
-keywords = ["cli", "repl", "command", "interactive", "framework"]
+repository = "https://github.com/biface/dcli"
+documentation = "https://docs.rs/dynamic-cli"
+# homepage = "https://github.com/biface/dcli"
+keywords = ["cli", "repl", "command", "yaml", "configuration"]
 categories = ["command-line-interface", "command-line-utilities", "config"]
 rust-version = "1.70"
+exclude = [
+    ".git*",
+    "*.md",
+    "examples/",
+    "benches/",
+    "tests/integration/",
+]
 
 [dependencies]
-# Configuration parsing
+# Serialization and configuration parsing
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-serde_yaml = "0.9"  # Note: Latest stable version as of Jan 2025
+serde_yaml = "0.9"
 
 # Error management
 thiserror = "2.0"
 anyhow = "1.0"
 
-# REPL interface
-rustyline = "17.0"
-
-# System utilities
-dirs = "6.0"
-
 # Terminal coloring and formatting
 colored = "3.0"
 
 [dev-dependencies]
-# Testing
+# Testing utilities
+tempfile = "3.13"
 criterion = { version = "0.8", features = ["html_reports"] }
-tempfile = "3.10"  # Note: Check crates.io for potential v3.12+
-assert_cmd = "2.1"
-predicates = "3.1"
+
+# Optional: Uncomment when interface module is implemented
+# rustyline = "14.0"
+# dirs = "5.0"
+# assert_cmd = "2.1"
+# predicates = "3.1"
 
 [features]
-default = ["colored-output"]
-colored-output = []
+default = []
+# Enable colored error output (enabled by default via colored crate)
+colored-output = ["colored"]
 
-#[[bench]]
-#name = "benchmarks"
-#harness = false
+# Future features (not yet implemented)
+# repl-interface = ["rustyline", "dirs"]
+# async-execution = ["tokio"]
 
 [lib]
 name = "dynamic_cli"
 path = "src/lib.rs"
+doctest = true
+
+# Benchmark configuration (uncomment when benchmarks are implemented)
+# [[bench]]
+# name = "parser_benchmarks"
+# harness = false
+# required-features = []
+
+# Example configuration (uncomment when examples are implemented)
+# [[example]]
+# name = "simple_calculator"
+# path = "examples/simple_calculator.rs"
+# required-features = []
 
 # Configuration for documentation generation
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+targets = ["x86_64-unknown-linux-gnu"]
+
+# Profile optimizations
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "unpacked"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+debug = false
+panic = "abort"
+
+[profile.bench]
+inherits = "release"
+debug = true
