@@ -3,8 +3,39 @@
 //! Formats errors with coloring to improve readability
 //! in the terminal.
 
+#[cfg(feature = "colored-output")]
 use colored::*;
+
 use crate::error::{DynamicCliError, ConfigError, ParseError};
+
+/// Helper functions for conditional coloring
+#[cfg(feature = "colored-output")]
+mod color {
+    use colored::*;
+    
+    pub fn error(s: &str) -> String { s.red().bold().to_string() }
+    pub fn question(s: &str) -> String { s.yellow().bold().to_string() }
+    pub fn bullet(s: &str) -> String { s.cyan().to_string() }
+    pub fn suggestion(s: &str) -> String { s.green().to_string() }
+    pub fn info(s: &str) -> String { s.blue().bold().to_string() }
+    pub fn type_name(s: &str) -> String { s.cyan().to_string() }
+    pub fn arg_name(s: &str) -> String { s.yellow().to_string() }
+    pub fn value(s: &str) -> String { s.red().to_string() }
+    pub fn dimmed(s: &str) -> String { s.dimmed().to_string() }
+}
+
+#[cfg(not(feature = "colored-output"))]
+mod color {
+    pub fn error(s: &str) -> String { s.to_string() }
+    pub fn question(s: &str) -> String { s.to_string() }
+    pub fn bullet(s: &str) -> String { s.to_string() }
+    pub fn suggestion(s: &str) -> String { s.to_string() }
+    pub fn info(s: &str) -> String { s.to_string() }
+    pub fn type_name(s: &str) -> String { s.to_string() }
+    pub fn arg_name(s: &str) -> String { s.to_string() }
+    pub fn value(s: &str) -> String { s.to_string() }
+    pub fn dimmed(s: &str) -> String { s.to_string() }
+}
 
 /// Display an error in a user-friendly way to the terminal
 ///
@@ -37,7 +68,7 @@ pub fn display_error(error: &DynamicCliError) {
 ///
 /// # Returns
 ///
-/// Formatted string with ANSI color codes
+/// Formatted string with ANSI color codes (if colored-output feature is enabled)
 ///
 /// # Example
 ///
@@ -55,8 +86,8 @@ pub fn display_error(error: &DynamicCliError) {
 pub fn format_error(error: &DynamicCliError) -> String {
     let mut output = String::new();
     
-    // Error header in bold red
-    output.push_str(&format!("{} ", "Error:".red().bold()));
+    // Error header (colored if feature enabled)
+    output.push_str(&format!("{} ", color::error("Error:")));
     
     // Format according to error type
     match error {
@@ -95,26 +126,26 @@ fn format_parse_error(output: &mut String, error: &ParseError) {
     // Add suggestions if available
     match error {
         ParseError::UnknownCommand { suggestions, .. } if !suggestions.is_empty() => {
-            output.push_str(&format!("\n{} Did you mean:\n", "?".yellow().bold()));
+            output.push_str(&format!("\n{} Did you mean:\n", color::question("?")));
             for suggestion in suggestions {
-                output.push_str(&format!("  {} {}\n", "•".cyan(), suggestion.green()));
+                output.push_str(&format!("  {} {}\n", color::bullet("•"), color::suggestion(suggestion)));
             }
         }
         
         ParseError::UnknownOption { suggestions, .. } if !suggestions.is_empty() => {
-            output.push_str(&format!("\n{} Did you mean:\n", "?".yellow().bold()));
+            output.push_str(&format!("\n{} Did you mean:\n", color::question("?")));
             for suggestion in suggestions {
-                output.push_str(&format!("  {} {}\n", "•".cyan(), suggestion.green()));
+                output.push_str(&format!("  {} {}\n", color::bullet("•"), color::suggestion(suggestion)));
             }
         }
         
         ParseError::TypeParseError { arg_name, expected_type, value, .. } => {
             output.push_str(&format!(
                 "\n{} Expected type {} for argument {}, got: {}\n",
-                "ℹ".blue().bold(),
-                expected_type.cyan(),
-                arg_name.yellow(),
-                value.red()
+                color::info("ℹ"),
+                color::type_name(expected_type),
+                color::arg_name(arg_name),
+                color::value(value)
             ));
         }
         
@@ -130,9 +161,9 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
             if let (Some(l), Some(c)) = (line, column) {
                 output.push_str(&format!(
                     "  {} line {}, column {}\n",
-                    "at".dimmed(),
-                    l.to_string().yellow(),
-                    c.to_string().yellow()
+                    color::dimmed("at"),
+                    color::arg_name(&l.to_string()),
+                    color::arg_name(&c.to_string())
                 ));
             }
         }
@@ -141,9 +172,9 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
             output.push_str(&format!("{}\n", source));
             output.push_str(&format!(
                 "  {} line {}, column {}\n",
-                "at".dimmed(),
-                line.to_string().yellow(),
-                column.to_string().yellow()
+                color::dimmed("at"),
+                color::arg_name(&line.to_string()),
+                color::arg_name(&column.to_string())
             ));
         }
         
@@ -152,8 +183,8 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
             if let Some(p) = path {
                 output.push_str(&format!(
                     "  {} {}\n",
-                    "in".dimmed(),
-                    p.cyan()
+                    color::dimmed("in"),
+                    color::type_name(p)
                 ));
             }
         }

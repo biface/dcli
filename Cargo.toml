@@ -6,9 +6,9 @@ authors = ["Dynamic CLI Contributors"]
 license = "MIT OR Apache-2.0"
 description = "A framework for building configurable CLI and REPL applications from YAML/JSON configuration files"
 readme = "README.md"
-repository = "https://github.com/biface/dcli"
+repository = "https://github.com/yourusername/dynamic-cli"
 documentation = "https://docs.rs/dynamic-cli"
-# homepage = "https://github.com/biface/dcli"
+homepage = "https://github.com/yourusername/dynamic-cli"
 keywords = ["cli", "repl", "command", "yaml", "configuration"]
 categories = ["command-line-interface", "command-line-utilities", "config"]
 rust-version = "1.70"
@@ -31,7 +31,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # Terminal coloring and formatting
-colored = "3.0"
+colored = { version = "3.0", optional = true }
 
 [dev-dependencies]
 # Testing utilities
@@ -45,8 +45,8 @@ criterion = { version = "0.8", features = ["html_reports"] }
 # predicates = "3.1"
 
 [features]
-default = []
-# Enable colored error output (enabled by default via colored crate)
+default = ["colored-output"]
+# Enable colored error output
 colored-output = ["colored"]
 
 # Future features (not yet implemented)
