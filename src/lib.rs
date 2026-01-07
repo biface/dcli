@@ -76,8 +76,7 @@
 //!
 //! ## Module Status
 //!
-//! - ✅ Complete: error, config, context, executor, registry, parser, validator
-//! - 🚧 In Development: interface, builder
+//! - ✅ Complete: error, config, context, executor, registry, parser, validator, interface, builder
 //! - 📋 Planned: utils, examples
 //!
 //! ## Examples
@@ -96,15 +95,7 @@ pub mod registry;
 pub mod parser;
 pub mod validator;
 pub mod interface;
-
-// ============================================================================
-// MODULES IN DEVELOPMENT (Not yet available)
-// ============================================================================
-
-// Will be added in future sessions:
-// pub mod interface;  // Session 7 - CLI and REPL interfaces
-// pub mod builder;    // Session 8 - Builder API
-// pub mod utils;      // Session 9 - Utility functions
+pub mod builder;
 
 // ============================================================================
 // PUBLIC RE-EXPORTS (For convenience)
@@ -139,6 +130,9 @@ pub use validator::{validate_file_exists, validate_file_extension, validate_rang
 
 // Interface types
 pub use interface::{CliInterface, ReplInterface};
+
+// Builder types
+pub use builder::{CliBuilder, CliApp};
 
 // ============================================================================
 // PRELUDE MODULE (Quick imports)
@@ -187,6 +181,9 @@ pub mod prelude {
 
     // Interface
     pub use crate::interface::{CliInterface, ReplInterface};
+
+    // Builder
+    pub use crate::builder::{CliBuilder, CliApp};
 }
 
 // ============================================================================
