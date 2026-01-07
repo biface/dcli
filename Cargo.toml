@@ -33,14 +33,18 @@ anyhow = "1.0"
 # Terminal coloring and formatting
 colored = { version = "3.0", optional = true }
 
+# REPL interface (Session 7 - NOW ACTIVE)
+rustyline = "14.0"
+
+# System utilities
+dirs = "5.0"
+
 [dev-dependencies]
 # Testing utilities
 tempfile = "3.13"
 criterion = { version = "0.8", features = ["html_reports"] }
 
-# Optional: Uncomment when interface module is implemented
-# rustyline = "14.0"
-# dirs = "5.0"
+# CLI testing (for future use when binary is created)
 # assert_cmd = "2.1"
 # predicates = "3.1"
 
@@ -50,7 +54,6 @@ default = ["colored-output"]
 colored-output = ["colored"]
 
 # Future features (not yet implemented)
-# repl-interface = ["rustyline", "dirs"]
 # async-execution = ["tokio"]
 
 [lib]

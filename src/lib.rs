@@ -95,6 +95,7 @@ pub mod executor;
 pub mod registry;
 pub mod parser;
 pub mod validator;
+pub mod interface;
 
 // ============================================================================
 // MODULES IN DEVELOPMENT (Not yet available)
@@ -135,6 +136,9 @@ pub use parser::{CliParser, ParsedCommand, ReplParser};
 
 // Validator functions
 pub use validator::{validate_file_exists, validate_file_extension, validate_range};
+
+// Interface types
+pub use interface::{CliInterface, ReplInterface};
 
 // ============================================================================
 // PRELUDE MODULE (Quick imports)
@@ -180,6 +184,9 @@ pub mod prelude {
 
     // Validation
     pub use crate::validator::{validate_file_exists, validate_file_extension, validate_range};
+
+    // Interface
+    pub use crate::interface::{CliInterface, ReplInterface};
 }
 
 // ============================================================================
