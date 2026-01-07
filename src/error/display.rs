@@ -3,9 +3,6 @@
 //! Formats errors with coloring to improve readability
 //! in the terminal.
 
-#[cfg(feature = "colored-output")]
-use colored::*;
-
 use crate::error::{DynamicCliError, ConfigError, ParseError};
 
 /// Helper functions for conditional coloring
