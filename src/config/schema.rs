@@ -34,10 +34,10 @@ use serde::{Deserialize, Serialize};
 pub struct CommandsConfig {
     /// Metadata about the application interface
     pub metadata: Metadata,
-    
+
     /// List of all available commands
     pub commands: Vec<CommandDefinition>,
-    
+
     /// Global options available to all commands
     #[serde(default)]
     pub global_options: Vec<OptionDefinition>,
@@ -57,12 +57,12 @@ pub struct CommandsConfig {
 pub struct Metadata {
     /// Application version (e.g., "1.0.0")
     pub version: String,
-    
+
     /// Prompt prefix displayed in REPL mode
-    /// 
+    ///
     /// Example: "chrom-rs" will display as "chrom-rs > "
     pub prompt: String,
-    
+
     /// Prompt suffix (typically " > " or ": ")
     #[serde(default = "default_prompt_suffix")]
     pub prompt_suffix: String,
@@ -100,28 +100,28 @@ fn default_prompt_suffix() -> String {
 pub struct CommandDefinition {
     /// Command name (used for invocation)
     pub name: String,
-    
+
     /// Alternative names for the command
     #[serde(default)]
     pub aliases: Vec<String>,
-    
+
     /// Human-readable description for help text
     pub description: String,
-    
+
     /// Whether this command is required to be implemented
-    /// 
+    ///
     /// If true, the application will fail to start if no handler is registered.
     #[serde(default)]
     pub required: bool,
-    
+
     /// Positional arguments
     #[serde(default)]
     pub arguments: Vec<ArgumentDefinition>,
-    
+
     /// Named options (flags)
     #[serde(default)]
     pub options: Vec<OptionDefinition>,
-    
+
     /// Name of the handler implementation
     ///
     /// This string is used to match the command with its
@@ -149,16 +149,16 @@ pub struct CommandDefinition {
 pub struct ArgumentDefinition {
     /// Argument name (used in error messages and documentation)
     pub name: String,
-    
+
     /// Expected type of the argument
     pub arg_type: ArgumentType,
-    
+
     /// Whether the argument is mandatory
     pub required: bool,
-    
+
     /// Human-readable description
     pub description: String,
-    
+
     /// Validation rules to apply
     #[serde(default)]
     pub validation: Vec<ValidationRule>,
@@ -185,26 +185,26 @@ pub struct ArgumentDefinition {
 pub struct OptionDefinition {
     /// Option name (internal identifier)
     pub name: String,
-    
+
     /// Short form (single character, e.g., "o" for -o)
     pub short: Option<String>,
-    
+
     /// Long form (e.g., "output" for --output)
     pub long: Option<String>,
-    
+
     /// Expected type of the option value
     pub option_type: ArgumentType,
-    
+
     /// Whether this option is mandatory
     #[serde(default)]
     pub required: bool,
-    
+
     /// Default value if not specified
     pub default: Option<String>,
-    
+
     /// Human-readable description
     pub description: String,
-    
+
     /// Restricted set of allowed values
     ///
     /// If non-empty, the value must be one of these choices.
@@ -230,16 +230,16 @@ pub struct OptionDefinition {
 pub enum ArgumentType {
     /// UTF-8 string
     String,
-    
+
     /// Signed integer (i64)
     Integer,
-    
+
     /// Floating-point number (f64)
     Float,
-    
+
     /// Boolean value (true/false, yes/no, 1/0)
     Bool,
-    
+
     /// File system path
     ///
     /// Represents a path that may or may not exist,
@@ -299,28 +299,21 @@ impl ArgumentType {
 #[serde(untagged)]
 pub enum ValidationRule {
     /// Require that a path exists on the file system
-    MustExist {
-        must_exist: bool,
-    },
-    
+    MustExist { must_exist: bool },
+
     /// Restrict file extensions (for path arguments)
     ///
     /// Extensions should be specified without the leading dot.
     /// Example: `["yaml", "yml"]` matches "config.yaml" and "data.yml"
-    Extensions {
-        extensions: Vec<String>,
-    },
-    
+    Extensions { extensions: Vec<String> },
+
     /// Enforce numeric range constraints
     ///
     /// Either or both bounds can be specified:
     /// - `min: Some(0.0), max: None` → x ≥ 0
     /// - `min: None, max: Some(100.0)` → x ≤ 100
     /// - `min: Some(0.0), max: Some(100.0)` → 0 ≤ x ≤ 100
-    Range {
-        min: Option<f64>,
-        max: Option<f64>,
-    },
+    Range { min: Option<f64>, max: Option<f64> },
 }
 
 impl CommandsConfig {
@@ -372,7 +365,7 @@ mod tests {
     #[test]
     fn test_minimal_config() {
         let config = CommandsConfig::minimal();
-        
+
         assert_eq!(config.metadata.version, "0.1.0");
         assert_eq!(config.metadata.prompt, "test");
         assert_eq!(config.metadata.prompt_suffix, " > ");
@@ -386,13 +379,13 @@ mod tests {
         let yaml = r#"
             type: string
         "#;
-        
+
         #[derive(Deserialize)]
         struct TestStruct {
             #[serde(rename = "type")]
             type_field: ArgumentType,
         }
-        
+
         let result: TestStruct = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(result.type_field, ArgumentType::String);
     }
@@ -404,9 +397,9 @@ mod tests {
             prompt: "myapp"
             prompt_suffix: " $ "
         "#;
-        
+
         let metadata: Metadata = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(metadata.version, "1.0.0");
         assert_eq!(metadata.prompt, "myapp");
         assert_eq!(metadata.prompt_suffix, " $ ");
@@ -419,9 +412,9 @@ mod tests {
             version: "1.0.0"
             prompt: "myapp"
         "#;
-        
+
         let metadata: Metadata = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(metadata.prompt_suffix, " > ");
     }
 
@@ -436,9 +429,9 @@ mod tests {
             options: []
             implementation: "test_handler"
         "#;
-        
+
         let cmd: CommandDefinition = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(cmd.name, "test_cmd");
         assert_eq!(cmd.aliases, vec!["tc", "test"]);
         assert_eq!(cmd.description, "A test command");
@@ -457,9 +450,9 @@ mod tests {
               - must_exist: true
               - extensions: [yaml, yml]
         "#;
-        
+
         let arg: ArgumentDefinition = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(arg.name, "input_file");
         assert_eq!(arg.arg_type, ArgumentType::Path);
         assert!(arg.required);
@@ -479,9 +472,9 @@ mod tests {
             description: "Output file"
             choices: []
         "#;
-        
+
         let opt: OptionDefinition = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(opt.name, "output");
         assert_eq!(opt.short, Some("o".to_string()));
         assert_eq!(opt.long, Some("output".to_string()));
@@ -495,9 +488,9 @@ mod tests {
         let yaml = r#"
             must_exist: true
         "#;
-        
+
         let rule: ValidationRule = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(rule, ValidationRule::MustExist { must_exist: true });
     }
 
@@ -506,9 +499,9 @@ mod tests {
         let yaml = r#"
             extensions: [yaml, yml, json]
         "#;
-        
+
         let rule: ValidationRule = serde_yaml::from_str(yaml).unwrap();
-        
+
         match rule {
             ValidationRule::Extensions { extensions } => {
                 assert_eq!(extensions, vec!["yaml", "yml", "json"]);
@@ -523,9 +516,9 @@ mod tests {
             min: 0.0
             max: 100.0
         "#;
-        
+
         let rule: ValidationRule = serde_yaml::from_str(yaml).unwrap();
-        
+
         match rule {
             ValidationRule::Range { min, max } => {
                 assert_eq!(min, Some(0.0));
@@ -552,9 +545,9 @@ mod tests {
                 implementation: "hello_handler"
             global_options: []
         "#;
-        
+
         let config: CommandsConfig = serde_yaml::from_str(yaml).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.commands.len(), 1);
         assert_eq!(config.commands[0].name, "hello");
@@ -568,26 +561,24 @@ mod tests {
                 prompt: "test".to_string(),
                 prompt_suffix: " > ".to_string(),
             },
-            commands: vec![
-                CommandDefinition {
-                    name: "cmd1".to_string(),
-                    aliases: vec!["c1".to_string()],
-                    description: "Test command".to_string(),
-                    required: true,
-                    arguments: vec![],
-                    options: vec![],
-                    implementation: "handler1".to_string(),
-                }
-            ],
+            commands: vec![CommandDefinition {
+                name: "cmd1".to_string(),
+                aliases: vec!["c1".to_string()],
+                description: "Test command".to_string(),
+                required: true,
+                arguments: vec![],
+                options: vec![],
+                implementation: "handler1".to_string(),
+            }],
             global_options: vec![],
         };
-        
+
         // Serialize to YAML
         let yaml = serde_yaml::to_string(&original).unwrap();
-        
+
         // Deserialize back
         let deserialized: CommandsConfig = serde_yaml::from_str(&yaml).unwrap();
-        
+
         assert_eq!(original, deserialized);
     }
 
@@ -604,9 +595,9 @@ mod tests {
             "global_options": []
         }
         "#;
-        
+
         let config: CommandsConfig = serde_json::from_str(json).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.commands.len(), 0);
     }

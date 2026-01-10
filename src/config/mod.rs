@@ -82,8 +82,8 @@
 //! ```
 
 // Public submodules
-pub mod schema;
 pub mod loader;
+pub mod schema;
 pub mod validator;
 
 // Re-export commonly used types and functions for convenience
@@ -165,13 +165,13 @@ global_options:
     description: "Configuration file"
     choices: []
         "#;
-        
+
         // Load the configuration
         let config = load_yaml(yaml).unwrap();
-        
+
         // Validate it
         validate_config(&config).unwrap();
-        
+
         // Verify structure
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.commands.len(), 2);
@@ -207,10 +207,10 @@ commands:
 
 global_options: []
         "#;
-        
+
         let config = load_yaml(yaml).unwrap();
         let result = validate_config(&config);
-        
+
         // Should fail due to duplicate command name
         assert!(result.is_err());
     }
@@ -252,12 +252,15 @@ global_options: []
   "global_options": []
 }
         "#;
-        
+
         let config = load_json(json).unwrap();
         validate_config(&config).unwrap();
-        
+
         assert_eq!(config.metadata.version, "2.0.0");
-        assert_eq!(config.commands[0].arguments[0].arg_type, ArgumentType::Integer);
+        assert_eq!(
+            config.commands[0].arguments[0].arg_type,
+            ArgumentType::Integer
+        );
     }
 
     /// Test re-exported types are accessible
@@ -267,7 +270,7 @@ global_options: []
         // from the module root
         let _config = CommandsConfig::minimal();
         let _arg_type = ArgumentType::String;
-        
+
         // If this compiles, re-exports are working
     }
 
@@ -312,12 +315,12 @@ commands:
 
 global_options: []
         "#;
-        
+
         let config = load_yaml(yaml).unwrap();
         let result = validate_config(&config);
-        
+
         assert!(result.is_ok());
-        
+
         // Verify validation rules were parsed correctly
         let cmd = &config.commands[0];
         assert_eq!(cmd.arguments[0].validation.len(), 2);
@@ -328,12 +331,12 @@ global_options: []
     #[test]
     fn test_integration_error_messages() {
         // Test various error conditions to ensure error messages are helpful
-        
+
         // 1. Invalid YAML syntax
         let bad_yaml = "metadata:\n  version: [unclosed";
         let result = load_yaml(bad_yaml);
         assert!(result.is_err());
-        
+
         // 2. Type mismatch in validation rules
         let yaml_type_error = r#"
 metadata:
@@ -355,7 +358,7 @@ commands:
     implementation: "handler"
 global_options: []
         "#;
-        
+
         let config = load_yaml(yaml_type_error).unwrap();
         let result = validate_config(&config);
         assert!(result.is_err());

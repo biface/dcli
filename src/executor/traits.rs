@@ -89,6 +89,7 @@ use std::collections::HashMap;
 ///
 /// ```
 /// use std::collections::HashMap;
+/// use dynamic_cli::error::ExecutionError;
 /// use dynamic_cli::executor::CommandHandler;
 /// use dynamic_cli::context::ExecutionContext;
 /// use dynamic_cli::Result;
@@ -102,7 +103,11 @@ use std::collections::HashMap;
 ///         args: &HashMap<String, String>,
 ///     ) -> Result<()> {
 ///         let name = args.get("name")
-///             .ok_or_else(|| anyhow::anyhow!("Missing 'name' argument"))?;
+///             .ok_or_else(|| {
+///                 ExecutionError::CommandFailed(
+///                     anyhow::anyhow!("Missing 'name' argument")
+///              )
+///          })?;
 ///         
 ///         let greeting = if let Some(formal) = args.get("formal") {
 ///             if formal == "true" {
@@ -122,7 +127,9 @@ use std::collections::HashMap;
 ///         // Custom validation: name must not be empty
 ///         if let Some(name) = args.get("name") {
 ///             if name.trim().is_empty() {
-///                 return Err(anyhow::anyhow!("Name cannot be empty").into());
+///                 return Err(ExecutionError::CommandFailed(
+///                         anyhow::anyhow!("Name cannot be empty")
+///                 ).into());
 ///             }
 ///         }
 ///         Ok(())
@@ -167,6 +174,7 @@ pub trait CommandHandler: Send + Sync {
     ///
     /// ```
     /// # use std::collections::HashMap;
+    /// # use dynamic_cli::error::ExecutionError;
     /// # use dynamic_cli::executor::CommandHandler;
     /// # use dynamic_cli::context::ExecutionContext;
     /// # use dynamic_cli::Result;
@@ -180,11 +188,17 @@ pub trait CommandHandler: Send + Sync {
     ///         args: &HashMap<String, String>,
     ///     ) -> Result<()> {
     ///         let path = args.get("path")
-    ///             .ok_or_else(|| anyhow::anyhow!("Missing path argument"))?;
+    ///             .ok_or_else(|| {
+    ///                ExecutionError::CommandFailed(
+    ///                       anyhow::anyhow!("Missing path argument")
+    ///             )
+    ///          })?;
     ///         
     ///         // Perform the actual work
     ///         let content = std::fs::read_to_string(path)
-    ///             .map_err(|e| anyhow::anyhow!("Failed to read file: {}", e))?;
+    ///             .map_err(|e| {
+    ///                ExecutionError::CommandFailed(anyhow::anyhow!("Failed to read file: {}", e))
+    ///         })?;
     ///         
     ///         println!("File contains {} bytes", content.len());
     ///         Ok(())
@@ -223,6 +237,7 @@ pub trait CommandHandler: Send + Sync {
     /// # use std::collections::HashMap;
     /// # use dynamic_cli::executor::CommandHandler;
     /// # use dynamic_cli::context::ExecutionContext;
+    /// # use dynamic_cli::error::ExecutionError;
     /// # use dynamic_cli::Result;
     /// #
     /// struct RangeCommand;
@@ -241,12 +256,14 @@ pub trait CommandHandler: Send + Sync {
     ///         // Custom validation: ensure min < max
     ///         if let (Some(min), Some(max)) = (args.get("min"), args.get("max")) {
     ///             let min_val: f64 = min.parse()
-    ///                 .map_err(|_| anyhow::anyhow!("Invalid min value"))?;
+    ///                 .map_err(|_| {
+    ///                     ExecutionError::CommandFailed(anyhow::anyhow!("Invalid min value"))
+    ///             })?;
     ///             let max_val: f64 = max.parse()
-    ///                 .map_err(|_| anyhow::anyhow!("Invalid max value"))?;
+    ///                 .map_err(|_| {ExecutionError::CommandFailed(anyhow::anyhow!("Invalid max value"))})?;
     ///             
     ///             if min_val >= max_val {
-    ///                 return Err(anyhow::anyhow!("min must be less than max").into());
+    ///                 return Err(ExecutionError::CommandFailed(anyhow::anyhow!("min must be less than max")).into());
     ///             }
     ///         }
     ///         Ok(())
@@ -294,10 +311,9 @@ mod tests {
             context: &mut dyn ExecutionContext,
             args: &HashMap<String, String>,
         ) -> Result<()> {
-            let ctx = crate::context::downcast_mut::<TestContext>(context)
-                .ok_or_else(|| ExecutionError::CommandFailed(
-                    anyhow::anyhow!("Wrong context type")
-                ))?;
+            let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
+                ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+            })?;
 
             let name = args.get("name").map(|s| s.as_str()).unwrap_or("World");
             ctx.state = format!("Hello, {}!", name);
@@ -320,21 +336,20 @@ mod tests {
         fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
             // Require "count" argument to be present and > 0
             if let Some(count) = args.get("count") {
-                let count_val: i32 = count
-                    .parse()
-                    .map_err(|_| ExecutionError::CommandFailed(
-                        anyhow::anyhow!("count must be an integer")
-                    ))?;
+                let count_val: i32 = count.parse().map_err(|_| {
+                    ExecutionError::CommandFailed(anyhow::anyhow!("count must be an integer"))
+                })?;
 
                 if count_val <= 0 {
-                    return Err(ExecutionError::CommandFailed(
-                        anyhow::anyhow!("count must be positive")
-                    ).into());
+                    return Err(ExecutionError::CommandFailed(anyhow::anyhow!(
+                        "count must be positive"
+                    ))
+                    .into());
                 }
             } else {
-                return Err(ExecutionError::CommandFailed(
-                    anyhow::anyhow!("count is required")
-                ).into());
+                return Err(
+                    ExecutionError::CommandFailed(anyhow::anyhow!("count is required")).into(),
+                );
             }
             Ok(())
         }
@@ -349,9 +364,7 @@ mod tests {
             _context: &mut dyn ExecutionContext,
             _args: &HashMap<String, String>,
         ) -> Result<()> {
-            Err(ExecutionError::CommandFailed(
-                anyhow::anyhow!("Simulated failure")
-            ).into())
+            Err(ExecutionError::CommandFailed(anyhow::anyhow!("Simulated failure")).into())
         }
     }
 
@@ -364,10 +377,9 @@ mod tests {
             context: &mut dyn ExecutionContext,
             args: &HashMap<String, String>,
         ) -> Result<()> {
-            let ctx = crate::context::downcast_mut::<TestContext>(context)
-                .ok_or_else(|| ExecutionError::CommandFailed(
-                    anyhow::anyhow!("Wrong context type")
-                ))?;
+            let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
+                ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+            })?;
 
             let value = args.get("value").map(|s| s.as_str()).unwrap_or("default");
             ctx.state.push_str(value);
@@ -582,10 +594,8 @@ mod tests {
     #[test]
     fn test_multiple_trait_objects() {
         // Store multiple handlers as trait objects
-        let handlers: Vec<Box<dyn CommandHandler>> = vec![
-            Box::new(HelloCommand),
-            Box::new(StatefulCommand),
-        ];
+        let handlers: Vec<Box<dyn CommandHandler>> =
+            vec![Box::new(HelloCommand), Box::new(StatefulCommand)];
 
         let mut context = TestContext::default();
 
@@ -725,11 +735,11 @@ mod tests {
     // (This is a documentation test, not an actual test that runs)
     /// ```compile_fail
     /// use dynamic_cli::executor::CommandHandler;
-    /// 
+    ///
     /// trait BrokenHandler: CommandHandler {
     ///     fn generic_method<T>(&self, value: T);
     /// }
-    /// 
+    ///
     /// // This would fail because trait objects can't have generic methods
     /// fn use_as_trait_object(handler: &dyn BrokenHandler) {
     ///     // Cannot call generic_method on trait object

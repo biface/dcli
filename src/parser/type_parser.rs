@@ -77,25 +77,25 @@ pub fn parse_value(value: &str, arg_type: ArgumentType) -> Result<String> {
             // String is always valid
             Ok(value.to_string())
         }
-        
+
         ArgumentType::Integer => {
             // Try to parse as i64
             parse_integer(value)?;
             Ok(value.to_string())
         }
-        
+
         ArgumentType::Float => {
             // Try to parse as f64
             parse_float(value)?;
             Ok(value.to_string())
         }
-        
+
         ArgumentType::Bool => {
             // Try to parse as boolean
             parse_bool(value)?;
             Ok(value.to_string())
         }
-        
+
         ArgumentType::Path => {
             // Try to parse as PathBuf
             parse_path(value)?;
@@ -131,7 +131,7 @@ pub fn parse_value(value: &str, arg_type: ArgumentType) -> Result<String> {
 ///
 /// assert_eq!(parse_integer("42").unwrap(), 42);
 /// assert_eq!(parse_integer("-123").unwrap(), -123);
-/// assert_eq!(parse_integer("1_000").unwrap(), 1000);
+/// assert_eq!(parse_integer("1000").unwrap(), 1000);
 ///
 /// // These will fail
 /// assert!(parse_integer("abc").is_err());
@@ -241,14 +241,14 @@ pub fn parse_float(value: &str) -> Result<f64> {
 /// ```
 pub fn parse_bool(value: &str) -> Result<bool> {
     let normalized = value.trim().to_lowercase();
-    
+
     match normalized.as_str() {
         // True values
         "true" | "yes" | "y" | "1" | "on" => Ok(true),
-        
+
         // False values
         "false" | "no" | "n" | "0" | "off" => Ok(false),
-        
+
         // Invalid value
         _ => Err(ParseError::TypeParseError {
             arg_name: "value".to_string(),
@@ -296,7 +296,7 @@ pub fn parse_path(value: &str) -> Result<PathBuf> {
     // PathBuf::from() is very permissive - it accepts almost any string
     // More strict validation (existence, permissions) is done by the validator module
     let path = PathBuf::from(value);
-    
+
     // We could add more validation here if needed, but for now
     // we trust that PathBuf::from() will handle platform-specific rules
     Ok(path)
@@ -314,7 +314,7 @@ mod tests {
     fn test_parse_value_string() {
         let result = parse_value("hello world", ArgumentType::String).unwrap();
         assert_eq!(result, "hello world");
-        
+
         // Empty string is valid
         let result = parse_value("", ArgumentType::String).unwrap();
         assert_eq!(result, "");
@@ -542,7 +542,12 @@ mod tests {
 
         for (value, arg_type) in test_cases {
             let result = parse_value(value, arg_type);
-            assert!(result.is_ok(), "Failed to parse '{}' as {:?}", value, arg_type);
+            assert!(
+                result.is_ok(),
+                "Failed to parse '{}' as {:?}",
+                value,
+                arg_type
+            );
             assert_eq!(result.unwrap(), value);
         }
     }
@@ -552,7 +557,7 @@ mod tests {
         // Verify that error messages are helpful
         let result = parse_integer("not_a_number");
         assert!(result.is_err());
-        
+
         let error = result.unwrap_err();
         let error_msg = format!("{}", error);
         assert!(error_msg.contains("integer"));

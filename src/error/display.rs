@@ -3,35 +3,71 @@
 //! Formats errors with coloring to improve readability
 //! in the terminal.
 
-use crate::error::{DynamicCliError, ConfigError, ParseError};
+use crate::error::{ConfigError, DynamicCliError, ParseError};
 
 /// Helper functions for conditional coloring
 #[cfg(feature = "colored-output")]
 mod color {
     use colored::*;
-    
-    pub fn error(s: &str) -> String { s.red().bold().to_string() }
-    pub fn question(s: &str) -> String { s.yellow().bold().to_string() }
-    pub fn bullet(s: &str) -> String { s.cyan().to_string() }
-    pub fn suggestion(s: &str) -> String { s.green().to_string() }
-    pub fn info(s: &str) -> String { s.blue().bold().to_string() }
-    pub fn type_name(s: &str) -> String { s.cyan().to_string() }
-    pub fn arg_name(s: &str) -> String { s.yellow().to_string() }
-    pub fn value(s: &str) -> String { s.red().to_string() }
-    pub fn dimmed(s: &str) -> String { s.dimmed().to_string() }
+
+    pub fn error(s: &str) -> String {
+        s.red().bold().to_string()
+    }
+    pub fn question(s: &str) -> String {
+        s.yellow().bold().to_string()
+    }
+    pub fn bullet(s: &str) -> String {
+        s.cyan().to_string()
+    }
+    pub fn suggestion(s: &str) -> String {
+        s.green().to_string()
+    }
+    pub fn info(s: &str) -> String {
+        s.blue().bold().to_string()
+    }
+    pub fn type_name(s: &str) -> String {
+        s.cyan().to_string()
+    }
+    pub fn arg_name(s: &str) -> String {
+        s.yellow().to_string()
+    }
+    pub fn value(s: &str) -> String {
+        s.red().to_string()
+    }
+    pub fn dimmed(s: &str) -> String {
+        s.dimmed().to_string()
+    }
 }
 
 #[cfg(not(feature = "colored-output"))]
 mod color {
-    pub fn error(s: &str) -> String { s.to_string() }
-    pub fn question(s: &str) -> String { s.to_string() }
-    pub fn bullet(s: &str) -> String { s.to_string() }
-    pub fn suggestion(s: &str) -> String { s.to_string() }
-    pub fn info(s: &str) -> String { s.to_string() }
-    pub fn type_name(s: &str) -> String { s.to_string() }
-    pub fn arg_name(s: &str) -> String { s.to_string() }
-    pub fn value(s: &str) -> String { s.to_string() }
-    pub fn dimmed(s: &str) -> String { s.to_string() }
+    pub fn error(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn question(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn bullet(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn suggestion(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn info(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn type_name(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn arg_name(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn value(s: &str) -> String {
+        s.to_string()
+    }
+    pub fn dimmed(s: &str) -> String {
+        s.to_string()
+    }
 }
 
 /// Display an error in a user-friendly way to the terminal
@@ -82,61 +118,74 @@ pub fn display_error(error: &DynamicCliError) {
 /// ```
 pub fn format_error(error: &DynamicCliError) -> String {
     let mut output = String::new();
-    
+
     // Error header (colored if feature enabled)
     output.push_str(&format!("{} ", color::error("Error:")));
-    
+
     // Format according to error type
     match error {
         DynamicCliError::Parse(e) => {
             format_parse_error(&mut output, e);
         }
-        
+
         DynamicCliError::Config(e) => {
             format_config_error(&mut output, e);
         }
-        
+
         DynamicCliError::Validation(e) => {
             output.push_str(&format!("{}\n", e));
         }
-        
+
         DynamicCliError::Execution(e) => {
             output.push_str(&format!("{}\n", e));
         }
-        
+
         DynamicCliError::Registry(e) => {
             output.push_str(&format!("{}\n", e));
         }
-        
+
         DynamicCliError::Io(e) => {
             output.push_str(&format!("{}\n", e));
         }
     }
-    
+
     output
 }
 
 /// Format a parsing error with suggestions
 fn format_parse_error(output: &mut String, error: &ParseError) {
     output.push_str(&format!("{}\n", error));
-    
+
     // Add suggestions if available
     match error {
         ParseError::UnknownCommand { suggestions, .. } if !suggestions.is_empty() => {
             output.push_str(&format!("\n{} Did you mean:\n", color::question("?")));
             for suggestion in suggestions {
-                output.push_str(&format!("  {} {}\n", color::bullet("•"), color::suggestion(suggestion)));
+                output.push_str(&format!(
+                    "  {} {}\n",
+                    color::bullet("•"),
+                    color::suggestion(suggestion)
+                ));
             }
         }
-        
+
         ParseError::UnknownOption { suggestions, .. } if !suggestions.is_empty() => {
             output.push_str(&format!("\n{} Did you mean:\n", color::question("?")));
             for suggestion in suggestions {
-                output.push_str(&format!("  {} {}\n", color::bullet("•"), color::suggestion(suggestion)));
+                output.push_str(&format!(
+                    "  {} {}\n",
+                    color::bullet("•"),
+                    color::suggestion(suggestion)
+                ));
             }
         }
-        
-        ParseError::TypeParseError { arg_name, expected_type, value, .. } => {
+
+        ParseError::TypeParseError {
+            arg_name,
+            expected_type,
+            value,
+            ..
+        } => {
             output.push_str(&format!(
                 "\n{} Expected type {} for argument {}, got: {}\n",
                 color::info("ℹ"),
@@ -145,7 +194,7 @@ fn format_parse_error(output: &mut String, error: &ParseError) {
                 color::value(value)
             ));
         }
-        
+
         _ => {}
     }
 }
@@ -153,7 +202,11 @@ fn format_parse_error(output: &mut String, error: &ParseError) {
 /// Format a configuration error with position
 fn format_config_error(output: &mut String, error: &ConfigError) {
     match error {
-        ConfigError::YamlParse { source, line, column } => {
+        ConfigError::YamlParse {
+            source,
+            line,
+            column,
+        } => {
             output.push_str(&format!("{}\n", source));
             if let (Some(l), Some(c)) = (line, column) {
                 output.push_str(&format!(
@@ -164,8 +217,12 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
                 ));
             }
         }
-        
-        ConfigError::JsonParse { source, line, column } => {
+
+        ConfigError::JsonParse {
+            source,
+            line,
+            column,
+        } => {
             output.push_str(&format!("{}\n", source));
             output.push_str(&format!(
                 "  {} line {}, column {}\n",
@@ -174,7 +231,7 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
                 color::arg_name(&column.to_string())
             ));
         }
-        
+
         ConfigError::InvalidSchema { reason, path } => {
             output.push_str(&format!("{}\n", reason));
             if let Some(p) = path {
@@ -185,7 +242,7 @@ fn format_config_error(output: &mut String, error: &ConfigError) {
                 ));
             }
         }
-        
+
         _ => {
             output.push_str(&format!("{}\n", error));
         }
@@ -201,10 +258,11 @@ mod tests {
     fn test_format_error_basic() {
         let error: DynamicCliError = ConfigError::FileNotFound {
             path: PathBuf::from("test.yaml"),
-        }.into();
-        
+        }
+        .into();
+
         let formatted = format_error(&error);
-        
+
         // Must contain "Error:" and the file path
         assert!(formatted.contains("Error:"));
         assert!(formatted.contains("test.yaml"));
@@ -215,14 +273,15 @@ mod tests {
         let error: DynamicCliError = ParseError::UnknownCommand {
             command: "simulat".to_string(),
             suggestions: vec!["simulate".to_string(), "validation".to_string()],
-        }.into();
-        
+        }
+        .into();
+
         let formatted = format_error(&error);
-        
+
         // Must contain the error message
         assert!(formatted.contains("Unknown command"));
         assert!(formatted.contains("simulat"));
-        
+
         // Must contain suggestions
         assert!(formatted.contains("Did you mean"));
         assert!(formatted.contains("simulate"));
@@ -233,14 +292,15 @@ mod tests {
         let error: DynamicCliError = ParseError::UnknownCommand {
             command: "xyz".to_string(),
             suggestions: vec![],
-        }.into();
-        
+        }
+        .into();
+
         let formatted = format_error(&error);
-        
+
         // Must contain the error message
         assert!(formatted.contains("Unknown command"));
         assert!(formatted.contains("xyz"));
-        
+
         // Must NOT contain suggestions
         assert!(!formatted.contains("Did you mean"));
     }
@@ -250,10 +310,10 @@ mod tests {
         let yaml_error = serde_yaml::from_str::<serde_yaml::Value>("invalid: [")
             .err()
             .unwrap();
-        
+
         let error: DynamicCliError = ConfigError::yaml_parse_with_location(yaml_error).into();
         let formatted = format_error(&error);
-        
+
         // Must contain position information
         assert!(formatted.contains("Error:"));
         // Exact position depends on serde_yaml implementation
@@ -264,8 +324,9 @@ mod tests {
         // Test that display_error doesn't panic (outputs to stderr)
         let error: DynamicCliError = ConfigError::FileNotFound {
             path: PathBuf::from("test.yaml"),
-        }.into();
-        
+        }
+        .into();
+
         // Should not panic
         display_error(&error);
     }

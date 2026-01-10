@@ -52,6 +52,7 @@
 //!
 //! ```
 //! use std::collections::HashMap;
+//! use dynamic_cli::error::ExecutionError;
 //! use dynamic_cli::executor::CommandHandler;
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
@@ -132,8 +133,10 @@
 //!
 //! ```
 //! use std::collections::HashMap;
+//! use dynamic_cli::error::ExecutionError;
 //! use dynamic_cli::executor::CommandHandler;
 //! use dynamic_cli::context::ExecutionContext;
+//! use dynamic_cli::DynamicCliError::Execution;
 //! use dynamic_cli::Result;
 //!
 //! struct DivideCommand;
@@ -143,20 +146,20 @@
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
 //!         args: &HashMap<String, String>,
-//!     ) -> Result<()> {
-//!         let a: f64 = args.get("numerator").unwrap().parse().unwrap();
-//!         let b: f64 = args.get("denominator").unwrap().parse().unwrap();
-//!         println!("Result: {}", a / b);
-//!         Ok(())
-//!     }
-//!     
-//!     fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
-//!         if let Some(denom) = args.get("denominator") {
-//!             let value: f64 = denom.parse()
-//!                 .map_err(|_| anyhow::anyhow!("Invalid denominator"))?;
-//!             if value == 0.0 {
-//!                 return Err(anyhow::anyhow!("Cannot divide by zero").into());
-//!             }
+//!     ) -> dynamic_cli::Result<()> {
+//!         let denom = args.get("denominator")
+//!             .ok_or_else(|| {
+//!                 ExecutionError::CommandFailed(
+//!                     anyhow::anyhow!("Missing Denominator"))})?;
+//!
+//!         let value: f64 = denom.parse()
+//!             .map_err(|_| {
+//!                 ExecutionError::CommandFailed(
+//!                     anyhow::anyhow!("Invalid Denominator"))})?;
+//!
+//!         if value == 0.0 {
+//!             return Err(ExecutionError::CommandFailed(
+//!                     anyhow::anyhow!("Cannot divide by zero")).into());
 //!         }
 //!         Ok(())
 //!     }
@@ -167,6 +170,7 @@
 //!
 //! ```
 //! use std::collections::HashMap;
+//! use dynamic_cli::error::ExecutionError;
 //! use dynamic_cli::executor::CommandHandler;
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
@@ -193,7 +197,7 @@
 //!             .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
 //!         
 //!         let filename = args.get("file")
-//!             .ok_or_else(|| anyhow::anyhow!("Missing file argument"))?;
+//!             .ok_or_else(|| { ExecutionError::CommandFailed(anyhow::anyhow!("Missing file argument"))})?;
 //!         
 //!         ctx.current_file = Some(filename.clone());
 //!         println!("Opened: {}", filename);
@@ -254,7 +258,7 @@
 //!         args: &HashMap<String, String>,
 //!     ) -> Result<()> {
 //!         let path = args.get("path")
-//!             .ok_or_else(|| anyhow::anyhow!("Missing path argument"))?;
+//!             .ok_or_else(|| { ExecutionError::CommandFailed(anyhow::anyhow!("Missing path argument"))})?;
 //!         
 //!         // Wrap application errors in ExecutionError
 //!         std::fs::read_to_string(path)
@@ -311,8 +315,10 @@ mod tests {
             context: &mut dyn ExecutionContext,
             args: &HashMap<String, String>,
         ) -> crate::error::Result<()> {
-            let ctx = crate::context::downcast_mut::<IntegrationContext>(context)
-                .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
+            let ctx =
+                crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
+                    ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+                })?;
 
             let message = args
                 .get("message")
@@ -332,8 +338,10 @@ mod tests {
             context: &mut dyn ExecutionContext,
             args: &HashMap<String, String>,
         ) -> crate::error::Result<()> {
-            let ctx = crate::context::downcast_mut::<IntegrationContext>(context)
-                .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
+            let ctx =
+                crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
+                    ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+                })?;
 
             if let (Some(key), Some(value)) = (args.get("key"), args.get("value")) {
                 ctx.state.insert(key.clone(), value.clone());
@@ -351,8 +359,10 @@ mod tests {
             context: &mut dyn ExecutionContext,
             args: &HashMap<String, String>,
         ) -> crate::error::Result<()> {
-            let ctx = crate::context::downcast_mut::<IntegrationContext>(context)
-                .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
+            let ctx =
+                crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
+                    ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+                })?;
 
             if let Some(key) = args.get("key") {
                 if let Some(value) = ctx.state.get(key) {
@@ -439,8 +449,11 @@ mod tests {
     #[test]
     fn test_heterogeneous_handler_collection() {
         // Test storing different handler types in a collection
-        let handlers: Vec<Box<dyn CommandHandler>> =
-            vec![Box::new(LogCommand), Box::new(SetCommand), Box::new(GetCommand)];
+        let handlers: Vec<Box<dyn CommandHandler>> = vec![
+            Box::new(LogCommand),
+            Box::new(SetCommand),
+            Box::new(GetCommand),
+        ];
 
         // Verify we can store different handlers
         assert_eq!(handlers.len(), 3);
@@ -496,9 +509,7 @@ mod tests {
                 _context: &mut dyn ExecutionContext,
                 _args: &HashMap<String, String>,
             ) -> crate::error::Result<()> {
-                Err(ExecutionError::CommandFailed(
-                    anyhow::anyhow!("Intentional failure")
-                ).into())
+                Err(ExecutionError::CommandFailed(anyhow::anyhow!("Intentional failure")).into())
             }
         }
 
@@ -524,17 +535,19 @@ mod tests {
                 context: &mut dyn ExecutionContext,
                 _args: &HashMap<String, String>,
             ) -> crate::error::Result<()> {
-                let ctx = crate::context::downcast_mut::<IntegrationContext>(context)
-                    .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
+                let ctx = crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(
+                    || ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")),
+                )?;
                 ctx.log.push("executed".to_string());
                 Ok(())
             }
 
             fn validate(&self, args: &HashMap<String, String>) -> crate::error::Result<()> {
                 if !args.contains_key("required") {
-                    return Err(ExecutionError::CommandFailed(
-                        anyhow::anyhow!("Missing required argument")
-                    ).into());
+                    return Err(ExecutionError::CommandFailed(anyhow::anyhow!(
+                        "Missing required argument"
+                    ))
+                    .into());
                 }
                 Ok(())
             }
@@ -580,13 +593,11 @@ mod tests {
                 context: &mut dyn ExecutionContext,
                 args: &HashMap<String, String>,
             ) -> crate::error::Result<()> {
-                let ctx = crate::context::downcast_mut::<AppContext>(context)
-                    .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
+                let ctx = crate::context::downcast_mut::<AppContext>(context).ok_or_else(|| {
+                    ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+                })?;
 
-                let amount: i32 = args
-                    .get("amount")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(1);
+                let amount: i32 = args.get("amount").and_then(|s| s.parse().ok()).unwrap_or(1);
 
                 ctx.counter += amount;
                 Ok(())

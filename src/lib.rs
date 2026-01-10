@@ -37,7 +37,8 @@
 //!         _context: &mut dyn ExecutionContext,
 //!         args: &HashMap<String, String>,
 //!     ) -> dynamic_cli::Result<()> {
-//!         let name = args.get("name").unwrap_or(&"World".to_string());
+//!         let default_name = "World".to_string();
+//!         let name = args.get("name").unwrap_or(&default_name);
 //!         println!("Hello, {}!", name);
 //!         Ok(())
 //!     }
@@ -87,16 +88,16 @@
 // PUBLIC MODULES (Complete and ready to use)
 // ============================================================================
 
-pub mod error;
+pub mod builder;
 pub mod config;
 pub mod context;
+pub mod error;
 pub mod executor;
-pub mod registry;
-pub mod parser;
-pub mod validator;
 pub mod interface;
-pub mod builder;
+pub mod parser;
+pub mod registry;
 pub mod utils;
+pub mod validator;
 
 // ============================================================================
 // PUBLIC RE-EXPORTS (For convenience)
@@ -111,13 +112,8 @@ pub use error::{DynamicCliError, Result};
 
 // Configuration types
 pub use config::schema::{
-    ArgumentDefinition,
-    ArgumentType,
-    CommandDefinition,
-    CommandsConfig,
-    Metadata,
-    OptionDefinition,
-    ValidationRule,
+    ArgumentDefinition, ArgumentType, CommandDefinition, CommandsConfig, Metadata,
+    OptionDefinition, ValidationRule,
 };
 
 // Registry
@@ -133,14 +129,12 @@ pub use validator::{validate_file_exists, validate_file_extension, validate_rang
 pub use interface::{CliInterface, ReplInterface};
 
 // Builder types
-pub use builder::{CliBuilder, CliApp};
+pub use builder::{CliApp, CliBuilder};
 
 // Utility functions
 pub use utils::{
-    parse_int, parse_float, parse_bool, detect_type,
-    is_blank, normalize, truncate,
-    normalize_path, get_extension, has_extension,
-    format_bytes, format_duration,
+    detect_type, format_bytes, format_duration, get_extension, has_extension, is_blank, normalize,
+    normalize_path, parse_bool, parse_float, parse_int, truncate,
 };
 
 // ============================================================================
@@ -194,13 +188,10 @@ pub mod prelude {
     pub use crate::interface::{CliInterface, ReplInterface};
 
     // Builder
-    pub use crate::builder::{CliBuilder, CliApp};
-    
+    pub use crate::builder::{CliApp, CliBuilder};
+
     // Utilities (most commonly used)
-    pub use crate::utils::{
-        parse_int, parse_float, parse_bool, detect_type,
-        is_blank, normalize,
-    };
+    pub use crate::utils::{detect_type, is_blank, normalize, parse_bool, parse_float, parse_int};
 }
 
 // ============================================================================
@@ -225,8 +216,8 @@ mod tests {
     #[test]
     fn test_module_imports() {
         use crate::config::schema::CommandsConfig;
-        use crate::registry::CommandRegistry;
         use crate::parser::ParsedCommand;
+        use crate::registry::CommandRegistry;
 
         // If this compiles, module structure is correct
         let _config = CommandsConfig::minimal();

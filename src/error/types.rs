@@ -14,23 +14,23 @@ pub enum DynamicCliError {
     /// Errors related to the configuration file
     #[error(transparent)]
     Config(#[from] ConfigError),
-    
+
     /// Command parsing errors
     #[error(transparent)]
     Parse(#[from] ParseError),
-    
+
     /// Validation errors
     #[error(transparent)]
     Validation(#[from] ValidationError),
-    
+
     /// Execution errors
     #[error(transparent)]
     Execution(#[from] ExecutionError),
-    
+
     /// Registry errors
     #[error(transparent)]
     Registry(#[from] RegistryError),
-    
+
     /// I/O errors
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -59,18 +59,14 @@ pub enum ConfigError {
     /// };
     /// ```
     #[error("Configuration file not found: {path:?}")]
-    FileNotFound {
-        path: PathBuf,
-    },
-    
+    FileNotFound { path: PathBuf },
+
     /// Unsupported file extension
     ///
     /// Only `.yaml`, `.yml` and `.json` are supported.
     #[error("Unsupported file format: '{extension}'. Supported: .yaml, .yml, .json")]
-    UnsupportedFormat {
-        extension: String,
-    },
-    
+    UnsupportedFormat { extension: String },
+
     /// YAML parsing error
     #[error("Failed to parse YAML configuration at line {line:?}, column {column:?}: {source}")]
     YamlParse {
@@ -80,7 +76,7 @@ pub enum ConfigError {
         line: Option<usize>,
         column: Option<usize>,
     },
-    
+
     /// JSON parsing error
     #[error("Failed to parse JSON configuration at line {line}, column {column}: {source}")]
     JsonParse {
@@ -90,7 +86,7 @@ pub enum ConfigError {
         line: usize,
         column: usize,
     },
-    
+
     /// Invalid configuration schema
     ///
     /// The file structure doesn't match the expected format.
@@ -100,27 +96,20 @@ pub enum ConfigError {
         /// Path in the config (e.g., "commands[0].options[2].type")
         path: Option<String>,
     },
-    
+
     /// Duplicate command (same name or alias)
     #[error("Duplicate command name or alias: '{name}'")]
-    DuplicateCommand {
-        name: String,
-    },
-    
+    DuplicateCommand { name: String },
+
     /// Unknown argument type
     #[error("Unknown argument type: '{type_name}' in {context}")]
-    UnknownType {
-        type_name: String,
-        context: String,
-    },
-    
+    UnknownType { type_name: String, context: String },
+
     /// Inconsistent configuration
     ///
     /// For example, a default value that's not in the allowed choices.
     #[error("Configuration inconsistency: {details}")]
-    Inconsistency {
-        details: String,
-    },
+    Inconsistency { details: String },
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -143,21 +132,15 @@ pub enum ParseError {
         /// Similar command suggestions
         suggestions: Vec<String>,
     },
-    
+
     /// Missing required positional argument
     #[error("Missing required argument: {argument} for command '{command}'")]
-    MissingArgument {
-        argument: String,
-        command: String,
-    },
-    
+    MissingArgument { argument: String, command: String },
+
     /// Missing required option
     #[error("Missing required option: --{option} for command '{command}'")]
-    MissingOption {
-        option: String,
-        command: String,
-    },
-    
+    MissingOption { option: String, command: String },
+
     /// Too many positional arguments
     #[error("Too many arguments for command '{command}'. Expected {expected}, got {got}")]
     TooManyArguments {
@@ -165,7 +148,7 @@ pub enum ParseError {
         expected: usize,
         got: usize,
     },
-    
+
     /// Unknown option
     ///
     /// Includes similar option suggestions.
@@ -176,7 +159,7 @@ pub enum ParseError {
         /// Similar option suggestions
         suggestions: Vec<String>,
     },
-    
+
     /// Type parsing error
     ///
     /// The user provided a value that can't be converted
@@ -190,7 +173,7 @@ pub enum ParseError {
         /// Error details (e.g., "not a valid integer")
         details: Option<String>,
     },
-    
+
     /// Value not in allowed choices
     #[error("Invalid value for {arg_name}: '{value}'. Must be one of: {}", 
         .choices.join(", "))]
@@ -199,7 +182,7 @@ pub enum ParseError {
         value: String,
         choices: Vec<String>,
     },
-    
+
     /// Invalid command syntax
     #[error("Invalid command syntax: {details}{}", 
         .hint.as_ref().map(|h| format!("\nHint: {}", h)).unwrap_or_default())]
@@ -222,11 +205,8 @@ pub enum ParseError {
 pub enum ValidationError {
     /// Required file doesn't exist
     #[error("File not found for argument '{arg_name}': {path:?}")]
-    FileNotFound {
-        path: PathBuf,
-        arg_name: String,
-    },
-    
+    FileNotFound { path: PathBuf, arg_name: String },
+
     /// Invalid file extension
     #[error("Invalid file extension for {arg_name}: {path:?}. Expected: {}", 
         .expected.join(", "))]
@@ -235,7 +215,7 @@ pub enum ValidationError {
         path: PathBuf,
         expected: Vec<String>,
     },
-    
+
     /// Value out of allowed range
     #[error("{arg_name} must be between {min} and {max}, got {value}")]
     OutOfRange {
@@ -244,14 +224,11 @@ pub enum ValidationError {
         min: f64,
         max: f64,
     },
-    
+
     /// Custom constraint not met
     #[error("Validation failed for {arg_name}: {reason}")]
-    CustomConstraint {
-        arg_name: String,
-        reason: String,
-    },
-    
+    CustomConstraint { arg_name: String, reason: String },
+
     /// Dependency between arguments not satisfied
     ///
     /// Some arguments require the presence of other arguments.
@@ -260,15 +237,12 @@ pub enum ValidationError {
         arg_name: String,
         required_arg: String,
     },
-    
+
     /// Mutually exclusive arguments
     ///
     /// Some arguments cannot be used together.
     #[error("Options {arg1} and {arg2} cannot be used together")]
-    MutuallyExclusive {
-        arg1: String,
-        arg2: String,
-    },
+    MutuallyExclusive { arg1: String, arg2: String },
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -289,27 +263,23 @@ pub enum ExecutionError {
         command: String,
         implementation: String,
     },
-    
+
     /// Error during context downcasting
     ///
     /// The handler tried to downcast the context to an incorrect type.
     #[error("Failed to downcast execution context to expected type: {expected_type}")]
-    ContextDowncastFailed {
-        expected_type: String,
-    },
-    
+    ContextDowncastFailed { expected_type: String },
+
     /// Invalid context state for this operation
     #[error("Invalid context state: {reason}")]
-    InvalidContextState {
-        reason: String,
-    },
-    
+    InvalidContextState { reason: String },
+
     /// Error in command implementation
     ///
     /// Wraps errors from user code.
     #[error("Command execution failed: {0}")]
     CommandFailed(#[source] anyhow::Error),
-    
+
     /// Command interrupted by user
     ///
     /// User pressed Ctrl+C during execution.
@@ -329,25 +299,21 @@ pub enum ExecutionError {
 pub enum RegistryError {
     /// Attempt to register an already existing command
     #[error("Command '{name}' is already registered")]
-    DuplicateRegistration {
-        name: String,
-    },
-    
+    DuplicateRegistration { name: String },
+
     /// Alias already used by another command
     #[error("Alias '{alias}' is already used by command '{existing_command}'")]
     DuplicateAlias {
         alias: String,
         existing_command: String,
     },
-    
+
     /// Missing handler for a definition
     ///
     /// A command is defined in the config but no handler
     /// has been registered for it.
     #[error("No handler provided for command '{command}'")]
-    MissingHandler {
-        command: String,
-    },
+    MissingHandler { command: String },
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -372,17 +338,14 @@ impl ParseError {
     /// let available = vec!["simulate".to_string(), "validate".to_string()];
     /// let error = ParseError::unknown_command_with_suggestions("simulat", &available);
     /// ```
-    pub fn unknown_command_with_suggestions(
-        command: &str,
-        available: &[String],
-    ) -> Self {
+    pub fn unknown_command_with_suggestions(command: &str, available: &[String]) -> Self {
         let suggestions = crate::error::find_similar_strings(command, available, 3);
         Self::UnknownCommand {
             command: command.to_string(),
             suggestions,
         }
     }
-    
+
     /// Create an unknown option error with suggestions
     pub fn unknown_option_with_suggestions(
         flag: &str,
@@ -410,7 +373,7 @@ impl ConfigError {
             column: location.map(|l| l.column()),
         }
     }
-    
+
     /// Create a JSON error with position
     ///
     /// Extracts position information from the serde_json error.
@@ -441,9 +404,12 @@ mod tests {
     fn test_parse_error_with_suggestions() {
         let available = vec!["simulate".to_string(), "validate".to_string()];
         let error = ParseError::unknown_command_with_suggestions("simulat", &available);
-        
+
         match error {
-            ParseError::UnknownCommand { command, suggestions } => {
+            ParseError::UnknownCommand {
+                command,
+                suggestions,
+            } => {
                 assert_eq!(command, "simulat");
                 assert!(!suggestions.is_empty());
                 assert!(suggestions.contains(&"simulate".to_string()));

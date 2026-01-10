@@ -51,11 +51,13 @@ impl CommandHandler for AddCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         // Parse arguments
@@ -83,11 +85,13 @@ impl CommandHandler for SubtractCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
@@ -112,11 +116,13 @@ impl CommandHandler for MultiplyCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
@@ -141,11 +147,13 @@ impl CommandHandler for DivideCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
@@ -154,9 +162,9 @@ impl CommandHandler for DivideCommand {
         // Check for division by zero
         if b == 0.0 {
             return Err(DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::CommandFailed(
-                    anyhow::anyhow!("Division by zero")
-                )
+                dynamic_cli::error::ExecutionError::CommandFailed(anyhow::anyhow!(
+                    "Division by zero"
+                )),
             ));
         }
 
@@ -179,11 +187,13 @@ impl CommandHandler for HistoryCommand {
         context: &mut dyn ExecutionContext,
         _args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_ref::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_ref::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         if ctx.history.is_empty() {
@@ -206,11 +216,13 @@ impl CommandHandler for ClearCommand {
         context: &mut dyn ExecutionContext,
         _args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         ctx.history.clear();
@@ -230,11 +242,13 @@ impl CommandHandler for LastCommand {
         context: &mut dyn ExecutionContext,
         _args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_ref::<CalculatorContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "CalculatorContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_ref::<CalculatorContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "CalculatorContext".to_string(),
+                    },
+                )
             })?;
 
         match ctx.last_result {

@@ -58,14 +58,15 @@ use std::path::Path;
 /// ```
 pub fn load_config<P: AsRef<Path>>(path: P) -> Result<CommandsConfig> {
     let path = path.as_ref();
-    
+
     // Check if file exists
     if !path.exists() {
         return Err(ConfigError::FileNotFound {
             path: path.to_path_buf(),
-        }.into());
+        }
+        .into());
     }
-    
+
     // Detect format from extension
     let extension = path
         .extension()
@@ -73,18 +74,18 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<CommandsConfig> {
         .ok_or_else(|| ConfigError::UnsupportedFormat {
             extension: "<none>".to_string(),
         })?;
-    
+
     // Read file content
-    let content = fs::read_to_string(path)
-        .map_err(DynamicCliError::from)?;
-    
+    let content = fs::read_to_string(path).map_err(DynamicCliError::from)?;
+
     // Parse according to format
     match extension.to_lowercase().as_str() {
         "yaml" | "yml" => load_yaml(&content),
         "json" => load_json(&content),
         other => Err(ConfigError::UnsupportedFormat {
             extension: other.to_string(),
-        }.into()),
+        }
+        .into()),
     }
 }
 
@@ -123,11 +124,10 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<CommandsConfig> {
 /// assert_eq!(config.metadata.version, "1.0.0");
 /// ```
 pub fn load_yaml(content: &str) -> Result<CommandsConfig> {
-    serde_yaml::from_str(content)
-        .map_err(|e| {
-            // Extract position information from error
-            ConfigError::yaml_parse_with_location(e).into()
-        })
+    serde_yaml::from_str(content).map_err(|e| {
+        // Extract position information from error
+        ConfigError::yaml_parse_with_location(e).into()
+    })
 }
 
 /// Load configuration from a JSON string
@@ -168,11 +168,10 @@ pub fn load_yaml(content: &str) -> Result<CommandsConfig> {
 /// assert_eq!(config.metadata.version, "1.0.0");
 /// ```
 pub fn load_json(content: &str) -> Result<CommandsConfig> {
-    serde_json::from_str(content)
-        .map_err(|e| {
-            // Extract position information from error
-            ConfigError::json_parse_with_location(e).into()
-        })
+    serde_json::from_str(content).map_err(|e| {
+        // Extract position information from error
+        ConfigError::json_parse_with_location(e).into()
+    })
 }
 
 #[cfg(test)]
@@ -187,7 +186,7 @@ mod tests {
             .suffix(extension)
             .tempfile()
             .unwrap();
-        
+
         file.write_all(content.as_bytes()).unwrap();
         file.flush().unwrap();
         file
@@ -210,9 +209,9 @@ commands:
     implementation: "hello_handler"
 global_options: []
         "#;
-        
+
         let config = load_yaml(yaml).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.metadata.prompt, "test");
         assert_eq!(config.commands.len(), 1);
@@ -227,12 +226,12 @@ metadata:
   prompt: "test"
 commands: [
         "#; // Invalid YAML - unclosed array
-        
+
         let result = load_yaml(yaml);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
-            DynamicCliError::Config(ConfigError::YamlParse { .. }) => {},
+            DynamicCliError::Config(ConfigError::YamlParse { .. }) => {}
             other => panic!("Expected YamlParse error, got {:?}", other),
         }
     }
@@ -260,9 +259,9 @@ commands: [
   "global_options": []
 }
         "#;
-        
+
         let config = load_json(json).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.commands.len(), 1);
         assert_eq!(config.commands[0].name, "hello");
@@ -278,12 +277,12 @@ commands: [
   },
   "commands": [
         "#; // Invalid JSON - unclosed array
-        
+
         let result = load_json(json);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
-            DynamicCliError::Config(ConfigError::JsonParse { .. }) => {},
+            DynamicCliError::Config(ConfigError::JsonParse { .. }) => {}
             other => panic!("Expected JsonParse error, got {:?}", other),
         }
     }
@@ -297,10 +296,10 @@ metadata:
 commands: []
 global_options: []
         "#;
-        
+
         let file = create_temp_file(yaml, ".yaml");
         let config = load_config(file.path()).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
     }
 
@@ -313,10 +312,10 @@ metadata:
 commands: []
 global_options: []
         "#;
-        
+
         let file = create_temp_file(yaml, ".yml");
         let config = load_config(file.path()).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
     }
 
@@ -332,17 +331,17 @@ global_options: []
   "global_options": []
 }
         "#;
-        
+
         let file = create_temp_file(json, ".json");
         let config = load_config(file.path()).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
     }
 
     #[test]
     fn test_load_config_file_not_found() {
         let result = load_config("nonexistent_file.yaml");
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             DynamicCliError::Config(ConfigError::FileNotFound { path }) => {
@@ -356,9 +355,9 @@ global_options: []
     fn test_load_config_unsupported_extension() {
         let content = "some content";
         let file = create_temp_file(content, ".txt");
-        
+
         let result = load_config(file.path());
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
             DynamicCliError::Config(ConfigError::UnsupportedFormat { extension }) => {
@@ -371,28 +370,28 @@ global_options: []
     #[test]
     fn test_load_config_no_extension() {
         let content = "some content";
-        
+
         // Create a file without extension
         let mut file = tempfile::Builder::new()
             .suffix("") // No suffix
             .tempfile()
             .unwrap();
-        
+
         file.write_all(content.as_bytes()).unwrap();
         file.flush().unwrap();
-        
+
         // Rename to remove any extension
         let path_without_ext = file.path().with_file_name("configfile");
         std::fs::copy(file.path(), &path_without_ext).unwrap();
-        
+
         let result = load_config(&path_without_ext);
-        
+
         // Cleanup
         let _ = std::fs::remove_file(&path_without_ext);
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
-            DynamicCliError::Config(ConfigError::UnsupportedFormat { .. }) => {},
+            DynamicCliError::Config(ConfigError::UnsupportedFormat { .. }) => {}
             other => panic!("Expected UnsupportedFormat error, got {:?}", other),
         }
     }
@@ -436,9 +435,9 @@ global_options:
     description: "Verbose output"
     choices: []
         "#;
-        
+
         let config = load_yaml(yaml).unwrap();
-        
+
         assert_eq!(config.metadata.version, "2.0.0");
         assert_eq!(config.commands.len(), 1);
         assert_eq!(config.commands[0].arguments.len(), 1);
@@ -479,9 +478,9 @@ global_options:
   "global_options": []
 }
         "#;
-        
+
         let config = load_json(json).unwrap();
-        
+
         assert_eq!(config.metadata.version, "2.0.0");
         assert_eq!(config.commands[0].arguments.len(), 1);
     }
@@ -490,12 +489,12 @@ global_options:
     fn test_error_contains_position_yaml() {
         // YAML with actual syntax error (unclosed array)
         let yaml_syntax_error = "{{{";
-        
+
         let result = load_yaml(yaml_syntax_error);
-        
+
         // Should fail due to YAML syntax error
         assert!(result.is_err());
-        
+
         // Verify it's a YamlParse error
         match result.unwrap_err() {
             DynamicCliError::Config(ConfigError::YamlParse { .. }) => {
@@ -514,11 +513,11 @@ metadata:
 commands: []
 global_options: []
         "#;
-        
+
         // Test with uppercase extension
         let file = create_temp_file(yaml, ".YAML");
         let config = load_config(file.path()).unwrap();
-        
+
         assert_eq!(config.metadata.version, "1.0.0");
     }
 }

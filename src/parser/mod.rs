@@ -419,8 +419,14 @@ mod tests {
             .unwrap();
 
         assert_eq!(parsed.command_name, "analyze");
-        assert_eq!(parsed.arguments.get("input"), Some(&"data file.csv".to_string()));
-        assert_eq!(parsed.arguments.get("output"), Some(&"report.txt".to_string()));
+        assert_eq!(
+            parsed.arguments.get("input"),
+            Some(&"data file.csv".to_string())
+        );
+        assert_eq!(
+            parsed.arguments.get("output"),
+            Some(&"report.txt".to_string())
+        );
         assert_eq!(parsed.arguments.get("verbose"), Some(&"true".to_string()));
         assert_eq!(parsed.arguments.get("iterations"), Some(&"500".to_string()));
         assert_eq!(parsed.arguments.get("threshold"), Some(&"0.95".to_string()));
@@ -497,7 +503,10 @@ mod tests {
         assert_eq!(parsed.command_name, "analyze");
         assert!(parsed.arguments.contains_key("input"));
         assert_eq!(parsed.arguments.get("verbose"), Some(&"true".to_string()));
-        assert_eq!(parsed.arguments.get("iterations"), Some(&"1000".to_string()));
+        assert_eq!(
+            parsed.arguments.get("iterations"),
+            Some(&"1000".to_string())
+        );
     }
 
     #[test]

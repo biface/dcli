@@ -124,11 +124,7 @@ pub fn validate_file_exists(path: &Path, arg_name: &str) -> Result<()> {
 /// - The list of expected extensions
 ///
 /// Example: `Invalid file extension for config_file: "config.txt". Expected: yaml, yml`
-pub fn validate_file_extension(
-    path: &Path,
-    arg_name: &str,
-    expected: &[String],
-) -> Result<()> {
+pub fn validate_file_extension(path: &Path, arg_name: &str, expected: &[String]) -> Result<()> {
     // Extract the file extension from the path
     let extension = path
         .extension()
@@ -211,9 +207,10 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Validation(
-                ValidationError::FileNotFound { path, arg_name },
-            ) => {
+            crate::error::DynamicCliError::Validation(ValidationError::FileNotFound {
+                path,
+                arg_name,
+            }) => {
                 assert_eq!(arg_name, "missing_file");
                 assert_eq!(path, nonexistent);
             }
@@ -289,13 +286,11 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Validation(
-                ValidationError::InvalidExtension {
-                    arg_name,
-                    path: error_path,
-                    expected,
-                },
-            ) => {
+            crate::error::DynamicCliError::Validation(ValidationError::InvalidExtension {
+                arg_name,
+                path: error_path,
+                expected,
+            }) => {
                 assert_eq!(arg_name, "doc");
                 assert_eq!(error_path, path);
                 assert_eq!(expected, allowed);
@@ -313,9 +308,9 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Validation(
-                ValidationError::InvalidExtension { .. },
-            ) => {
+            crate::error::DynamicCliError::Validation(ValidationError::InvalidExtension {
+                ..
+            }) => {
                 // Expected
             }
             other => panic!("Expected InvalidExtension error, got {:?}", other),

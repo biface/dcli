@@ -67,16 +67,16 @@ use std::path::PathBuf;
 pub struct ReplInterface {
     /// Command registry
     registry: CommandRegistry,
-    
+
     /// Execution context
     context: Box<dyn ExecutionContext>,
-    
+
     /// Prompt string (e.g., "myapp > ")
     prompt: String,
-    
+
     /// Rustyline editor for input
     editor: DefaultEditor,
-    
+
     /// History file path
     history_path: Option<PathBuf>,
 }
@@ -120,14 +120,13 @@ impl ReplInterface {
         prompt: String,
     ) -> Result<Self> {
         // Create rustyline editor
-        let editor = DefaultEditor::new()
-            .map_err(|e| ExecutionError::CommandFailed(anyhow::anyhow!(
-                "Failed to initialize REPL: {}", e
-            )))?;
-        
+        let editor = DefaultEditor::new().map_err(|e| {
+            ExecutionError::CommandFailed(anyhow::anyhow!("Failed to initialize REPL: {}", e))
+        })?;
+
         // Determine history file path
         let history_path = Self::get_history_path(&prompt);
-        
+
         let mut repl = Self {
             registry,
             context,
@@ -135,13 +134,13 @@ impl ReplInterface {
             editor,
             history_path,
         };
-        
+
         // Load history if available
         repl.load_history();
-        
+
         Ok(repl)
     }
-    
+
     /// Get the history file path
     ///
     /// Uses the user's config directory to store command history.
@@ -151,7 +150,7 @@ impl ReplInterface {
             app_dir.join("history.txt")
         })
     }
-    
+
     /// Load command history from file
     fn load_history(&mut self) {
         if let Some(ref path) = self.history_path {
@@ -159,12 +158,12 @@ impl ReplInterface {
             if let Some(parent) = path.parent() {
                 let _ = std::fs::create_dir_all(parent);
             }
-            
+
             // Load history (ignore errors if file doesn't exist yet)
             let _ = self.editor.load_history(path);
         }
     }
-    
+
     /// Save command history to file
     fn save_history(&mut self) {
         if let Some(ref path) = self.history_path {
@@ -173,7 +172,7 @@ impl ReplInterface {
             }
         }
     }
-    
+
     /// Run the REPL loop
     ///
     /// Enters an interactive loop that:
@@ -213,7 +212,7 @@ impl ReplInterface {
         loop {
             // Read line from user
             let readline = self.editor.readline(&self.prompt);
-            
+
             match readline {
                 Ok(line) => {
                     // Skip empty lines
@@ -221,16 +220,16 @@ impl ReplInterface {
                     if line.is_empty() {
                         continue;
                     }
-                    
+
                     // Add to history
                     let _ = self.editor.add_history_entry(line);
-                    
+
                     // Check for built-in exit commands
                     if line == "exit" || line == "quit" {
                         println!("Goodbye!");
                         break;
                     }
-                    
+
                     // Parse and execute command
                     match self.execute_line(line) {
                         Ok(()) => {
@@ -242,19 +241,19 @@ impl ReplInterface {
                         }
                     }
                 }
-                
+
                 Err(ReadlineError::Interrupted) => {
                     // Ctrl-C pressed
                     println!("^C");
                     continue;
                 }
-                
+
                 Err(ReadlineError::Eof) => {
                     // Ctrl-D pressed
                     println!("exit");
                     break;
                 }
-                
+
                 Err(err) => {
                     // Other readline errors (rare)
                     eprintln!("Error reading input: {}", err);
@@ -262,35 +261,37 @@ impl ReplInterface {
                 }
             }
         }
-        
+
         // Save history before exiting
         self.save_history();
-        
+
         Ok(())
     }
-    
+
     /// Execute a single line of input
     ///
     /// Parses the line and executes the corresponding command.
     fn execute_line(&mut self, line: &str) -> Result<()> {
         // Create parser (borrows registry immutably)
         let parser = ReplParser::new(&self.registry);
-        
+
         // Parse command (parser is dropped after this, releasing the borrow)
         let parsed = parser.parse_line(line)?;
-        
+
         // Now we can borrow registry again to get the handler
-        let handler = self.registry.get_handler(&parsed.command_name)
+        let handler = self
+            .registry
+            .get_handler(&parsed.command_name)
             .ok_or_else(|| {
                 DynamicCliError::Execution(ExecutionError::HandlerNotFound {
                     command: parsed.command_name.clone(),
                     implementation: "unknown".to_string(),
                 })
             })?;
-        
+
         // Execute (handler references registry, context is borrowed mutably)
         handler.execute(&mut *self.context, &parsed.arguments)?;
-        
+
         Ok(())
     }
 }
@@ -305,30 +306,30 @@ impl Drop for ReplInterface {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{CommandDefinition, ArgumentDefinition, ArgumentType};
+    use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition};
     use std::collections::HashMap;
-    
+
     // Test context
     #[derive(Default)]
     struct TestContext {
         executed_commands: Vec<String>,
     }
-    
+
     impl ExecutionContext for TestContext {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }
-        
+
         fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
             self
         }
     }
-    
+
     // Test handler
     struct TestHandler {
         name: String,
     }
-    
+
     impl crate::executor::CommandHandler for TestHandler {
         fn execute(
             &self,
@@ -341,10 +342,10 @@ mod tests {
             Ok(())
         }
     }
-    
+
     fn create_test_registry() -> CommandRegistry {
         let mut registry = CommandRegistry::new();
-        
+
         let cmd_def = CommandDefinition {
             name: "test".to_string(),
             aliases: vec!["t".to_string()],
@@ -354,13 +355,13 @@ mod tests {
             options: vec![],
             implementation: "test_handler".to_string(),
         };
-        
+
         let handler = Box::new(TestHandler {
             name: "test".to_string(),
         });
-        
+
         registry.register(cmd_def, handler).unwrap();
-        
+
         registry
     }
 
@@ -368,7 +369,7 @@ mod tests {
     fn test_repl_interface_creation() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        
+
         let repl = ReplInterface::new(registry, context, "test".to_string());
         assert!(repl.is_ok());
     }
@@ -377,12 +378,12 @@ mod tests {
     fn test_repl_execute_line() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        
+
         let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-        
+
         let result = repl.execute_line("test");
         assert!(result.is_ok());
-        
+
         // Verify command was executed
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         assert_eq!(ctx.executed_commands, vec!["test".to_string()]);
@@ -392,9 +393,9 @@ mod tests {
     fn test_repl_execute_with_alias() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        
+
         let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-        
+
         let result = repl.execute_line("t");
         assert!(result.is_ok());
     }
@@ -403,14 +404,14 @@ mod tests {
     fn test_repl_execute_unknown_command() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        
+
         let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-        
+
         let result = repl.execute_line("unknown");
         assert!(result.is_err());
-        
+
         match result.unwrap_err() {
-            DynamicCliError::Parse(_) => {},
+            DynamicCliError::Parse(_) => {}
             other => panic!("Expected Parse error, got: {:?}", other),
         }
     }
@@ -418,7 +419,7 @@ mod tests {
     #[test]
     fn test_repl_history_path() {
         let path = ReplInterface::get_history_path("myapp");
-        
+
         // Path should exist (unless we're in a very restricted environment)
         if let Some(p) = path {
             assert!(p.to_str().unwrap().contains("myapp"));
@@ -429,25 +430,23 @@ mod tests {
     #[test]
     fn test_repl_command_with_args() {
         let mut registry = CommandRegistry::new();
-        
+
         let cmd_def = CommandDefinition {
             name: "greet".to_string(),
             aliases: vec![],
             description: "Greet someone".to_string(),
             required: false,
-            arguments: vec![
-                ArgumentDefinition {
-                    name: "name".to_string(),
-                    arg_type: ArgumentType::String,
-                    required: true,
-                    description: "Name".to_string(),
-                    validation: vec![],
-                }
-            ],
+            arguments: vec![ArgumentDefinition {
+                name: "name".to_string(),
+                arg_type: ArgumentType::String,
+                required: true,
+                description: "Name".to_string(),
+                validation: vec![],
+            }],
             options: vec![],
             implementation: "greet_handler".to_string(),
         };
-        
+
         struct GreetHandler;
         impl crate::executor::CommandHandler for GreetHandler {
             fn execute(
@@ -459,12 +458,12 @@ mod tests {
                 Ok(())
             }
         }
-        
+
         registry.register(cmd_def, Box::new(GreetHandler)).unwrap();
-        
+
         let context = Box::new(TestContext::default());
         let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-        
+
         let result = repl.execute_line("greet Alice");
         assert!(result.is_ok());
     }
@@ -473,9 +472,9 @@ mod tests {
     fn test_repl_empty_line() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        
+
         let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-        
+
         // Empty line should return an error from parser
         let result = repl.execute_line("");
         assert!(result.is_err());

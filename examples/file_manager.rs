@@ -55,11 +55,13 @@ impl CommandHandler for ListCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<FileManagerContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "FileManagerContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "FileManagerContext".to_string(),
+                    },
+                )
             })?;
 
         // Get directory path
@@ -72,7 +74,7 @@ impl CommandHandler for ListCommand {
                 dynamic_cli::error::ValidationError::FileNotFound {
                     path: path.to_path_buf(),
                     arg_name: "directory".to_string(),
-                }
+                },
             ));
         }
 
@@ -81,13 +83,13 @@ impl CommandHandler for ListCommand {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "directory".to_string(),
                     reason: "Path must be a directory".to_string(),
-                }
+                },
             ));
         }
 
         // Read directory
         let entries = fs::read_dir(path).map_err(DynamicCliError::from)?;
-        
+
         let mut files = Vec::new();
         let mut dirs = Vec::new();
         let mut total_size = 0u64;
@@ -102,8 +104,11 @@ impl CommandHandler for ListCommand {
             } else {
                 let size = metadata.len();
                 total_size += size;
-                files.push(format!("{} ({})", name, 
-                    dynamic_cli::utils::format_bytes(size)));
+                files.push(format!(
+                    "{} ({})",
+                    name,
+                    dynamic_cli::utils::format_bytes(size)
+                ));
             }
         }
 
@@ -115,20 +120,24 @@ impl CommandHandler for ListCommand {
         // Display results
         println!("\nDirectory: {}", path.display());
         println!("─────────────────────────────────────");
-        
+
         if !dirs.is_empty() {
             println!("\nDirectories:");
             println!("{}", dynamic_cli::utils::format_numbered_list(&dirs));
         }
-        
+
         if !files.is_empty() {
             println!("\nFiles:");
             println!("{}", dynamic_cli::utils::format_numbered_list(&files));
         }
-        
+
         println!("\n─────────────────────────────────────");
-        println!("Total: {} directories, {} files ({})", 
-            dirs.len(), files.len(), dynamic_cli::utils::format_bytes(total_size));
+        println!(
+            "Total: {} directories, {} files ({})",
+            dirs.len(),
+            files.len(),
+            dynamic_cli::utils::format_bytes(total_size)
+        );
 
         Ok(())
     }
@@ -143,11 +152,13 @@ impl CommandHandler for InfoCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<FileManagerContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "FileManagerContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "FileManagerContext".to_string(),
+                    },
+                )
             })?;
 
         let file = args.get("file").unwrap();
@@ -159,13 +170,13 @@ impl CommandHandler for InfoCommand {
                 dynamic_cli::error::ValidationError::FileNotFound {
                     path: path.to_path_buf(),
                     arg_name: "file".to_string(),
-                }
+                },
             ));
         }
 
         // Get metadata
         let metadata = fs::metadata(path).map_err(DynamicCliError::from)?;
-        
+
         // Update context
         ctx.files_processed += 1;
         ctx.last_operation = Some("info".to_string());
@@ -174,17 +185,27 @@ impl CommandHandler for InfoCommand {
         println!("\nFile Information");
         println!("═════════════════════════════════════");
         println!("Path:       {}", path.display());
-        println!("Type:       {}", if metadata.is_dir() { "Directory" } else { "File" });
-        println!("Size:       {}", dynamic_cli::utils::format_bytes(metadata.len()));
-        
+        println!(
+            "Type:       {}",
+            if metadata.is_dir() {
+                "Directory"
+            } else {
+                "File"
+            }
+        );
+        println!(
+            "Size:       {}",
+            dynamic_cli::utils::format_bytes(metadata.len())
+        );
+
         if let Some(ext) = dynamic_cli::utils::get_extension(file) {
             println!("Extension:  .{}", ext);
         }
-        
+
         if let Ok(modified) = metadata.modified() {
             println!("Modified:   {:?}", modified);
         }
-        
+
         println!("Permissions: {:?}", metadata.permissions());
         println!("Read-only:  {}", metadata.permissions().readonly());
 
@@ -201,16 +222,18 @@ impl CommandHandler for SearchCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_mut::<FileManagerContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "FileManagerContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "FileManagerContext".to_string(),
+                    },
+                )
             })?;
 
         let dir = args.get("directory").map(|s| s.as_str()).unwrap_or(".");
         let pattern = args.get("pattern").map(|s| s.as_str()).unwrap_or("*");
-        
+
         let path = Path::new(dir);
 
         // Validate directory
@@ -219,7 +242,7 @@ impl CommandHandler for SearchCommand {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "directory".to_string(),
                     reason: "Must be an existing directory".to_string(),
-                }
+                },
             ));
         }
 
@@ -232,17 +255,17 @@ impl CommandHandler for SearchCommand {
 
         // Search files
         let mut matches = Vec::new();
-        
+
         for entry in fs::read_dir(path).map_err(DynamicCliError::from)? {
             let entry = entry.map_err(DynamicCliError::from)?;
             let name = entry.file_name().to_string_lossy().to_string();
-            
+
             let is_match = if let Some(ext) = extension {
                 dynamic_cli::utils::has_extension(&name, &[ext])
             } else {
                 name.contains(pattern)
             };
-            
+
             if is_match {
                 matches.push(name);
             }
@@ -256,7 +279,7 @@ impl CommandHandler for SearchCommand {
         println!("\nSearch Results in {}", path.display());
         println!("Pattern: {}", pattern);
         println!("─────────────────────────────────────");
-        
+
         if matches.is_empty() {
             println!("No files found.");
         } else {
@@ -277,21 +300,23 @@ impl CommandHandler for StatsCommand {
         context: &mut dyn ExecutionContext,
         _args: &HashMap<String, String>,
     ) -> Result<()> {
-        let ctx = dynamic_cli::context::downcast_ref::<FileManagerContext>(context)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "FileManagerContext".to_string(),
-                })
+        let ctx =
+            dynamic_cli::context::downcast_ref::<FileManagerContext>(context).ok_or_else(|| {
+                DynamicCliError::Execution(
+                    dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                        expected_type: "FileManagerContext".to_string(),
+                    },
+                )
             })?;
 
         println!("\nFile Manager Statistics");
         println!("═════════════════════════════════════");
         println!("Files processed: {}", ctx.files_processed);
-        
+
         if let Some(ref dir) = ctx.current_dir {
             println!("Current directory: {}", dir.display());
         }
-        
+
         if let Some(ref op) = ctx.last_operation {
             println!("Last operation: {}", op);
         }

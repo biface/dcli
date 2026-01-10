@@ -352,8 +352,7 @@ impl CliBuilder {
                     reason: format!(
                         "Required command '{}' has no registered handler (implementation: '{}'). \
                         Use register_handler() to register it.",
-                        command_def.name,
-                        command_def.implementation
+                        command_def.name, command_def.implementation
                     ),
                     path: None,
                 }));
@@ -366,7 +365,8 @@ impl CliBuilder {
         }
 
         // Determine prompt
-        let prompt = self.prompt
+        let prompt = self
+            .prompt
             .or_else(|| Some(config.metadata.prompt.clone()))
             .unwrap_or_else(|| "cli".to_string());
 
@@ -573,9 +573,7 @@ impl CliApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{
-        ArgumentDefinition, ArgumentType, CommandDefinition, Metadata,
-    };
+    use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition, Metadata};
 
     // Test context
     #[derive(Default)]
@@ -604,8 +602,8 @@ mod tests {
             context: &mut dyn ExecutionContext,
             _args: &HashMap<String, String>,
         ) -> Result<()> {
-            let ctx = crate::context::downcast_mut::<TestContext>(context)
-                .expect("Failed to downcast");
+            let ctx =
+                crate::context::downcast_mut::<TestContext>(context).expect("Failed to downcast");
             ctx.executed.push(self.name.clone());
             Ok(())
         }
@@ -660,8 +658,7 @@ mod tests {
             name: "test".to_string(),
         });
 
-        let builder = CliBuilder::new()
-            .register_handler("test_handler", handler);
+        let builder = CliBuilder::new().register_handler("test_handler", handler);
 
         assert_eq!(builder.handlers.len(), 1);
     }
@@ -694,9 +691,7 @@ mod tests {
     fn test_builder_build_missing_config() {
         let context = Box::new(TestContext::default());
 
-        let result = CliBuilder::new()
-            .context(context)
-            .build();
+        let result = CliBuilder::new().context(context).build();
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -711,9 +706,7 @@ mod tests {
     fn test_builder_build_missing_context() {
         let config = create_test_config();
 
-        let result = CliBuilder::new()
-            .config(config)
-            .build();
+        let result = CliBuilder::new().config(config).build();
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -729,10 +722,7 @@ mod tests {
         let config = create_test_config();
         let context = Box::new(TestContext::default());
 
-        let result = CliBuilder::new()
-            .config(config)
-            .context(context)
-            .build();
+        let result = CliBuilder::new().config(config).context(context).build();
 
         assert!(result.is_err());
         match result.unwrap_err() {

@@ -73,7 +73,8 @@
 //!         _ctx: &mut dyn dynamic_cli::context::ExecutionContext,
 //!         args: &HashMap<String, String>,
 //!     ) -> dynamic_cli::Result<()> {
-//!         let name = args.get("name").unwrap_or(&"World".to_string());
+//!         let default_world = "World".to_string();
+//!         let name = args.get("name").unwrap_or(&default_world);
 //!         println!("Hello, {}!", name);
 //!         Ok(())
 //!     }
@@ -428,12 +429,12 @@ mod tests {
 
         // Executor pattern: resolve name, then get handler
         let user_input = "t"; // User types alias
-        
+
         if let Some(canonical_name) = registry.resolve_name(user_input) {
             if let Some(handler) = registry.get_handler(canonical_name) {
                 let mut context = TestContext;
                 let args = HashMap::new();
-                
+
                 // Execute would happen here
                 let result = handler.execute(&mut context, &args);
                 assert!(result.is_ok());
@@ -550,7 +551,9 @@ mod tests {
         };
 
         // First registration succeeds
-        assert!(registry.register(def.clone(), Box::new(TestHandler)).is_ok());
+        assert!(registry
+            .register(def.clone(), Box::new(TestHandler))
+            .is_ok());
 
         // Second registration fails
         let result = registry.register(def, Box::new(TestHandler));

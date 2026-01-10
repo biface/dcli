@@ -12,9 +12,18 @@
 //! # Example
 //!
 //! ```
-//! use dynamic_cli::config::{schema::CommandsConfig, validator::validate_config};
+//! use dynamic_cli::config::schema::{CommandsConfig, Metadata};
+//! use dynamic_cli::config::validator::validate_config;
 //!
-//! # let config = CommandsConfig::minimal();
+//! # let config = CommandsConfig {
+//!       metadata: Metadata {
+//!         version: "1.0.0".to_string(),
+//!         prompt: "test".to_string(),
+//!         prompt_suffix: " >".to_string()
+//!         },
+//!       commands: vec![],
+//!       global_options: vec![]
+//! };
 //! // After loading configuration
 //! validate_config(&config)?;
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
@@ -49,56 +58,70 @@ use std::collections::{HashMap, HashSet};
 /// # Example
 ///
 /// ```
-/// use dynamic_cli::config::{schema::CommandsConfig, validator::validate_config};
+/// use dynamic_cli::config::schema::{CommandsConfig, Metadata};
+/// use dynamic_cli::config::validator::validate_config;
 ///
-/// # let config = CommandsConfig::minimal();
+/// # let config = CommandsConfig {
+///       metadata: Metadata {
+///         version: "1.0.0".to_string(),
+///         prompt: "test".to_string(),
+///         prompt_suffix: " >".to_string()
+///         },
+///       commands: vec![],
+///       global_options: vec![]
+/// };
+/// // After loading configuration
 /// validate_config(&config)?;
 /// # Ok::<(), dynamic_cli::error::DynamicCliError>(())
 /// ```
 pub fn validate_config(config: &CommandsConfig) -> Result<()> {
     // Track all command names and aliases to detect duplicates
     let mut seen_names: HashSet<String> = HashSet::new();
-    
+
     for (idx, command) in config.commands.iter().enumerate() {
         // Validate the command itself
         validate_command(command)?;
-        
+
         // Check for duplicate command name
         if !seen_names.insert(command.name.clone()) {
             return Err(ConfigError::DuplicateCommand {
                 name: command.name.clone(),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Check for duplicate aliases
         for alias in &command.aliases {
             if !seen_names.insert(alias.clone()) {
                 return Err(ConfigError::DuplicateCommand {
                     name: alias.clone(),
-                }.into());
+                }
+                .into());
             }
         }
-        
+
         // Validate that command has a non-empty name
         if command.name.trim().is_empty() {
             return Err(ConfigError::InvalidSchema {
                 reason: "Command name cannot be empty".to_string(),
                 path: Some(format!("commands[{}].name", idx)),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Validate that implementation is specified
         if command.implementation.trim().is_empty() {
             return Err(ConfigError::InvalidSchema {
                 reason: "Command implementation cannot be empty".to_string(),
                 path: Some(format!("commands[{}].implementation", idx)),
-            }.into());
+            }
+            .into());
         }
     }
-    
+
     // Validate global options
     validate_options(&config.global_options, "global_options")?;
-    
+
     Ok(())
 }
 
@@ -146,14 +169,14 @@ pub fn validate_command(cmd: &CommandDefinition) -> Result<()> {
     validate_argument_ordering(&cmd.arguments, &cmd.name)?;
     validate_argument_names(&cmd.arguments, &cmd.name)?;
     validate_argument_validation_rules(&cmd.arguments, &cmd.name)?;
-    
+
     // Validate options
     validate_options(&cmd.options, &cmd.name)?;
     validate_option_flags(&cmd.options, &cmd.name)?;
-    
+
     // Check for name conflicts between arguments and options
     check_name_conflicts(&cmd.arguments, &cmd.options, &cmd.name)?;
-    
+
     Ok(())
 }
 
@@ -190,13 +213,13 @@ pub fn validate_command(cmd: &CommandDefinition) -> Result<()> {
 pub fn validate_argument_types(args: &[ArgumentDefinition]) -> Result<()> {
     // Currently all ArgumentType variants are valid
     // This function exists for future extensibility
-    
+
     for arg in args {
         // Validate that the type is properly defined
         // (In the current implementation, all enum variants are valid)
         let _ = arg.arg_type;
     }
-    
+
     Ok(())
 }
 
@@ -211,7 +234,7 @@ pub fn validate_argument_types(args: &[ArgumentDefinition]) -> Result<()> {
 /// * `context` - Context string for error messages (command name)
 fn validate_argument_ordering(args: &[ArgumentDefinition], context: &str) -> Result<()> {
     let mut seen_optional = false;
-    
+
     for (idx, arg) in args.iter().enumerate() {
         if !arg.required {
             seen_optional = true;
@@ -222,41 +245,41 @@ fn validate_argument_ordering(args: &[ArgumentDefinition], context: &str) -> Res
                     arg.name
                 ),
                 path: Some(format!("{}.arguments[{}]", context, idx)),
-            }.into());
+            }
+            .into());
         }
     }
-    
+
     Ok(())
 }
 
 /// Validate that argument names are unique
 fn validate_argument_names(args: &[ArgumentDefinition], context: &str) -> Result<()> {
     let mut seen_names: HashSet<String> = HashSet::new();
-    
+
     for (idx, arg) in args.iter().enumerate() {
         if arg.name.trim().is_empty() {
             return Err(ConfigError::InvalidSchema {
                 reason: "Argument name cannot be empty".to_string(),
                 path: Some(format!("{}.arguments[{}]", context, idx)),
-            }.into());
+            }
+            .into());
         }
-        
+
         if !seen_names.insert(arg.name.clone()) {
             return Err(ConfigError::InvalidSchema {
                 reason: format!("Duplicate argument name: '{}'", arg.name),
                 path: Some(format!("{}.arguments", context)),
-            }.into());
+            }
+            .into());
         }
     }
-    
+
     Ok(())
 }
 
 /// Validate that validation rules are consistent with argument types
-fn validate_argument_validation_rules(
-    args: &[ArgumentDefinition],
-    _context: &str,
-) -> Result<()> {
+fn validate_argument_validation_rules(args: &[ArgumentDefinition], _context: &str) -> Result<()> {
     for (_idx, arg) in args.iter().enumerate() {
         for (_rule_idx, rule) in arg.validation.iter().enumerate() {
             match rule {
@@ -283,9 +306,10 @@ fn validate_argument_validation_rules(
                                 arg.name,
                                 arg.arg_type.as_str()
                             ),
-                        }.into());
+                        }
+                        .into());
                     }
-                    
+
                     // Validate that min <= max if both are specified
                     if let (Some(min_val), Some(max_val)) = (min, max) {
                         if min_val > max_val {
@@ -294,38 +318,41 @@ fn validate_argument_validation_rules(
                                     "Invalid range for argument '{}': min ({}) > max ({})",
                                     arg.name, min_val, max_val
                                 ),
-                            }.into());
+                            }
+                            .into());
                         }
                     }
                 }
             }
         }
     }
-    
+
     Ok(())
 }
 
 /// Validate option definitions
 fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
     let mut seen_names: HashSet<String> = HashSet::new();
-    
+
     for (idx, opt) in options.iter().enumerate() {
         // Validate name is not empty
         if opt.name.trim().is_empty() {
             return Err(ConfigError::InvalidSchema {
                 reason: "Option name cannot be empty".to_string(),
                 path: Some(format!("{}.options[{}]", context, idx)),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Check for duplicate names
         if !seen_names.insert(opt.name.clone()) {
             return Err(ConfigError::InvalidSchema {
                 reason: format!("Duplicate option name: '{}'", opt.name),
                 path: Some(format!("{}.options", context)),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Validate that at least one of short or long is specified
         if opt.short.is_none() && opt.long.is_none() {
             return Err(ConfigError::InvalidSchema {
@@ -334,9 +361,10 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
                     opt.name
                 ),
                 path: Some(format!("{}.options[{}]", context, idx)),
-            }.into());
+            }
+            .into());
         }
-        
+
         // Validate choices are consistent with default
         if let Some(ref default) = opt.default {
             if !opt.choices.is_empty() && !opt.choices.contains(default) {
@@ -347,21 +375,20 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
                         opt.name,
                         opt.choices.join(", ")
                     ),
-                }.into());
+                }
+                .into());
             }
         }
-        
+
         // Validate that boolean options don't have choices
         if opt.option_type == ArgumentType::Bool && !opt.choices.is_empty() {
             return Err(ConfigError::Inconsistency {
-                details: format!(
-                    "Boolean option '{}' cannot have choices",
-                    opt.name
-                ),
-            }.into());
+                details: format!("Boolean option '{}' cannot have choices", opt.name),
+            }
+            .into());
         }
     }
-    
+
     Ok(())
 }
 
@@ -369,7 +396,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
 fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<()> {
     let mut seen_short: HashMap<String, String> = HashMap::new();
     let mut seen_long: HashMap<String, String> = HashMap::new();
-    
+
     for opt in options {
         // Check short form
         if let Some(ref short) = opt.short {
@@ -380,9 +407,10 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         short, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
-                }.into());
+                }
+                .into());
             }
-            
+
             if let Some(existing) = seen_short.insert(short.clone(), opt.name.clone()) {
                 return Err(ConfigError::InvalidSchema {
                     reason: format!(
@@ -390,22 +418,21 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         short, existing, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
-                }.into());
+                }
+                .into());
             }
         }
-        
+
         // Check long form
         if let Some(ref long) = opt.long {
             if long.is_empty() {
                 return Err(ConfigError::InvalidSchema {
-                    reason: format!(
-                        "Long option for '{}' cannot be empty",
-                        opt.name
-                    ),
+                    reason: format!("Long option for '{}' cannot be empty", opt.name),
                     path: Some(format!("{}.options", context)),
-                }.into());
+                }
+                .into());
             }
-            
+
             if let Some(existing) = seen_long.insert(long.clone(), opt.name.clone()) {
                 return Err(ConfigError::InvalidSchema {
                     reason: format!(
@@ -413,11 +440,12 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         long, existing, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
-                }.into());
+                }
+                .into());
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -428,19 +456,17 @@ fn check_name_conflicts(
     context: &str,
 ) -> Result<()> {
     let arg_names: HashSet<String> = args.iter().map(|a| a.name.clone()).collect();
-    
+
     for opt in options {
         if arg_names.contains(&opt.name) {
             return Err(ConfigError::InvalidSchema {
-                reason: format!(
-                    "Option '{}' has the same name as an argument",
-                    opt.name
-                ),
+                reason: format!("Option '{}' has the same name as an argument", opt.name),
                 path: Some(format!("{}.options", context)),
-            }.into());
+            }
+            .into());
         }
     }
-    
+
     Ok(())
 }
 
@@ -478,7 +504,7 @@ mod tests {
                 implementation: "handler2".to_string(),
             },
         ];
-        
+
         let result = validate_config(&config);
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -512,7 +538,7 @@ mod tests {
                 implementation: "handler2".to_string(),
             },
         ];
-        
+
         let result = validate_config(&config);
         assert!(result.is_err());
     }
@@ -528,10 +554,10 @@ mod tests {
             options: vec![],
             implementation: "handler".to_string(),
         };
-        
+
         let mut config = CommandsConfig::minimal();
         config.commands = vec![cmd];
-        
+
         let result = validate_config(&config);
         assert!(result.is_err());
     }
@@ -554,7 +580,7 @@ mod tests {
                 validation: vec![],
             },
         ];
-        
+
         let result = validate_argument_ordering(&args, "test");
         assert!(result.is_err());
     }
@@ -577,84 +603,74 @@ mod tests {
                 validation: vec![],
             },
         ];
-        
+
         let result = validate_argument_names(&args, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_validate_validation_rules_type_mismatch() {
-        let args = vec![
-            ArgumentDefinition {
-                name: "count".to_string(),
-                arg_type: ArgumentType::Integer,
-                required: true,
-                description: "Count".to_string(),
-                validation: vec![
-                    ValidationRule::MustExist { must_exist: true }, // Wrong for integer!
-                ],
-            },
-        ];
-        
+        let args = vec![ArgumentDefinition {
+            name: "count".to_string(),
+            arg_type: ArgumentType::Integer,
+            required: true,
+            description: "Count".to_string(),
+            validation: vec![
+                ValidationRule::MustExist { must_exist: true }, // Wrong for integer!
+            ],
+        }];
+
         let result = validate_argument_validation_rules(&args, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_validate_validation_rules_invalid_range() {
-        let args = vec![
-            ArgumentDefinition {
-                name: "percentage".to_string(),
-                arg_type: ArgumentType::Float,
-                required: true,
-                description: "Percentage".to_string(),
-                validation: vec![
-                    ValidationRule::Range {
-                        min: Some(100.0),
-                        max: Some(0.0), // min > max!
-                    },
-                ],
-            },
-        ];
-        
+        let args = vec![ArgumentDefinition {
+            name: "percentage".to_string(),
+            arg_type: ArgumentType::Float,
+            required: true,
+            description: "Percentage".to_string(),
+            validation: vec![ValidationRule::Range {
+                min: Some(100.0),
+                max: Some(0.0), // min > max!
+            }],
+        }];
+
         let result = validate_argument_validation_rules(&args, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_validate_options_no_flags() {
-        let options = vec![
-            OptionDefinition {
-                name: "opt1".to_string(),
-                short: None,
-                long: None, // Neither short nor long!
-                option_type: ArgumentType::String,
-                required: false,
-                default: None,
-                description: "Option".to_string(),
-                choices: vec![],
-            },
-        ];
-        
+        let options = vec![OptionDefinition {
+            name: "opt1".to_string(),
+            short: None,
+            long: None, // Neither short nor long!
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Option".to_string(),
+            choices: vec![],
+        }];
+
         let result = validate_options(&options, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_validate_options_default_not_in_choices() {
-        let options = vec![
-            OptionDefinition {
-                name: "mode".to_string(),
-                short: Some("m".to_string()),
-                long: Some("mode".to_string()),
-                option_type: ArgumentType::String,
-                required: false,
-                default: Some("invalid".to_string()), // Not in choices!
-                description: "Mode".to_string(),
-                choices: vec!["fast".to_string(), "slow".to_string()],
-            },
-        ];
-        
+        let options = vec![OptionDefinition {
+            name: "mode".to_string(),
+            short: Some("m".to_string()),
+            long: Some("mode".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: Some("invalid".to_string()), // Not in choices!
+            description: "Mode".to_string(),
+            choices: vec!["fast".to_string(), "slow".to_string()],
+        }];
+
         let result = validate_options(&options, "test");
         assert!(result.is_err());
     }
@@ -683,55 +699,49 @@ mod tests {
                 choices: vec![],
             },
         ];
-        
+
         let result = validate_option_flags(&options, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_validate_option_flags_invalid_short() {
-        let options = vec![
-            OptionDefinition {
-                name: "opt1".to_string(),
-                short: Some("opt".to_string()), // Too long!
-                long: None,
-                option_type: ArgumentType::String,
-                required: false,
-                default: None,
-                description: "Option".to_string(),
-                choices: vec![],
-            },
-        ];
-        
+        let options = vec![OptionDefinition {
+            name: "opt1".to_string(),
+            short: Some("opt".to_string()), // Too long!
+            long: None,
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Option".to_string(),
+            choices: vec![],
+        }];
+
         let result = validate_option_flags(&options, "test");
         assert!(result.is_err());
     }
 
     #[test]
     fn test_check_name_conflicts() {
-        let args = vec![
-            ArgumentDefinition {
-                name: "output".to_string(),
-                arg_type: ArgumentType::Path,
-                required: true,
-                description: "Output".to_string(),
-                validation: vec![],
-            },
-        ];
-        
-        let options = vec![
-            OptionDefinition {
-                name: "output".to_string(), // Same name as argument!
-                short: Some("o".to_string()),
-                long: Some("output".to_string()),
-                option_type: ArgumentType::Path,
-                required: false,
-                default: None,
-                description: "Output".to_string(),
-                choices: vec![],
-            },
-        ];
-        
+        let args = vec![ArgumentDefinition {
+            name: "output".to_string(),
+            arg_type: ArgumentType::Path,
+            required: true,
+            description: "Output".to_string(),
+            validation: vec![],
+        }];
+
+        let options = vec![OptionDefinition {
+            name: "output".to_string(), // Same name as argument!
+            short: Some("o".to_string()),
+            long: Some("output".to_string()),
+            option_type: ArgumentType::Path,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec![],
+        }];
+
         let result = check_name_conflicts(&args, &options, "test");
         assert!(result.is_err());
     }
@@ -743,53 +753,47 @@ mod tests {
             aliases: vec!["proc".to_string()],
             description: "Process data".to_string(),
             required: false,
-            arguments: vec![
-                ArgumentDefinition {
-                    name: "input".to_string(),
-                    arg_type: ArgumentType::Path,
-                    required: true,
-                    description: "Input file".to_string(),
-                    validation: vec![
-                        ValidationRule::MustExist { must_exist: true },
-                        ValidationRule::Extensions {
-                            extensions: vec!["csv".to_string()],
-                        },
-                    ],
-                },
-            ],
-            options: vec![
-                OptionDefinition {
-                    name: "output".to_string(),
-                    short: Some("o".to_string()),
-                    long: Some("output".to_string()),
-                    option_type: ArgumentType::Path,
-                    required: false,
-                    default: Some("out.csv".to_string()),
-                    description: "Output file".to_string(),
-                    choices: vec![],
-                },
-            ],
+            arguments: vec![ArgumentDefinition {
+                name: "input".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Input file".to_string(),
+                validation: vec![
+                    ValidationRule::MustExist { must_exist: true },
+                    ValidationRule::Extensions {
+                        extensions: vec!["csv".to_string()],
+                    },
+                ],
+            }],
+            options: vec![OptionDefinition {
+                name: "output".to_string(),
+                short: Some("o".to_string()),
+                long: Some("output".to_string()),
+                option_type: ArgumentType::Path,
+                required: false,
+                default: Some("out.csv".to_string()),
+                description: "Output file".to_string(),
+                choices: vec![],
+            }],
             implementation: "process_handler".to_string(),
         };
-        
+
         assert!(validate_command(&cmd).is_ok());
     }
 
     #[test]
     fn test_validate_boolean_with_choices() {
-        let options = vec![
-            OptionDefinition {
-                name: "flag".to_string(),
-                short: Some("f".to_string()),
-                long: Some("flag".to_string()),
-                option_type: ArgumentType::Bool,
-                required: false,
-                default: None,
-                description: "A flag".to_string(),
-                choices: vec!["true".to_string(), "false".to_string()], // Boolean can't have choices!
-            },
-        ];
-        
+        let options = vec![OptionDefinition {
+            name: "flag".to_string(),
+            short: Some("f".to_string()),
+            long: Some("flag".to_string()),
+            option_type: ArgumentType::Bool,
+            required: false,
+            default: None,
+            description: "A flag".to_string(),
+            choices: vec!["true".to_string(), "false".to_string()], // Boolean can't have choices!
+        }];
+
         let result = validate_options(&options, "test");
         assert!(result.is_err());
     }

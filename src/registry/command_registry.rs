@@ -251,7 +251,8 @@ impl CommandRegistry {
         }
 
         // Register the command
-        self.commands.insert(cmd_name.clone(), (definition, handler));
+        self.commands
+            .insert(cmd_name.clone(), (definition, handler));
 
         Ok(())
     }
@@ -412,7 +413,9 @@ impl CommandRegistry {
     /// ```
     pub fn get_handler(&self, name: &str) -> Option<&Box<dyn CommandHandler>> {
         let canonical_name = self.resolve_name(name)?;
-        self.commands.get(canonical_name).map(|(_, handler)| handler)
+        self.commands
+            .get(canonical_name)
+            .map(|(_, handler)| handler)
     }
 
     /// List all registered command definitions
@@ -604,7 +607,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("hello", vec!["hi", "greet"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         assert_eq!(registry.len(), 1);
         assert!(registry.contains("hello"));
@@ -684,7 +689,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec![]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         assert_eq!(registry.resolve_name("test"), Some("test"));
     }
@@ -694,7 +701,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("hello", vec!["hi", "greet"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         assert_eq!(registry.resolve_name("hi"), Some("hello"));
         assert_eq!(registry.resolve_name("greet"), Some("hello"));
@@ -712,7 +721,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec![]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         let retrieved = registry.get_definition("test");
         assert!(retrieved.is_some());
@@ -724,7 +735,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("hello", vec!["hi"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         let retrieved = registry.get_definition("hi");
         assert!(retrieved.is_some());
@@ -743,7 +756,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec![]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         let handler = registry.get_handler("test");
         assert!(handler.is_some());
@@ -754,7 +769,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("hello", vec!["hi"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         let handler = registry.get_handler("hi");
         assert!(handler.is_some());
@@ -779,13 +796,22 @@ mod tests {
         let mut registry = CommandRegistry::new();
 
         registry
-            .register(create_test_definition("cmd1", vec![]), Box::new(TestHandler))
+            .register(
+                create_test_definition("cmd1", vec![]),
+                Box::new(TestHandler),
+            )
             .unwrap();
         registry
-            .register(create_test_definition("cmd2", vec![]), Box::new(TestHandler))
+            .register(
+                create_test_definition("cmd2", vec![]),
+                Box::new(TestHandler),
+            )
             .unwrap();
         registry
-            .register(create_test_definition("cmd3", vec![]), Box::new(TestHandler))
+            .register(
+                create_test_definition("cmd3", vec![]),
+                Box::new(TestHandler),
+            )
             .unwrap();
 
         let commands = registry.list_commands();
@@ -842,7 +868,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec!["t"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         assert!(registry.contains("test"));
         assert!(registry.contains("t"));
@@ -854,7 +882,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("command", vec!["c", "cmd", "com"]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         // All aliases should resolve to the same command
         assert_eq!(registry.resolve_name("c"), Some("command"));
@@ -873,7 +903,9 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("Test", vec![]);
 
-        registry.register(definition, Box::new(TestHandler)).unwrap();
+        registry
+            .register(definition, Box::new(TestHandler))
+            .unwrap();
 
         // Case matters
         assert!(registry.contains("Test"));

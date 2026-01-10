@@ -24,14 +24,14 @@
 //! }
 //! ```
 
-mod types;
 mod display;
 mod suggestions;
+mod types;
 
 // Public re-exports
-pub use types::*;
 pub use display::{display_error, format_error};
 pub use suggestions::find_similar_strings;
+pub use types::*;
 
 /// Specialized Result type for dynamic-cli
 ///

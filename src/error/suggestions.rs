@@ -43,10 +43,10 @@ pub fn find_similar_strings(
         .iter()
         .map(|c| (c.clone(), levenshtein_distance(target, c)))
         .collect();
-    
+
     // Sort by increasing distance
     distances.sort_by_key(|(_, dist)| *dist);
-    
+
     // Take the first N that have a reasonable distance
     distances
         .into_iter()
@@ -91,7 +91,7 @@ pub fn find_similar_strings(
 fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len1 = s1.len();
     let len2 = s2.len();
-    
+
     // Base cases: empty string
     if len1 == 0 {
         return len2;
@@ -99,11 +99,11 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     if len2 == 0 {
         return len1;
     }
-    
+
     // Initialize dynamic programming matrix
     // matrix[i][j] = distance between s1[0..i] and s2[0..j]
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-    
+
     // Initialize first row and column
     // (distance from empty string to substring)
     for i in 0..=len1 {
@@ -112,16 +112,16 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     for j in 0..=len2 {
         matrix[0][j] = j;
     }
-    
+
     // Fill the matrix
     let s1_chars: Vec<char> = s1.chars().collect();
     let s2_chars: Vec<char> = s2.chars().collect();
-    
+
     for (i, &c1) in s1_chars.iter().enumerate() {
         for (j, &c2) in s2_chars.iter().enumerate() {
             // Substitution cost: 0 if characters are identical, 1 otherwise
             let cost = if c1 == c2 { 0 } else { 1 };
-            
+
             // Take minimum of:
             // - matrix[i][j+1] + 1  : deletion from s1
             // - matrix[i+1][j] + 1  : insertion into s1
@@ -131,7 +131,7 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
                 .min(matrix[i][j] + cost);
         }
     }
-    
+
     // Final distance is in the bottom-right corner
     matrix[len1][len2]
 }
@@ -173,9 +173,9 @@ mod tests {
             "validate".to_string(),
             "plot".to_string(),
         ];
-        
+
         let suggestions = find_similar_strings("simulate", &candidates, 3);
-        
+
         // Exact match should be first
         assert_eq!(suggestions.first(), Some(&"simulate".to_string()));
     }
@@ -187,9 +187,9 @@ mod tests {
             "validate".to_string(),
             "plot".to_string(),
         ];
-        
+
         let suggestions = find_similar_strings("simulat", &candidates, 3);
-        
+
         // "simulate" should be suggested (distance 1)
         assert!(suggestions.contains(&"simulate".to_string()));
         assert!(!suggestions.contains(&"plot".to_string())); // Too far
@@ -203,9 +203,9 @@ mod tests {
             "aabb".to_string(),
             "abbb".to_string(),
         ];
-        
+
         let suggestions = find_similar_strings("aaaa", &candidates, 2);
-        
+
         // Maximum 2 suggestions
         assert!(suggestions.len() <= 2);
         assert!(suggestions.contains(&"aaaa".to_string()));
@@ -213,14 +213,11 @@ mod tests {
 
     #[test]
     fn test_find_similar_strings_threshold() {
-        let candidates = vec![
-            "simulate".to_string(),
-            "wxyz".to_string(),
-        ];
-        
+        let candidates = vec!["simulate".to_string(), "wxyz".to_string()];
+
         let suggestions = find_similar_strings("abc", &candidates, 10);
         println!("{:?}", suggestions);
-        
+
         // "simulate" and "xyz" are too far (distance > 3)
         // Only suggestions with distance ≤ 3 are returned
         assert!(suggestions.is_empty());
@@ -245,13 +242,10 @@ mod tests {
 
     #[test]
     fn test_find_similar_strings_case_sensitive() {
-        let candidates = vec![
-            "Simulate".to_string(),
-            "simulate".to_string(),
-        ];
-        
+        let candidates = vec!["Simulate".to_string(), "simulate".to_string()];
+
         let suggestions = find_similar_strings("simulate", &candidates, 2);
-        
+
         // Should find exact match first
         assert_eq!(suggestions.first(), Some(&"simulate".to_string()));
     }
@@ -262,7 +256,7 @@ mod tests {
     fn test_levenshtein_performance() {
         let s1 = "a".repeat(100);
         let s2 = "b".repeat(100);
-        
+
         // Should not take more than a few milliseconds
         let distance = levenshtein_distance(&s1, &s2);
         assert_eq!(distance, 100);

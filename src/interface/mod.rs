@@ -227,27 +227,27 @@ pub use repl::ReplInterface;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::*;
     use crate::config::schema::CommandDefinition;
+    use crate::prelude::*;
     use std::collections::HashMap;
 
     // Test context
     #[derive(Default)]
     struct TestContext;
-    
+
     impl ExecutionContext for TestContext {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }
-        
+
         fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
             self
         }
     }
-    
+
     // Test handler
     struct TestHandler;
-    
+
     impl CommandHandler for TestHandler {
         fn execute(
             &self,
@@ -257,18 +257,18 @@ mod tests {
             Ok(())
         }
     }
-    
+
     #[test]
     fn test_module_imports() {
         // Verify that types are re-exported
         let _: Option<CliInterface> = None;
         let _: Option<ReplInterface> = None;
     }
-    
+
     #[test]
     fn test_cli_interface_accessible() {
         let mut registry = CommandRegistry::new();
-        
+
         let cmd_def = CommandDefinition {
             name: "test".to_string(),
             aliases: vec![],
@@ -278,17 +278,17 @@ mod tests {
             options: vec![],
             implementation: "test".to_string(),
         };
-        
+
         registry.register(cmd_def, Box::new(TestHandler)).unwrap();
-        
+
         let context = Box::new(TestContext::default());
         let _cli = CliInterface::new(registry, context);
     }
-    
+
     #[test]
     fn test_repl_interface_accessible() {
         let mut registry = CommandRegistry::new();
-        
+
         let cmd_def = CommandDefinition {
             name: "test".to_string(),
             aliases: vec![],
@@ -298,9 +298,9 @@ mod tests {
             options: vec![],
             implementation: "test".to_string(),
         };
-        
+
         registry.register(cmd_def, Box::new(TestHandler)).unwrap();
-        
+
         let context = Box::new(TestContext::default());
         let _repl = ReplInterface::new(registry, context, "test".to_string());
     }

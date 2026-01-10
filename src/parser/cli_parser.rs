@@ -190,7 +190,12 @@ impl<'a> CliParser<'a> {
                 self.parse_long_option(arg, args, &mut i, &mut result)?;
             } else if arg.starts_with('-') && arg.len() > 1 {
                 // Short option (ensure it's not just a negative number)
-                if arg.chars().nth(1).map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                if arg
+                    .chars()
+                    .nth(1)
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
                     // This is a negative number, treat as positional
                     self.parse_positional_argument(arg, positional_index, &mut result)?;
                     positional_index += 1;
@@ -239,16 +244,27 @@ impl<'a> CliParser<'a> {
             let option = self.find_option_by_long(arg_without_dashes)?;
 
             // For boolean options, presence means true
-            if matches!(option.option_type, crate::config::schema::ArgumentType::Bool) {
+            if matches!(
+                option.option_type,
+                crate::config::schema::ArgumentType::Bool
+            ) {
                 result.insert(option.name.clone(), "true".to_string());
             } else {
                 // Non-boolean: expect value in next argument
                 *index += 1;
                 if *index >= args.len() {
                     return Err(ParseError::InvalidSyntax {
-                        details: format!("Option --{} requires a value", option.long.as_ref().unwrap()),
-                        hint: Some(format!("Usage: --{}=<value> or --{} <value>", option.long.as_ref().unwrap(), option.long.as_ref().unwrap())),
-                    }.into());
+                        details: format!(
+                            "Option --{} requires a value",
+                            option.long.as_ref().unwrap()
+                        ),
+                        hint: Some(format!(
+                            "Usage: --{}=<value> or --{} <value>",
+                            option.long.as_ref().unwrap(),
+                            option.long.as_ref().unwrap()
+                        )),
+                    }
+                    .into());
                 }
 
                 let value = &args[*index];
@@ -272,7 +288,10 @@ impl<'a> CliParser<'a> {
         let option = self.find_option_by_short(short_flag)?;
 
         // For boolean options, presence means true
-        if matches!(option.option_type, crate::config::schema::ArgumentType::Bool) {
+        if matches!(
+            option.option_type,
+            crate::config::schema::ArgumentType::Bool
+        ) {
             result.insert(option.name.clone(), "true".to_string());
         } else {
             // Check if value is attached (e.g., -ovalue)
@@ -286,8 +305,12 @@ impl<'a> CliParser<'a> {
                 if *index >= args.len() {
                     return Err(ParseError::InvalidSyntax {
                         details: format!("Option -{} requires a value", short_flag),
-                        hint: Some(format!("Usage: -{}<value> or -{} <value>", short_flag, short_flag)),
-                    }.into());
+                        hint: Some(format!(
+                            "Usage: -{}<value> or -{} <value>",
+                            short_flag, short_flag
+                        )),
+                    }
+                    .into());
                 }
 
                 let value = &args[*index];
@@ -355,7 +378,11 @@ impl<'a> CliParser<'a> {
         for option in &self.definition.options {
             if option.required && !result.contains_key(&option.name) {
                 return Err(ParseError::MissingOption {
-                    option: option.long.clone().or(option.short.clone()).unwrap_or_default(),
+                    option: option
+                        .long
+                        .clone()
+                        .or(option.short.clone())
+                        .unwrap_or_default(),
                     command: self.definition.name.clone(),
                 }
                 .into());
@@ -500,7 +527,9 @@ mod tests {
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Parse(ParseError::MissingArgument { argument, .. }) => {
+            crate::error::DynamicCliError::Parse(ParseError::MissingArgument {
+                argument, ..
+            }) => {
                 assert_eq!(argument, "input");
             }
             other => panic!("Expected MissingArgument error, got {:?}", other),
@@ -653,7 +682,12 @@ mod tests {
         let definition = create_test_definition();
         let parser = CliParser::new(&definition);
 
-        let args = vec!["input.txt".to_string(), "-v".to_string(), "-c".to_string(), "5".to_string()];
+        let args = vec![
+            "input.txt".to_string(),
+            "-v".to_string(),
+            "-c".to_string(),
+            "5".to_string(),
+        ];
         let result = parser.parse(&args).unwrap();
 
         // Provided values should override defaults
@@ -671,7 +705,11 @@ mod tests {
         let parser = CliParser::new(&definition);
 
         // "abc" cannot be parsed as integer
-        let args = vec!["input.txt".to_string(), "--count".to_string(), "abc".to_string()];
+        let args = vec![
+            "input.txt".to_string(),
+            "--count".to_string(),
+            "abc".to_string(),
+        ];
         let result = parser.parse(&args);
 
         assert!(result.is_err());

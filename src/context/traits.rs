@@ -15,7 +15,7 @@
 //! # Example
 //!
 //! ```
-//! use dynamic_cli::context::{ExecutionContext, ExecutionContextExt};
+//! use dynamic_cli::context::{ExecutionContext, downcast_mut};
 //! use std::any::Any;
 //!
 //! // Define your application's context
@@ -39,7 +39,7 @@
 //! // Use the context with downcasting
 //! fn use_context(ctx: &mut dyn ExecutionContext) {
 //!     // Downcast to concrete type
-//!     if let Some(my_ctx) = ctx.downcast_mut::<MyContext>() {
+//!     if let Some(my_ctx) = downcast_mut::<MyContext>(ctx) {
 //!         my_ctx.counter += 1;
 //!         my_ctx.data.push("Hello".to_string());
 //!     }
@@ -98,10 +98,12 @@ use std::any::Any;
 /// downcast it to their expected type:
 ///
 /// ```
-/// use dynamic_cli::context::{ExecutionContext, ExecutionContextExt};
-/// use std::collections::HashMap;
+/// use dynamic_cli::context::{ExecutionContext, downcast_mut};
+/// use std::collections::HashMap;///
+/// #
+/// use rustyline::Context;
 ///
-/// # struct MyContext { value: i32 }
+/// struct MyContext { value: i32 }
 /// # impl ExecutionContext for MyContext {
 /// #     fn as_any(&self) -> &dyn std::any::Any { self }
 /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
@@ -112,8 +114,7 @@ use std::any::Any;
 ///     args: &HashMap<String, String>,
 /// ) -> Result<(), Box<dyn std::error::Error>> {
 ///     // Downcast to concrete type
-///     let ctx = context
-///         .downcast_mut::<MyContext>()
+///     let ctx = downcast_mut::<MyContext>(context)
 ///         .ok_or("Invalid context type")?;
 ///
 ///     // Use the context
@@ -271,7 +272,9 @@ pub fn downcast_ref<T: ExecutionContext + 'static>(context: &dyn ExecutionContex
 ///
 /// This operation is safe because it uses Rust's `Any::downcast_mut`,
 /// which performs runtime type checking.
-pub fn downcast_mut<T: ExecutionContext + 'static>(context: &mut dyn ExecutionContext) -> Option<&mut T> {
+pub fn downcast_mut<T: ExecutionContext + 'static>(
+    context: &mut dyn ExecutionContext,
+) -> Option<&mut T> {
     context.as_any_mut().downcast_mut::<T>()
 }
 
@@ -461,8 +464,7 @@ mod tests {
     fn test_realistic_handler_scenario() {
         // Simulate a command handler pattern
         fn handler(ctx: &mut dyn ExecutionContext, increment: i32) -> Result<(), String> {
-            let concrete = downcast_mut::<TestContext>(ctx)
-                .ok_or("Invalid context type")?;
+            let concrete = downcast_mut::<TestContext>(ctx).ok_or("Invalid context type")?;
 
             concrete.value += increment;
             Ok(())
@@ -481,8 +483,7 @@ mod tests {
     #[test]
     fn test_handler_with_wrong_context_type() {
         fn handler(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            downcast_mut::<TestContext>(ctx)
-                .ok_or("Wrong context type")?;
+            downcast_mut::<TestContext>(ctx).ok_or("Wrong context type")?;
             Ok(())
         }
 

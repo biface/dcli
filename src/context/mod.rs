@@ -176,11 +176,11 @@
 pub mod traits;
 
 // Re-export commonly used types for convenience
-pub use traits::{ExecutionContext, downcast_ref, downcast_mut};
+pub use traits::{downcast_mut, downcast_ref, ExecutionContext};
 
 #[cfg(test)]
 mod tests {
-    use super::{ExecutionContext, downcast_ref, downcast_mut};
+    use super::{downcast_mut, downcast_ref, ExecutionContext};
     use std::any::Any;
     use std::collections::HashMap;
 
@@ -235,8 +235,7 @@ mod tests {
     fn test_integration_command_pattern() {
         /// Simulate a command handler
         fn increment_command(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
             app_ctx.command_count += 1;
             app_ctx.last_command = Some("increment".to_string());
@@ -256,19 +255,21 @@ mod tests {
     #[test]
     fn test_integration_multiple_commands() {
         fn command_a(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
-            app_ctx.data.insert("key_a".to_string(), "value_a".to_string());
+            app_ctx
+                .data
+                .insert("key_a".to_string(), "value_a".to_string());
             app_ctx.command_count += 1;
             Ok(())
         }
 
         fn command_b(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
-            app_ctx.data.insert("key_b".to_string(), "value_b".to_string());
+            app_ctx
+                .data
+                .insert("key_b".to_string(), "value_b".to_string());
             app_ctx.command_count += 1;
             Ok(())
         }
@@ -288,8 +289,7 @@ mod tests {
     #[test]
     fn test_integration_wrong_context_type() {
         fn command_expecting_test_context(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Expected TestAppContext")?;
+            downcast_mut::<TestAppContext>(ctx).ok_or("Expected TestAppContext")?;
             Ok(())
         }
 
@@ -303,8 +303,7 @@ mod tests {
     #[test]
     fn test_integration_read_only_access() {
         fn read_command_count(ctx: &dyn ExecutionContext) -> Result<u32, String> {
-            let app_ctx = downcast_ref::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_ref::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
             Ok(app_ctx.command_count)
         }
@@ -320,38 +319,41 @@ mod tests {
     fn test_integration_stateful_workflow() {
         // Simulate a series of commands that build up state
         fn init_command(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
-            app_ctx.data.insert("initialized".to_string(), "true".to_string());
+            app_ctx
+                .data
+                .insert("initialized".to_string(), "true".to_string());
             app_ctx.last_command = Some("init".to_string());
             Ok(())
         }
 
         fn process_command(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
             // Check initialization
             if app_ctx.data.get("initialized") != Some(&"true".to_string()) {
                 return Err("Not initialized".to_string());
             }
 
-            app_ctx.data.insert("processed".to_string(), "true".to_string());
+            app_ctx
+                .data
+                .insert("processed".to_string(), "true".to_string());
             app_ctx.last_command = Some("process".to_string());
             Ok(())
         }
 
         fn finalize_command(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
             // Check processing
             if app_ctx.data.get("processed") != Some(&"true".to_string()) {
                 return Err("Not processed".to_string());
             }
 
-            app_ctx.data.insert("finalized".to_string(), "true".to_string());
+            app_ctx
+                .data
+                .insert("finalized".to_string(), "true".to_string());
             app_ctx.last_command = Some("finalize".to_string());
             Ok(())
         }
@@ -373,8 +375,7 @@ mod tests {
     #[test]
     fn test_integration_error_propagation() {
         fn failing_command(ctx: &mut dyn ExecutionContext) -> Result<(), String> {
-            let _app_ctx = downcast_mut::<TestAppContext>(ctx)
-                .ok_or("Invalid context")?;
+            let _app_ctx = downcast_mut::<TestAppContext>(ctx).ok_or("Invalid context")?;
 
             // Simulate command failure
             Err("Command failed".to_string())
@@ -435,10 +436,10 @@ mod tests {
     #[test]
     fn test_nested_context_manipulation() {
         fn add_value(ctx: &mut dyn ExecutionContext, key: &str, value: i32) -> Result<(), String> {
-            let nested = downcast_mut::<NestedContext>(ctx)
-                .ok_or("Invalid context")?;
+            let nested = downcast_mut::<NestedContext>(ctx).ok_or("Invalid context")?;
 
-            nested.outer
+            nested
+                .outer
                 .entry(key.to_string())
                 .or_insert_with(InnerContext::default)
                 .values

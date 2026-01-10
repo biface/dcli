@@ -343,7 +343,9 @@ impl<'a> ReplParser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition, OptionDefinition};
+    use crate::config::schema::{
+        ArgumentDefinition, ArgumentType, CommandDefinition, OptionDefinition,
+    };
     use crate::context::ExecutionContext;
     use crate::executor::CommandHandler;
 
@@ -427,7 +429,9 @@ mod tests {
             implementation: "process_handler".to_string(),
         };
 
-        registry.register(process_def, Box::new(TestHandler)).unwrap();
+        registry
+            .register(process_def, Box::new(TestHandler))
+            .unwrap();
 
         registry
     }
@@ -542,7 +546,9 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Parse(ParseError::UnknownCommand { command, .. }) => {
+            crate::error::DynamicCliError::Parse(ParseError::UnknownCommand {
+                command, ..
+            }) => {
                 assert_eq!(command, "unknown");
             }
             other => panic!("Expected UnknownCommand error, got {:?}", other),
@@ -597,10 +603,18 @@ mod tests {
         let registry = create_test_registry();
         let parser = ReplParser::new(&registry);
 
-        let parsed = parser.parse_line("process input.txt output.txt --verbose").unwrap();
+        let parsed = parser
+            .parse_line("process input.txt output.txt --verbose")
+            .unwrap();
         assert_eq!(parsed.command_name, "process");
-        assert_eq!(parsed.arguments.get("input"), Some(&"input.txt".to_string()));
-        assert_eq!(parsed.arguments.get("output"), Some(&"output.txt".to_string()));
+        assert_eq!(
+            parsed.arguments.get("input"),
+            Some(&"input.txt".to_string())
+        );
+        assert_eq!(
+            parsed.arguments.get("output"),
+            Some(&"output.txt".to_string())
+        );
         assert_eq!(parsed.arguments.get("verbose"), Some(&"true".to_string()));
     }
 
@@ -611,7 +625,10 @@ mod tests {
 
         let parsed = parser.parse_line("proc input.txt -v").unwrap();
         assert_eq!(parsed.command_name, "process");
-        assert_eq!(parsed.arguments.get("input"), Some(&"input.txt".to_string()));
+        assert_eq!(
+            parsed.arguments.get("input"),
+            Some(&"input.txt".to_string())
+        );
         assert_eq!(parsed.arguments.get("verbose"), Some(&"true".to_string()));
     }
 
@@ -634,7 +651,9 @@ mod tests {
         let registry = create_test_registry();
         let parser = ReplParser::new(&registry);
 
-        let parsed = parser.parse_line(r#"process "/path/with spaces/file.txt""#).unwrap();
+        let parsed = parser
+            .parse_line(r#"process "/path/with spaces/file.txt""#)
+            .unwrap();
         assert_eq!(parsed.command_name, "process");
         assert_eq!(
             parsed.arguments.get("input"),
@@ -656,7 +675,10 @@ mod tests {
             .unwrap();
 
         assert_eq!(parsed.command_name, "process");
-        assert_eq!(parsed.arguments.get("input"), Some(&"input file.txt".to_string()));
+        assert_eq!(
+            parsed.arguments.get("input"),
+            Some(&"input file.txt".to_string())
+        );
         assert_eq!(
             parsed.arguments.get("output"),
             Some(&"output file.txt".to_string())
