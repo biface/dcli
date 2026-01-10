@@ -96,6 +96,7 @@ pub mod parser;
 pub mod validator;
 pub mod interface;
 pub mod builder;
+pub mod utils;
 
 // ============================================================================
 // PUBLIC RE-EXPORTS (For convenience)
@@ -134,6 +135,14 @@ pub use interface::{CliInterface, ReplInterface};
 // Builder types
 pub use builder::{CliBuilder, CliApp};
 
+// Utility functions
+pub use utils::{
+    parse_int, parse_float, parse_bool, detect_type,
+    is_blank, normalize, truncate,
+    normalize_path, get_extension, has_extension,
+    format_bytes, format_duration,
+};
+
 // ============================================================================
 // PRELUDE MODULE (Quick imports)
 // ============================================================================
@@ -156,6 +165,8 @@ pub use builder::{CliBuilder, CliApp};
 /// // - ParsedCommand, CliParser, ReplParser
 /// // - validate_file_exists, validate_file_extension, validate_range
 /// // - Common config types (ArgumentType, CommandsConfig)
+/// // - CliBuilder, CliApp
+/// // - Utility functions (parse_int, parse_bool, is_blank, etc.)
 /// ```
 pub mod prelude {
     // Context management
@@ -184,6 +195,12 @@ pub mod prelude {
 
     // Builder
     pub use crate::builder::{CliBuilder, CliApp};
+    
+    // Utilities (most commonly used)
+    pub use crate::utils::{
+        parse_int, parse_float, parse_bool, detect_type,
+        is_blank, normalize,
+    };
 }
 
 // ============================================================================
