@@ -1,0 +1,66 @@
+# File Manager Configuration
+# Browse and manage files with validation
+
+metadata:
+  version: "1.0.0"
+  prompt: "filemgr"
+  prompt_suffix: " > "
+
+commands:
+  - name: list
+    aliases: [ls, dir]
+    description: "List files in a directory"
+    required: true
+    arguments:
+      - name: directory
+        arg_type: path
+        required: false
+        description: "Directory to list (default: current)"
+        validation: []
+    options: []
+    implementation: "list_handler"
+
+  - name: info
+    aliases: [stat, details]
+    description: "Show detailed file information"
+    required: true
+    arguments:
+      - name: file
+        arg_type: path
+        required: true
+        description: "File or directory path"
+        validation:
+          - must_exist: true
+    options: []
+    implementation: "info_handler"
+
+  - name: search
+    aliases: [find]
+    description: "Search files by pattern"
+    required: true
+    arguments:
+      - name: directory
+        arg_type: path
+        required: false
+        description: "Directory to search in"
+        validation: []
+    options:
+      - name: pattern
+        short: p
+        long: pattern
+        option_type: string
+        required: false
+        default: "*"
+        description: "Search pattern (e.g., *.rs, *.txt)"
+        choices: []
+    implementation: "search_handler"
+
+  - name: stats
+    aliases: [statistics]
+    description: "Show file manager statistics"
+    required: false
+    arguments: []
+    options: []
+    implementation: "stats_handler"
+
+global_options: []

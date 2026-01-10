@@ -1,0 +1,106 @@
+# Calculator Configuration
+# Simple arithmetic calculator with history
+
+metadata:
+  version: "1.0.0"
+  prompt: "calc"
+  prompt_suffix: " > "
+
+commands:
+  - name: add
+    aliases: ["+", "plus"]
+    description: "Add two numbers"
+    required: true
+    arguments:
+      - name: a
+        arg_type: float
+        required: true
+        description: "First number"
+        validation: []
+      - name: b
+        arg_type: float
+        required: true
+        description: "Second number"
+        validation: []
+    options: []
+    implementation: "add_handler"
+
+  - name: subtract
+    aliases: ["-", "minus", "sub"]
+    description: "Subtract two numbers"
+    required: true
+    arguments:
+      - name: a
+        arg_type: float
+        required: true
+        description: "First number"
+        validation: []
+      - name: b
+        arg_type: float
+        required: true
+        description: "Second number"
+        validation: []
+    options: []
+    implementation: "subtract_handler"
+
+  - name: multiply
+    aliases: ["*", "times", "mul"]
+    description: "Multiply two numbers"
+    required: true
+    arguments:
+      - name: a
+        arg_type: float
+        required: true
+        description: "First number"
+        validation: []
+      - name: b
+        arg_type: float
+        required: true
+        description: "Second number"
+        validation: []
+    options: []
+    implementation: "multiply_handler"
+
+  - name: divide
+    aliases: ["/", "div"]
+    description: "Divide two numbers"
+    required: true
+    arguments:
+      - name: a
+        arg_type: float
+        required: true
+        description: "Dividend"
+        validation: []
+      - name: b
+        arg_type: float
+        required: true
+        description: "Divisor (cannot be zero)"
+        validation: []
+    options: []
+    implementation: "divide_handler"
+
+  - name: history
+    aliases: [hist, h]
+    description: "Show calculation history"
+    required: false
+    arguments: []
+    options: []
+    implementation: "history_handler"
+
+  - name: clear
+    aliases: [cls, c]
+    description: "Clear history"
+    required: false
+    arguments: []
+    options: []
+    implementation: "clear_handler"
+
+  - name: last
+    aliases: [l]
+    description: "Show last result"
+    required: false
+    arguments: []
+    options: []
+    implementation: "last_handler"
+
+global_options: []

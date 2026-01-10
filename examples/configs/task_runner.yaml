@@ -1,0 +1,90 @@
+# Task Runner Configuration
+# Complete task management system
+
+metadata:
+  version: "1.0.0"
+  prompt: "tasks"
+  prompt_suffix: " > "
+
+commands:
+  - name: add
+    aliases: [new, create]
+    description: "Add a new task"
+    required: true
+    arguments:
+      - name: description
+        arg_type: string
+        required: true
+        description: "Task description"
+        validation: []
+    options:
+      - name: priority
+        short: p
+        long: priority
+        option_type: string
+        required: false
+        default: "medium"
+        description: "Task priority"
+        choices: [low, medium, high]
+    implementation: "add_handler"
+
+  - name: list
+    aliases: [ls, show]
+    description: "List tasks"
+    required: true
+    arguments: []
+    options:
+      - name: all
+        short: a
+        long: all
+        option_type: bool
+        required: false
+        description: "Show all tasks (including completed)"
+        choices: []
+    implementation: "list_handler"
+
+  - name: complete
+    aliases: [done, finish]
+    description: "Mark a task as completed"
+    required: true
+    arguments:
+      - name: id
+        arg_type: integer
+        required: true
+        description: "Task ID"
+        validation:
+          - min: 0
+    options: []
+    implementation: "complete_handler"
+
+  - name: delete
+    aliases: [remove, rm]
+    description: "Delete a task"
+    required: true
+    arguments:
+      - name: id
+        arg_type: integer
+        required: true
+        description: "Task ID"
+        validation:
+          - min: 0
+    options: []
+    implementation: "delete_handler"
+
+  - name: stats
+    aliases: [statistics, info]
+    description: "Show task statistics"
+    required: false
+    arguments: []
+    options: []
+    implementation: "stats_handler"
+
+  - name: clear
+    aliases: [cleanup]
+    description: "Remove all completed tasks"
+    required: false
+    arguments: []
+    options: []
+    implementation: "clear_handler"
+
+global_options: []
