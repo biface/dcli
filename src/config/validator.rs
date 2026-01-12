@@ -280,8 +280,8 @@ fn validate_argument_names(args: &[ArgumentDefinition], context: &str) -> Result
 
 /// Validate that validation rules are consistent with argument types
 fn validate_argument_validation_rules(args: &[ArgumentDefinition], _context: &str) -> Result<()> {
-    for (_idx, arg) in args.iter().enumerate() {
-        for (_rule_idx, rule) in arg.validation.iter().enumerate() {
+    for arg in args.iter() {
+        for rule in arg.validation.iter() {
             match rule {
                 ValidationRule::MustExist { .. } | ValidationRule::Extensions { .. } => {
                     // These rules only make sense for Path arguments

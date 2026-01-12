@@ -39,6 +39,7 @@
 //! assert_eq!(parsed.get("input"), Some(&"file.txt".to_string()));
 //! ```
 
+#[allow(unused_imports)]
 use crate::config::schema::{ArgumentDefinition, CommandDefinition, OptionDefinition};
 use crate::error::{ParseError, Result};
 use crate::parser::type_parser;

@@ -106,9 +106,11 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 
     // Initialize first row and column
     // (distance from empty string to substring)
+    #[allow(clippy::needless_range_loop)]
     for i in 0..=len1 {
         matrix[i][0] = i;
     }
+    #[allow(clippy::needless_range_loop)]
     for j in 0..=len2 {
         matrix[0][j] = j;
     }

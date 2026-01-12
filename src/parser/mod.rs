@@ -184,6 +184,7 @@
 //! - Command history and auto-completion hints
 //! - Streaming parser for very large inputs
 
+#[allow(unused_imports)]
 use crate::error::Result;
 
 // Public submodules

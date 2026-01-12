@@ -150,8 +150,8 @@ pub trait CommandHandler: Send + Sync {
     ///               to access your specific context type.
     ///
     /// * `args` - Parsed and validated arguments as name-value pairs.
-    ///           All values are strings; type conversion should be done
-    ///           within the handler if needed.
+    ///            All values are strings; type conversion should be done
+    ///            within the handler if needed.
     ///
     /// # Returns
     ///
