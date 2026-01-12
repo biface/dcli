@@ -4,12 +4,12 @@ Tout d'abord, merci d'envisager de contribuer à dynamic-cli ! 🎉
 
 **[English](CONTRIBUTING.md)** | **Français**
 
-## 📋 Table des Matières
+## Table des Matières
 
 - [Code de Conduite](#code-de-conduite)
 - [Premiers Pas](#premiers-pas)
 - [Configuration du Développement](#configuration-du-développement)
-- [Comment Puis-je Contribuer ?](#comment-puis-je-contribuer)
+- [Comment Puis-je Contribuer ?](#comment-puis-je-contribuer-)
 - [Flux de Travail de Développement](#flux-de-travail-de-développement)
 - [Standards de Codage](#standards-de-codage)
 - [Directives de Test](#directives-de-test)
@@ -19,7 +19,7 @@ Tout d'abord, merci d'envisager de contribuer à dynamic-cli ! 🎉
 
 ---
 
-## 📜 Code de Conduite
+## Code de Conduite
 
 Ce projet et tous ceux qui y participent sont régis par notre Code de Conduite. En participant, vous vous engagez à respecter ce code. Veuillez signaler tout comportement inacceptable aux mainteneurs du projet.
 
@@ -40,7 +40,7 @@ Ce projet et tous ceux qui y participent sont régis par notre Code de Conduite.
 
 ---
 
-## 🚀 Premiers Pas
+## Premiers Pas
 
 ### Prérequis
 
@@ -87,7 +87,7 @@ git push origin feature/ma-fonctionnalite
 
 ---
 
-## 🛠 Configuration du Développement
+## Configuration du Développement
 
 ### Configuration Initiale
 
@@ -151,7 +151,7 @@ dynamic-cli/
 
 ---
 
-## 💡 Comment Puis-je Contribuer ?
+## Comment Puis-je Contribuer ?
 
 ### Signaler des Bugs
 
@@ -264,7 +264,7 @@ Nous accueillons les contributions de code ! Voici les types de contributions qu
 
 ---
 
-## 🔄 Flux de Travail de Développement
+## Flux de Travail de Développement
 
 ### 1. Trouver ou Créer une Issue
 
@@ -362,7 +362,7 @@ git push origin feature/ma-fonctionnalite
 
 ---
 
-## 📏 Standards de Codage
+## Standards de Codage
 
 ### Principes Généraux
 
@@ -458,7 +458,7 @@ pub fn parse_value(
 
 ---
 
-## 🧪 Directives de Test
+## Directives de Test
 
 ### Objectifs de Couverture de Tests
 
@@ -560,7 +560,7 @@ cargo tarpaulin --out Html
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 ### Standards de Documentation
 
@@ -637,7 +637,7 @@ cargo doc --all-features --no-deps
 
 ---
 
-## 🔀 Processus de Pull Request
+## Processus de Pull Request
 
 ### Avant de Soumettre
 
@@ -707,7 +707,7 @@ Décrivez comment vous avez testé vos changements :
 
 ---
 
-## 🤝 Communauté
+## Communauté
 
 ### Obtenir de l'Aide
 
@@ -738,7 +738,7 @@ Nous valorisons toutes les contributions ! Les contributeurs sont reconnus dans 
 
 ---
 
-## 📜 Licence
+## Licence
 
 En contribuant à dynamic-cli, vous acceptez que vos contributions soient sous licence MIT/Apache-2.0 double licence.
 
@@ -746,7 +746,7 @@ Sauf indication contraire explicite de votre part, toute contribution intentionn
 
 ---
 
-## 🙏 Merci !
+## Merci !
 
 Vos contributions ont pour objet d'améliorer dynamic-cli. Que vous corrigiez une faute de frappe, signaliez un bug ou implémentiez une fonctionnalité majeure, nous apprécions votre effort et votre temps.
 
@@ -754,7 +754,7 @@ Bon codage ! 🚀
 
 ---
 
-## 📖 Ressources Supplémentaires
+## Ressources Supplémentaires
 
 **Apprendre Rust :**
 - [Le Livre Rust](https://jimskapt.github.io/rust-book-fr/) (français)
@@ -772,5 +772,5 @@ Bon codage ! 🚀
 - [Journal des modifications](CHANGELOG.md)
 ---
 
-**Dernière Mise à Jour** : 2026-01-11  
-**Version** : 0.1.0
+**Dernière Mise à Jour** : 2026-01-12  
+**Version** : 0.1.1

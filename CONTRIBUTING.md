@@ -4,7 +4,7 @@ First off, thank you for considering contributing to dynamic-cli! 🎉
 
 **English** | **[Français](CONTRIBUTING.fr.md)**
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
@@ -19,7 +19,7 @@ First off, thank you for considering contributing to dynamic-cli! 🎉
 
 ---
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
 
@@ -40,7 +40,7 @@ This project and everyone participating in it is governed by our Code of Conduct
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -87,7 +87,7 @@ git push origin feature/my-awesome-feature
 
 ---
 
-## 🛠 Development Setup
+## Development Setup
 
 ### Initial Setup
 
@@ -151,7 +151,7 @@ dynamic-cli/
 
 ---
 
-## 💡 How Can I Contribute?
+## How Can I Contribute?
 
 ### Reporting Bugs
 
@@ -264,7 +264,7 @@ We welcome code contributions! Here are the types of contributions we're looking
 
 ---
 
-## 🔄 Development Workflow
+## Development Workflow
 
 ### 1. Find or Create an Issue
 
@@ -276,11 +276,11 @@ We welcome code contributions! Here are the types of contributions we're looking
 
 ```bash
 # Fork on GitHub, then:
-git clone https://github.com/biface/dynamic-cli.git
+git clone https://github.com/biface/dcli.git
 cd dynamic-cli
 
 # Add upstream
-git remote add upstream https://github.com/biface/dynamic-cli.git
+git remote add upstream https://github.com/biface/dcli.git
 
 # Create a feature branch
 git checkout -b feature/descriptive-name
@@ -362,7 +362,7 @@ git push origin feature/my-feature
 
 ---
 
-## 📏 Coding Standards
+## Coding Standards
 
 ### General Principles
 
@@ -458,7 +458,7 @@ pub fn parse_value(
 
 ---
 
-## 🧪 Testing Guidelines
+## Testing Guidelines
 
 ### Test Coverage Goals
 
@@ -560,7 +560,7 @@ cargo tarpaulin --out Html
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 ### Documentation Standards
 
@@ -637,7 +637,7 @@ cargo doc --all-features --no-deps
 
 ---
 
-## 🔀 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 
@@ -707,7 +707,7 @@ Describe how you tested your changes:
 
 ---
 
-## 🤝 Community
+## Community
 
 ### Getting Help
 
@@ -738,7 +738,7 @@ We value all contributions! Contributors are recognized in:
 
 ---
 
-## 📜 License
+## License
 
 By contributing to dynamic-cli, you agree that your contributions will be licensed under the MIT/Apache-2.0 dual license.
 
@@ -746,7 +746,7 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 ---
 
-## 🙏 Thank You!
+## Thank You!
 
 Your contributions aim to improve dynamic-cli. Whether you're fixing a typo, reporting a bug, or implementing a major feature, we appreciate your effort and time.
 
@@ -754,7 +754,7 @@ Happy coding! 🚀
 
 ---
 
-## 📖 Additional Resources
+## Additional Resources
 
 **Learning Rust:**
 - [The Rust Book](https://doc.rust-lang.org/book/)
@@ -773,5 +773,5 @@ Happy coding! 🚀
 
 ---
 
-**Last Updated**: 2026-01-11  
-**Version**: 0.1.0
+**Last Updated**: 2026-01-12  
+**Version**: 0.1.1

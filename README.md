@@ -35,7 +35,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.1.0"
+dynamic-cli = "0.1.1"
 ```
 
 ### Basic Example
@@ -206,8 +206,8 @@ We welcome contributions from everyone! Here's how you can help:
 
 ### Ways to Contribute
 
-- 🐛 **Report bugs** - Found a bug? [Open an issue](https://github.com/OWNER/dynamic-cli/issues)
-- 💡 **Suggest features** - Have an idea? [Start a discussion](https://github.com/OWNER/dynamic-cli/discussions)
+- 🐛 **Report bugs** - Found a bug? [Open an issue](https://github.com/biface/dcli/issues)
+- 💡 **Suggest features** - Have an idea? [Start a discussion](https://github.com/biface/dcli/discussions)
 - 📝 **Improve documentation** - Fix typos, clarify, add examples
 - 🔧 **Submit code** - Fix bugs, implement features, improve performance
 - 🧪 **Add tests** - Increase coverage, add edge cases
@@ -286,8 +286,8 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 **Need help?**
 
 - 📖 Check the [API documentation](https://docs.rs/dynamic-cli)
-- 💬 Open a [discussion](https://github.com/OWNER/dynamic-cli/discussions)
-- 🐛 Report an [issue](https://github.com/OWNER/dynamic-cli/issues)
+- 💬 Open a [discussion](https://github.com/biface/dcli/discussions)
+- 🐛 Report an [issue](https://github.com/biface/dcli/issues)
 - 📧 Contact the maintainers
 
 **Found a security vulnerability?**  
@@ -303,4 +303,4 @@ If you find dynamic-cli useful, please:
 - 📢 **Share** it with others who might find it useful
 - 📝 **Write** a blog post or tutorial!
 
-**Last updated**: 2026-01-11
+**Last updated**: 2026-01-12

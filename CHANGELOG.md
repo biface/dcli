@@ -241,6 +241,23 @@ async = ["tokio", "async-trait"]
 
 ---
 
+## [0.1.1] - 2026-01-11
+
+### Fixed
+- Silenced 11 clippy warnings while preserving necessary imports
+    - Added `#[allow(unused_imports)]` for `Result` in `parser/mod.rs` (import is necessary)
+    - Added `#[allow(unused_imports)]` for `ArgumentDefinition` in `parser/cli_parser.rs` (import is necessary)
+    - Removed unnecessary `.enumerate()` calls in `config/validator.rs`
+    - Added `#[allow(clippy::needless_range_loop)]` in `error/suggestions.rs` (algorithm clarity)
+
+### Documentation
+- Added Issues and Discussions links to README.md and CONTRIBUTING.md
+- Updated French versions (README.fr.md, CONTRIBUTING.fr.md)
+
+### Notes
+- All imports marked as "unused" by clippy are actually necessary for compilation
+- Using `#[allow]` attributes instead of removing imports prevents compilation errors
+
 ## [0.1.0] - 2025-01-08
 
 ### Added
@@ -533,6 +550,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-01-11  
-**Current Version**: 0.1.0  
+**Last Updated**: 2026-01-12  
+**Current Version**: 0.1.1  
 **Next Release**: 0.2.0 (Planned Q1-Q2 2026)

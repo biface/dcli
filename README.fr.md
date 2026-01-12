@@ -35,7 +35,7 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.1.0"
+dynamic-cli = "0.1.1"
 ```
 
 ### Exemple Basique
@@ -206,8 +206,8 @@ Nous accueillons les contributions de tous ! Voici comment vous pouvez aider :
 
 ### Façons de Contribuer
 
-- 🐛 **Signaler des bugs** - Trouvé un bug ? [Ouvrez une issue](https://github.com/OWNER/dynamic-cli/issues)
-- 💡 **Suggérer des fonctionnalités** - Vous avez une idée ? [Démarrez une discussion](https://github.com/OWNER/dynamic-cli/discussions)
+- 🐛 **Signaler des bugs** - Trouvé un bug ? [Ouvrez une issue](https://github.com/biface/dcli/issues)
+- 💡 **Suggérer des fonctionnalités** - Vous avez une idée ? [Démarrez une discussion](https://github.com/biface/dcli/discussions)
 - 📝 **Améliorer la documentation** - Corrigez des fautes, clarifiez, ajoutez des exemples
 - 🔧 **Soumettre du code** - Corrigez des bugs, implémentez des fonctionnalités, améliorez les performances
 - 🧪 **Ajouter des tests** - Augmentez la couverture, ajoutez des cas limites
@@ -286,8 +286,8 @@ Sauf indication contraire explicite de votre part, toute contribution intentionn
 **Besoin d'aide ?**
 
 - 📖 Consultez la [documentation API](https://docs.rs/dynamic-cli)
-- 💬 Ouvrez une [discussion](https://github.com/OWNER/dynamic-cli/discussions)
-- 🐛 Signalez une [issue](https://github.com/OWNER/dynamic-cli/issues)
+- 💬 Ouvrez une [discussion](https://github.com/biface/dcli/discussions)
+- 🐛 Signalez une [issue](https://github.com/biface/dcli/issues)
 - 📧 Contactez les mainteneurs
 
 **Trouvé une vulnérabilité de sécurité ?**  
@@ -303,4 +303,4 @@ Si vous trouvez dynamic-cli utile, veuillez :
 - 📢 **Partager** avec d'autres qui pourraient le trouver utile
 - 📝 **Écrire** un article de blog ou un tutoriel!
 
-**Dernière mise à jour** : 2026-01-11
+**Dernière mise à jour** : 2026-01-12

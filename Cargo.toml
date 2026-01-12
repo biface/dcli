@@ -1,6 +1,6 @@
 [package]
 name = "dynamic-cli"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Dynamic CLI Contributors"]
 license = "MIT OR Apache-2.0"
@@ -8,7 +8,7 @@ description = "A framework for building configurable CLI and REPL applications f
 readme = "README.md"
 repository = "https://github.com/biface/dcli"
 documentation = "https://docs.rs/dynamic-cli"
-homepage = "https://github.com/biface/dli"
+homepage = "https://github.com/biface/dcli"
 keywords = ["cli", "repl", "command", "yaml", "configuration"]
 categories = ["command-line-interface", "command-line-utilities", "config"]
 rust-version = "1.70"
@@ -42,7 +42,7 @@ dirs = "5.0"
 [dev-dependencies]
 # Testing utilities
 tempfile = "3.13"
-criterion = { version = "0.8", features = ["html_reports"] }
+#criterion = { version = "0.8", features = ["html_reports"] }
 
 # CLI testing (for future use when binary is created)
 # assert_cmd = "2.1"
