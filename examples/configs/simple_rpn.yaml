@@ -1,0 +1,123 @@
+# Simple RPN Calculator configuration file
+#
+# This file defines the commands for a simple Reverse Polish Notation calculator.
+# Each command manipulates s shared stack stored in the execution context.
+#
+# In memory of the awesome Hewlett Packard 41 CX, the context also shares the `last x` register.
+#
+
+metadata:
+  version: "0.1.0"
+  prompt: "rpn"
+  prompt_suffix: " > "
+
+commands:
+
+  # Stack manipulation commands
+
+  - name: push
+    aliases: []
+    description: "Push a number onto the stack, and store it to last x register"
+    required: true
+    arguments:
+      - name: value
+        arg_type: float
+        required: true
+        description: "The number to push"
+        validation: []
+    options: []
+    implementation: "push_command"
+
+  - name: pop
+    aliases: []
+    description: "Pop and display the top value from the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "pop_command"
+
+  - name: lastx
+    aliases: []
+    description: "Display the last pushed value onto the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "lastx_command"
+
+  - name: swap
+    aliases: ["X<>Y"]
+    description: "Exchange top of the stack and the previous record"
+    required: false
+    arguments: []
+    options: []
+    implementation: "swap_command"
+
+  - name: peek
+    aliases: []
+    description: "Display the top value without remove it"
+    required: false
+    arguments: []
+    options: []
+    implementation: "peek_command"
+
+  - name: show
+    aliases: ["display", "stack"]
+    description: "Display the entire stack as a list"
+    required: false
+    arguments: []
+    options: []
+    implementation: "show_command"
+
+  - name: clear
+    aliases: []
+    description: "Clear the entire stack and last x register"
+    required: false
+    arguments: []
+    options: []
+    implementation: "clear_command"
+
+  # arithmetic operations
+
+  - name: add
+    aliases: ["+"]
+    description: "Pop two values, push their sum"
+    required: true
+    arguments: []
+    options: []
+    implementation: "add_function"
+
+  - name: sub
+    aliases: [ "-" ]
+    description: "Pop two values, push their difference"
+    required: true
+    arguments: [ ]
+    options: [ ]
+    implementation: "sub_function"
+
+  - name: mul
+    aliases: [ "*" ]
+    description: "Pop two values, push their product"
+    required: true
+    arguments: [ ]
+    options: [ ]
+    implementation: "mul_function"
+
+  - name: div
+    aliases: [ "/" ]
+    description: "Pop two values, push their quotient"
+    required: false
+    arguments: []
+    options: []
+    implementation: "div_function"
+
+  # Logarithm functions
+
+  - name: ln
+    aliases: []
+    description: "Natural logarithm"
+    required: false
+    arguments: []
+    options: []
+    implementation: "ln_function"
+
+global_options: []
