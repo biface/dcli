@@ -154,21 +154,29 @@ Completion rate:    50.0%
 
 ---
 
+### 4. Reverse Polish Notation calculator
+
+The Reverse Polish Notation is also called postfix notation. A RPN calculator uses a stack to store numbers and process
+them later. This notation does not require parentheses.
+
+The expression `(5 + 4) * 3` is then written as follows: `5 4 + 3 *` or even `3 5 4 + *`
+
+
 ## 🎯 What These Examples Demonstrate
 
 ### Framework Features
 
-| Feature | Calculator | File Manager | Task Runner |
-|---------|-----------|--------------|-------------|
-| **REPL Mode** | ✓ | ✓ | ✓ |
-| **CLI Mode** | ✓ | ✓ | ✓ |
-| **Context Management** | ✓ | ✓ | ✓ |
-| **Argument Parsing** | ✓ | ✓ | ✓ |
-| **Validation** | Basic | Path validation | Advanced |
-| **Error Handling** | ✓ | ✓ | ✓ |
-| **Options/Flags** | - | ✓ | ✓ |
-| **Formatted Output** | ✓ | ✓ | ✓ |
-| **State Persistence** | History | Statistics | Task list |
+| Feature                | Calculator | File Manager    | Task Runner  |
+|------------------------|------------|-----------------|--------------|
+| **REPL Mode**          | ✓          | ✓               | ✓            |
+| **CLI Mode**           | ✓          | ✓               | ✓            |
+| **Context Management** | ✓          | ✓               | ✓            |
+| **Argument Parsing**   | ✓          | ✓               | ✓            |
+| **Validation**         | Basic      | Path validation | Advanced     |
+| **Error Handling**     | ✓          | ✓               | ✓            |
+| **Options/Flags**      | -          | ✓               | ✓            |
+| **Formatted Output**   | ✓          | ✓               | ✓            |
+| **State Persistence**  | History    | Statistics      | Task list    |
 
 ### Design Patterns
 
@@ -299,7 +307,7 @@ impl ExecutionContext for MyContext {
 }
 ```
 
-2. **Implement command handlers:**
+3. **Implement command handlers:**
 ```rust
 struct MyCommand;
 

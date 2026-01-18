@@ -72,6 +72,10 @@ commands:
 global_options: []
 ```
 
+> Note :
+> 
+>  La syntaxe du fichier de configuration est disponible dans [cet espace projet](CONFIG_SYNTAX_REFERENCE.fr.md) 
+
 **2. Implémentez vos gestionnaires de commandes** :
 
 ```rust
@@ -233,7 +237,7 @@ git push origin feature/ma-fonctionnalite
 
 ### Directives de Développement
 
-**Avant de soumettre une pull request :**
+**Avant de soumettre une `pull request` :**
 
 - [ ] Le code suit les directives de style Rust (`cargo fmt`)
 - [ ] Tous les tests passent (`cargo test --all-features`)
@@ -301,6 +305,6 @@ Si vous trouvez dynamic-cli utile, veuillez :
 
 - ⭐ **Étoiler le dépôt** sur GitHub
 - 📢 **Partager** avec d'autres qui pourraient le trouver utile
-- 📝 **Écrire** un article de blog ou un tutoriel!
+- 📝 **Écrire** un article de blog ou un tutoriel !
 
 **Dernière mise à jour** : 2026-01-12

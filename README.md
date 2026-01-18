@@ -71,6 +71,9 @@ commands:
 
 global_options: []
 ```
+> Note :
+> 
+> The proper syntax for the configuration file is available in [the project repository](CONFIG_SYNTAX_REFERENCE.md).  
 
 **2. Implement your command handlers**:
 
