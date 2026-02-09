@@ -1,45 +1,36 @@
 # Codecov Configuration for dynamic-cli
-# CLI/REPL Framework for Rust
-# https://docs.codecov.com/docs/codecov-yaml
+# CLI/REPL Framework
 
 # Coverage targets and thresholds
 coverage:
   precision: 2
   round: down
-  range: "70...100"
+  range: 70...100
   
   status:
-    # Overall project coverage
     project:
       default:
-        target: 85%           # Target: >85% coverage
-        threshold: 2%         # Alert if drop >2%
-        informational: false
+        target: 85%
+        threshold: 2%
         
-    # Per-patch coverage (new code in PRs)
     patch:
       default:
-        target: 80%           # Minimum 80% for new code
-        threshold: 5%         # Allow 5% variation
-        informational: false
+        target: 80%
+        threshold: 5%
 
 # Comment behavior on pull requests
 comment:
-  layout: "reach, diff, flags, files"
+  layout: reach,diff,flags,files
   behavior: default
   require_changes: false
-  require_base: false
-  require_head: true
 
 # Ignore patterns
 ignore:
-  - "tests/**/*"              # Integration tests
-  - "examples/**/*"           # Example applications
-  - "benches/**/*"            # Benchmarks
-  - "**/tests.rs"             # Test modules
-  - "**/test_*.rs"            # Test utilities
+  - "tests/**/*"
+  - "examples/**/*"
+  - "benches/**/*"
 
-# Flag configuration for different parts of the codebase
+# Flag configuration
 flags:
   core:
     paths:
@@ -48,36 +39,21 @@ flags:
       - src/context/
       - src/executor/
       - src/registry/
-    carryforward: true
-    
+      
   parsing:
     paths:
       - src/parser/
       - src/validator/
-    carryforward: true
-    
+      
   interface:
     paths:
       - src/interface/
       - src/builder.rs
-    carryforward: true
-    
+      
   utils:
     paths:
       - src/utils.rs
-    carryforward: true
 
-# GitHub checks configuration
+# GitHub checks
 github_checks:
   annotations: true
-
-# Codecov AI (if available)
-codecov_bot:
-  enabled: true
-
-# Repository settings
-codecov:
-  require_ci_to_pass: true
-  notify:
-    after_n_builds: 1
-    wait_for_ci: true

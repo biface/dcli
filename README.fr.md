@@ -1,8 +1,7 @@
 # dynamic-cli
 
 [![Crates.io](https://img.shields.io/crates/v/dynamic-cli.svg)](https://crates.io/crates/dynamic-cli)
-[![codecov](https://codecov.io/gh/biface/dcli/branch/main/graph/badge.svg)](https://codecov.io/gh/biface/dcli)
-[![Documentation](https://docs.rs/dynamic-cli/badge.svg)](https://docs.rs/dynamic-cli)
+[![codecov](https://codecov.io/gh/biface/dcli/graph/badge.svg?token=58T5WKC802)](https://codecov.io/gh/biface/dcli)[![Documentation](https://docs.rs/dynamic-cli/badge.svg)](https://docs.rs/dynamic-cli)
 [![Licence](https://img.shields.io/badge/licence-MIT%20OU%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 Un framework Rust puissant pour créer des applications CLI et REPL configurables via des fichiers YAML/JSON.
