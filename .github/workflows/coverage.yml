@@ -7,10 +7,12 @@ on:
   push:
     branches: 
       - main
+      - master
       - 'feature/**'      # Toutes les branches feature/solver, feature/physics, etc.
   pull_request:
     branches: 
       - main
+      - master
 
 env:
   CARGO_TERM_COLOR: always
