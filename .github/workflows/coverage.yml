@@ -1,0 +1,85 @@
+name: Code Coverage
+
+# Génère et publie le rapport de couverture de code sur codecov.io
+# Utilise cargo-llvm-cov pour une couverture précise
+
+on:
+  push:
+    branches: 
+      - main
+      - 'feature/**'      # Toutes les branches feature/solver, feature/physics, etc.
+  pull_request:
+    branches: 
+      - main
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+          
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+          
+      - name: Cache cargo index
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-index-
+          
+      - name: Cache cargo build
+        uses: actions/cache@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+          
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+        
+      - name: Generate code coverage
+        run: |
+          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+          flags: unittests
+          name: codecov-chrom-rs
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
+          
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report
+          path: lcov.info
+          retention-days: 30
+          
+      - name: Display coverage summary
+        run: |
+          echo "📊 Coverage Report Generated"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "View detailed report at: https://codecov.io/gh/${{ github.repository }}"

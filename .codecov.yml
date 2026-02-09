@@ -1,0 +1,83 @@
+# Codecov Configuration for dynamic-cli
+# CLI/REPL Framework for Rust
+# https://docs.codecov.com/docs/codecov-yaml
+
+# Coverage targets and thresholds
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  
+  status:
+    # Overall project coverage
+    project:
+      default:
+        target: 85%           # Target: >85% coverage
+        threshold: 2%         # Alert if drop >2%
+        informational: false
+        
+    # Per-patch coverage (new code in PRs)
+    patch:
+      default:
+        target: 80%           # Minimum 80% for new code
+        threshold: 5%         # Allow 5% variation
+        informational: false
+
+# Comment behavior on pull requests
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: false
+  require_head: true
+
+# Ignore patterns
+ignore:
+  - "tests/**/*"              # Integration tests
+  - "examples/**/*"           # Example applications
+  - "benches/**/*"            # Benchmarks
+  - "**/tests.rs"             # Test modules
+  - "**/test_*.rs"            # Test utilities
+
+# Flag configuration for different parts of the codebase
+flags:
+  core:
+    paths:
+      - src/error/
+      - src/config/
+      - src/context/
+      - src/executor/
+      - src/registry/
+    carryforward: true
+    
+  parsing:
+    paths:
+      - src/parser/
+      - src/validator/
+    carryforward: true
+    
+  interface:
+    paths:
+      - src/interface/
+      - src/builder.rs
+    carryforward: true
+    
+  utils:
+    paths:
+      - src/utils.rs
+    carryforward: true
+
+# GitHub checks configuration
+github_checks:
+  annotations: true
+
+# Codecov AI (if available)
+codecov_bot:
+  enabled: true
+
+# Repository settings
+codecov:
+  require_ci_to_pass: true
+  notify:
+    after_n_builds: 1
+    wait_for_ci: true
