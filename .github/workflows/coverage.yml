@@ -5,14 +5,14 @@ name: Code Coverage
 
 on:
   push:
-    branches: 
-      - main
+    branches:
       - master
+      - main
       - 'feature/**'      # Toutes les branches feature/solver, feature/physics, etc.
   pull_request:
-    branches: 
-      - main
+    branches:
       - master
+      - main
 
 env:
   CARGO_TERM_COLOR: always
@@ -33,7 +33,7 @@ jobs:
           components: llvm-tools-preview
           
       - name: Cache cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -41,7 +41,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
           
       - name: Cache cargo index
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
@@ -49,7 +49,7 @@ jobs:
             ${{ runner.os }}-cargo-index-
           
       - name: Cache cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -69,12 +69,12 @@ jobs:
           files: lcov.info
           fail_ci_if_error: false
           flags: unittests
-          name: codecov-chrom-rs
+          name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
           
       - name: Archive code coverage results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: code-coverage-report
           path: lcov.info
