@@ -1,0 +1,23 @@
+# .github/ISSUE_TEMPLATE/config.yml
+#
+# Configure la page de sélection de template sur GitHub.
+# Désactive les issues "blank" pour forcer l'usage des templates.
+# Les discussions sont renvoyées vers l'onglet Discussions.
+
+blank_issues_enabled: false
+
+contact_links:
+  - name: "💬 Question ou idée générale"
+    url: https://github.com/biface/dcli/discussions
+    about: >
+      Pour toute question d'utilisation, proposition informelle ou retour
+      d'expérience — préférer l'onglet Discussions plutôt qu'une issue.
+
+  - name: "📖 Documentation API"
+    url: https://docs.rs/dynamic-cli
+    about: >
+      Consulter la documentation complète sur docs.rs avant d'ouvrir une issue.
+
+  - name: "📦 crates.io"
+    url: https://crates.io/crates/dynamic-cli
+    about: "Versions publiées et dépendances."

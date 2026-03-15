@@ -1,0 +1,150 @@
+name: "✨ Feature"
+description: >
+  Proposer une nouvelle fonctionnalité ou amélioration pour dynamic-cli.
+title: "[FEAT] "
+labels:
+  - "type: feature"
+  - "status: triage"
+
+body:
+  # ── Motivation ───────────────────────────────────────────────────────────────
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation — Pourquoi ?"
+      description: >
+        Quel problème utilisateur ou développeur cette fonctionnalité résout-elle ?
+        Quel cas d'usage concret est actuellement impossible ou pénible ?
+      placeholder: |
+        En tant qu'utilisateur de dynamic-cli, je ne peux pas…
+        La limitation actuelle du module `xxx` m'oblige à…
+    validations:
+      required: true
+
+  # ── Description ──────────────────────────────────────────────────────────────
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description — Quoi ?"
+      description: "Description précise de la fonctionnalité souhaitée."
+      placeholder: |
+        Ajouter une méthode `xxx` sur `CliBuilder` qui…
+        Le module `yyy` devrait exposer un trait `ZZZ` permettant…
+    validations:
+      required: true
+
+  # ── Critères d'acceptation ───────────────────────────────────────────────────
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: "Critères d'acceptation"
+      description: >
+        Liste de conditions vérifiables. Chaque critère doit pouvoir se traduire
+        en un test unitaire ou de doc.
+      placeholder: |
+        - [ ] `cargo test` passe (couverture ≥ 85 %)
+        - [ ] `cargo clippy -- -D warnings` : 0 warning
+        - [ ] `cargo test --doc` : exemples rustdoc compilent et passent
+        - [ ] Rétro-compatibilité : l'API publique existante est inchangée
+        - [ ] `CHANGELOG.md` mis à jour
+      render: markdown
+    validations:
+      required: true
+
+  # ── API proposée ─────────────────────────────────────────────────────────────
+  - type: textarea
+    id: api-sketch
+    attributes:
+      label: "Esquisse d'API (optionnel)"
+      description: >
+        Signatures Rust envisagées, exemples d'utilisation, structure de config YAML
+        si applicable. Pas besoin d'être définitif.
+      placeholder: |
+        ```rust
+        // Dans le prelude
+        pub trait HelpFormatter {
+            fn format(&self, config: &AppConfig) -> String;
+        }
+
+        // Dans CliBuilder
+        pub fn help_formatter(mut self, f: Box<dyn HelpFormatter>) -> Self { … }
+        ```
+      render: markdown
+    validations:
+      required: false
+
+  # ── Décisions liées ──────────────────────────────────────────────────────────
+  - type: input
+    id: related-dd
+    attributes:
+      label: "Design Decisions liées"
+      description: "DDxxx qui couvrent les choix d'architecture associés."
+      placeholder: "DD010, DD012"
+    validations:
+      required: false
+
+  # ── Modules / scopes affectés ────────────────────────────────────────────────
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: "Modules / scopes affectés"
+      description: "Ajouter les labels `scope:` correspondants manuellement après création."
+      options:
+        - label: "`api` — interface publique / prelude"
+        - label: "`cli` — parser, interface, builder"
+        - label: "`docs` — rustdoc, exemples, guides"
+        - label: "`tests` — couverture, doc-tests"
+        - label: "`ci` — pipeline, codecov, clippy"
+
+  # ── Métadonnées ──────────────────────────────────────────────────────────────
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priorité"
+      description: "Appliquer le label `priority:` correspondant après création."
+      options:
+        - "none — nice-to-have, hors roadmap immédiate"
+        - "low — dans la version suivante"
+        - "medium — dans la version cible"
+        - "high — bloquant pour la publication"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: "Effort estimé"
+      description: "Appliquer le label `effort:` correspondant après création."
+      options:
+        - "XS — < 1 h"
+        - "S  — ½ journée"
+        - "M  — 1 journée"
+        - "L  — 2–3 jours"
+        - "XL — > 3 jours"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: "Changement cassant ?"
+      description: >
+        Si oui, ajouter `type: breaking` à la place de `type: feature`
+        et vérifier la contrainte `chrom-rs`.
+      options:
+        - "Non — rétro-compatible"
+        - "Oui — nécessite une version mineure / majeure dédiée"
+    validations:
+      required: true
+
+  # ── Checklist de soumission ──────────────────────────────────────────────────
+  - type: checkboxes
+    id: submit-checklist
+    attributes:
+      label: "Checklist avant soumission"
+      options:
+        - label: "La fonctionnalité n'existe pas déjà (vérification docs.rs + issues ouvertes)"
+          required: true
+        - label: "La contrainte rétro-compatibilité a été évaluée (`chrom-rs` dépend de `0.1.1`)"
+          required: true
+        - label: "Une DD est créée ou référencée si des choix d'architecture sont impliqués"

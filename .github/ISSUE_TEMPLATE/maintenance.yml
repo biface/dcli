@@ -1,0 +1,134 @@
+name: "🔧 Maintenance"
+description: >
+  Tâche technique sans nouvelle fonctionnalité : docs, refactoring, tests,
+  CI/CD, performance, dépréciation.
+title: "[MAINT] "
+labels:
+  - "status: triage"
+
+body:
+  # ── Type de maintenance ──────────────────────────────────────────────────────
+  - type: dropdown
+    id: maint-type
+    attributes:
+      label: "Type de tâche"
+      description: >
+        Sélectionner le type principal.
+        Remplacer le label `status: triage` par le `type:` correspondant après création.
+      options:
+        - "chore   — mise à jour dépendances, ménage, configuration"
+        - "docs    — rustdoc, README, guides, exemples"
+        - "test    — ajout / correction de tests, couverture"
+        - "refactor — restructuration sans changement de comportement"
+        - "ci      — GitHub Actions, codecov, clippy config"
+        - "perf    — optimisation performances"
+        - "deprecation — marquer du code obsolète (`#[deprecated]`)"
+    validations:
+      required: true
+
+  # ── Description ──────────────────────────────────────────────────────────────
+  - type: textarea
+    id: description
+    attributes:
+      label: "Description de la tâche"
+      description: "Que faut-il faire, et pourquoi maintenant ?"
+      placeholder: |
+        Mettre à jour `rustyline` de `14.0` vers `15.x` suite au changelog upstream.
+        Vérifier que l'interface REPL se comporte identiquement après la mise à jour.
+    validations:
+      required: true
+
+  # ── Critères de complétion ───────────────────────────────────────────────────
+  - type: textarea
+    id: done
+    attributes:
+      label: "Critères de complétion"
+      description: "Conditions objectives pour fermer cette issue."
+      placeholder: |
+        - [ ] `cargo test --all-features` passe
+        - [ ] `cargo clippy -- -D warnings` : 0 warning
+        - [ ] `CHANGELOG.md` mis à jour si nécessaire
+        - [ ] `Cargo.lock` committé si mise à jour de dépendance
+      render: markdown
+    validations:
+      required: true
+
+  # ── Motivation / urgence ─────────────────────────────────────────────────────
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation / urgence (optionnel)"
+      description: >
+        Pourquoi cette tâche maintenant plutôt que plus tard ?
+        Ex. : vulnérabilité, dette technique bloquante, prérequis pour une feature.
+    validations:
+      required: false
+
+  # ── Modules / scopes affectés ────────────────────────────────────────────────
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: "Modules / scopes affectés"
+      description: "Ajouter les labels `scope:` correspondants manuellement après création."
+      options:
+        - label: "`api` — interface publique / prelude"
+        - label: "`cli` — parser, interface, builder"
+        - label: "`docs` — rustdoc, exemples, guides"
+        - label: "`tests` — couverture, doc-tests"
+        - label: "`ci` — pipeline, codecov, clippy"
+
+  # ── Métadonnées ──────────────────────────────────────────────────────────────
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priorité"
+      description: "Appliquer le label `priority:` correspondant après création."
+      options:
+        - "none — à faire un jour, hors sprint"
+        - "low — avant la prochaine version mineure"
+        - "medium — dans la version cible"
+        - "high — bloque la publication ou la CI"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: "Effort estimé"
+      description: "Appliquer le label `effort:` correspondant après création."
+      options:
+        - "XS — < 1 h"
+        - "S  — ½ journée"
+        - "M  — 1 journée"
+        - "L  — 2–3 jours"
+        - "XL — > 3 jours"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: "Couche écosystème"
+      description: "Appliquer le label `ecosystem:` correspondant après création."
+      options:
+        - "language — idiomes Rust"
+        - "framework — architecture dynamic-cli"
+        - "ops — publication, crates.io"
+        - "pipeline — toolchain, CI"
+    validations:
+      required: false
+
+  # ── Tâche de mise à jour de dépendance (optionnel) ───────────────────────────
+  - type: textarea
+    id: dep-update
+    attributes:
+      label: "Détail mise à jour de dépendance (si applicable)"
+      description: "Remplir uniquement pour un `type: chore` de mise à jour."
+      placeholder: |
+        | Crate | Avant | Après | Breaking ? |
+        |-------|-------|-------|------------|
+        | rustyline | 14.0 | 15.x | À vérifier |
+        | colored   | 3.0  | 3.x  | Non        |
+      render: markdown
+    validations:
+      required: false

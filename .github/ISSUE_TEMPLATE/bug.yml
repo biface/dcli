@@ -1,0 +1,157 @@
+name: "🐛 Bug"
+description: >
+  Signaler un comportement incorrect, une panique, ou un résultat inattendu
+  dans dynamic-cli.
+title: "[BUG] "
+labels:
+  - "type: bug"
+  - "status: triage"
+  - "priority: high"
+
+body:
+  # ── Résumé ───────────────────────────────────────────────────────────────────
+  - type: textarea
+    id: summary
+    attributes:
+      label: "Résumé du problème"
+      description: "Une phrase : ce qui se passe vs ce qui devrait se passer."
+      placeholder: "Lors de l'appel à `CliBuilder::build()` avec une config YAML vide, le programme panique au lieu de retourner `Err`."
+    validations:
+      required: true
+
+  # ── Comportement attendu ──────────────────────────────────────────────────────
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Comportement attendu"
+      placeholder: "Retourner `Err(DynamicCliError::ConfigError(…))` avec un message explicite."
+    validations:
+      required: true
+
+  # ── Comportement observé ─────────────────────────────────────────────────────
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Comportement observé"
+      placeholder: |
+        ```
+        thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/config/mod.rs:42:10
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  # ── Reproduction ─────────────────────────────────────────────────────────────
+  - type: textarea
+    id: repro
+    attributes:
+      label: "Étapes de reproduction"
+      description: >
+        Code Rust minimal reproduisant le problème (MCVE).
+        Un test unitaire échouant est idéal.
+      placeholder: |
+        ```rust
+        use dynamic_cli::prelude::*;
+
+        #[test]
+        fn repro_empty_config() {
+            let result = CliBuilder::new()
+                .config_file("non_existent.yaml")
+                .build();
+            assert!(result.is_err()); // panic ici au lieu d'Err
+        }
+        ```
+      render: markdown
+    validations:
+      required: true
+
+  # ── Environnement ────────────────────────────────────────────────────────────
+  - type: input
+    id: rust-version
+    attributes:
+      label: "Version Rust"
+      description: "Résultat de `rustc --version`"
+      placeholder: "rustc 1.85.0 (4d91de4e4 2025-02-17)"
+    validations:
+      required: true
+
+  - type: input
+    id: dcli-version
+    attributes:
+      label: "Version dynamic-cli"
+      placeholder: "0.1.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Système d'exploitation"
+      options:
+        - "Linux"
+        - "macOS"
+        - "Windows"
+        - "Autre"
+    validations:
+      required: true
+
+  # ── Module concerné ──────────────────────────────────────────────────────────
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: "Module(s) concerné(s)"
+      description: "Ajouter les labels `scope:` correspondants manuellement après création."
+      options:
+        - label: "`api` — interface publique / prelude"
+        - label: "`cli` — parser, interface, builder"
+        - label: "`docs` — rustdoc, exemples"
+        - label: "`tests` — couverture"
+        - label: "`ci` — pipeline"
+
+  # ── Métadonnées ──────────────────────────────────────────────────────────────
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Sévérité / Priorité"
+      description: >
+        Le label `priority: high` est appliqué par défaut. Ajuster si nécessaire.
+      options:
+        - "high — panique, corruption de données, régression publique"
+        - "medium — comportement incorrect, workaround disponible"
+        - "low — cosmétique, message d'erreur imprécis"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: "Effort de correction estimé"
+      description: "Appliquer le label `effort:` correspondant après création."
+      options:
+        - "XS — typo, guard clause manquant"
+        - "S  — correction localisée (1 module)"
+        - "M  — correction multi-modules"
+        - "L  — refactoring requis"
+        - "XL — impact architectural"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: breaking-fix
+    attributes:
+      label: "La correction est-elle un changement cassant ?"
+      description: "Si oui, ajouter aussi `type: breaking`."
+      options:
+        - "Non — correction transparente"
+        - "Oui — modification d'API nécessaire"
+    validations:
+      required: true
+
+  # ── Contexte additionnel ─────────────────────────────────────────────────────
+  - type: textarea
+    id: extra
+    attributes:
+      label: "Contexte additionnel"
+      description: "Logs complets, backtrace, config YAML utilisée, etc."
+    validations:
+      required: false

@@ -1,0 +1,170 @@
+name: "🧭 Design Decision (DD)"
+description: >
+  Proposer ou documenter une décision d'architecture / de conception.
+  Correspond aux ADR du fichier DESIGN_DECISIONS.md.
+title: "[DD] "
+labels:
+  - "type: decision"
+  - "status: triage"
+
+body:
+  # ── Numérotation & identité ──────────────────────────────────────────────────
+  - type: input
+    id: dd-id
+    attributes:
+      label: "Identifiant DD"
+      description: >
+        Numéro séquentiel à trois chiffres (ex. `DD013`).
+        Consulter DESIGN_DECISIONS.md pour le prochain numéro disponible.
+      placeholder: "DDxxx"
+    validations:
+      required: true
+
+  - type: input
+    id: target-version
+    attributes:
+      label: "Version cible"
+      description: "Version du projet où cette décision prend effet."
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  # ── Contexte ─────────────────────────────────────────────────────────────────
+  - type: textarea
+    id: context
+    attributes:
+      label: "Contexte"
+      description: >
+        Pourquoi cette décision est-elle nécessaire ?
+        Quelle contrainte, lacune ou opportunité la motive ?
+      placeholder: |
+        Le module `xxx` ne supporte pas encore...
+        La dépendance `yyy` pose le problème suivant...
+    validations:
+      required: true
+
+  # ── Options envisagées ───────────────────────────────────────────────────────
+  - type: textarea
+    id: options
+    attributes:
+      label: "Options envisagées"
+      description: >
+        Lister les alternatives, avec pour chacune ses avantages et ses risques.
+        Utiliser un tableau Markdown pour faciliter la comparaison.
+      placeholder: |
+        | Option | Avantage | Risque / coût |
+        |--------|----------|---------------|
+        | **A** — … | … | … |
+        | **B** — … | … | … |
+        | **C** — … | … | … |
+      render: markdown
+    validations:
+      required: true
+
+  # ── Recommandation ───────────────────────────────────────────────────────────
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: "Recommandation préliminaire"
+      description: "L'option favorisée et sa justification courte."
+      placeholder: "Option A — parce que…"
+    validations:
+      required: false
+
+  # ── Conséquences ─────────────────────────────────────────────────────────────
+  - type: textarea
+    id: consequences
+    attributes:
+      label: "Conséquences anticipées"
+      description: >
+        Impact sur l'API publique, les dépendances, les tests, la rétro-compatibilité,
+        ou les décisions futures.
+      placeholder: |
+        - Modifie la signature de `xxx` → breaking change si non feature-flaggé
+        - Nécessite une nouvelle dépendance : `yyy`
+        - Implique de mettre à jour `DESIGN_DECISIONS.md` (DDxxx)
+    validations:
+      required: false
+
+  # ── Modules / scopes affectés ────────────────────────────────────────────────
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: "Modules / scopes affectés"
+      description: >
+        Cocher les modules concernés.
+        Ajouter les labels `scope:` correspondants manuellement après création.
+      options:
+        - label: "`api` — interface publique / prelude"
+        - label: "`cli` — parser, interface, builder"
+        - label: "`docs` — rustdoc, exemples, guides"
+        - label: "`tests` — couverture, doc-tests"
+        - label: "`ci` — pipeline, codecov, clippy"
+
+  # ── Métadonnées ──────────────────────────────────────────────────────────────
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priorité"
+      description: "Appliquer le label `priority:` correspondant après création."
+      options:
+        - "none — pas urgente, informative"
+        - "low — à traiter dans la version cible"
+        - "medium — bloque une fonctionnalité"
+        - "high — bloque la publication"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: "Effort de décision estimé"
+      description: >
+        Temps pour documenter, valider et intégrer la décision dans le code.
+        Appliquer le label `effort:` correspondant après création.
+      options:
+        - "XS — < 1 h (évidence, consensus immédiat)"
+        - "S  — ½ journée (recherche légère)"
+        - "M  — 1 journée (prototype ou benchmark)"
+        - "L  — 2–3 jours (refactoring impliqué)"
+        - "XL — > 3 jours (impact architectural majeur)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: "Couche écosystème concernée"
+      description: "Appliquer le label `ecosystem:` correspondant après création."
+      options:
+        - "language — idiomes Rust, borrow checker, traits"
+        - "framework — architecture dynamic-cli"
+        - "ops — publication crates.io, CI/CD"
+        - "pipeline — toolchain, tarpaulin, clippy"
+    validations:
+      required: false
+
+  # ── Liens & références ───────────────────────────────────────────────────────
+  - type: textarea
+    id: references
+    attributes:
+      label: "Références & issues liées"
+      description: >
+        DDxxx précédentes, issues GitHub, PR, liens crates.io / RFC Rust pertinents.
+      placeholder: |
+        - Découle de DD001 (object-safety)
+        - Bloque #42 (feature: --help dynamique)
+        - RFC Rust : https://…
+    validations:
+      required: false
+
+  # ── Checklist de clôture ─────────────────────────────────────────────────────
+  - type: checkboxes
+    id: done-checklist
+    attributes:
+      label: "Checklist de clôture (à cocher avant de fermer l'issue)"
+      options:
+        - label: "La décision est documentée dans `DESIGN_DECISIONS.md`"
+        - label: "Les modules impactés sont identifiés"
+        - label: "Les issues / PR de mise en œuvre sont liées"
+        - label: "Le label `status: closed` a été appliqué"
