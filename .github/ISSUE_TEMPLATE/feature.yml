@@ -1,5 +1,5 @@
 name: "✨ Feature"
-description: "Propose a new feature or improvement for dynamic-cli."
+description: "Propose a new feature or improvement."
 title: "[FEAT] "
 labels:
   - "type: feature"
@@ -14,7 +14,7 @@ body:
         What problem does this feature solve?
         Which use case is currently impossible or cumbersome?
       placeholder: |
-        As a dynamic-cli user, I cannot…
+        As a user, I cannot…
         The current limitation of the `xxx` module forces me to…
     validations:
       required: true
@@ -25,8 +25,8 @@ body:
       label: "What?"
       description: "Precise description of the desired feature."
       placeholder: |
-        Add a method `xxx` on `CliBuilder` that…
-        The `yyy` module should expose a trait `ZZZ` enabling…
+        Add a method `xxx` on `YyyStruct` that…
+        The `zzz` module should expose a trait enabling…
     validations:
       required: true
 
@@ -39,9 +39,10 @@ body:
         a unit test or documentation test.
       placeholder: |
         - [ ] `cargo test` passes — coverage ≥ 85 %
-        - [ ] `cargo clippy -- -D warnings`: 0 warnings
-        - [ ] `cargo test --doc`: rustdoc examples compile and pass
-        - [ ] Existing public API unchanged
+        - [ ] `cargo clippy -- -D warnings`: 0 errors
+        - [ ] `cargo fmt --check`: no diff
+        - [ ] Doctests compile and pass
+        - [ ] Existing public API unchanged (verified by `cargo-semver-checks`)
         - [ ] `CHANGELOG.md` updated
       render: markdown
     validations:
@@ -52,16 +53,19 @@ body:
     attributes:
       label: "API sketch (optional)"
       description: >
-        Proposed Rust signatures, usage examples, or YAML config structure.
+        Proposed signatures, usage examples, or trait definitions.
         Need not be final.
       placeholder: |
         ```rust
-        pub trait HelpFormatter {
+        pub trait MyFormatter {
             fn format(&self, config: &AppConfig) -> String;
         }
 
-        // In CliBuilder
-        pub fn help_formatter(mut self, f: Box<dyn HelpFormatter>) -> Self { … }
+        impl Builder {
+            pub fn set_formatter<F: MyFormatter>(mut self, f: F) -> Self {
+                ...
+            }
+        }
         ```
       render: markdown
     validations:
@@ -72,7 +76,7 @@ body:
     attributes:
       label: "Related Design Decisions"
       description: "DD issue numbers covering the associated architecture choices."
-      placeholder: "#xx (DD010), #xx (DD012)"
+      placeholder: "#xx (DD-010), #xx (DD-012)"
     validations:
       required: false
 
@@ -82,11 +86,10 @@ body:
       label: "Affected scopes"
       description: "Apply the matching `scope:` labels manually after creation."
       options:
-        - label: "`api` — public interface & prelude"
-        - label: "`cli` — parser, interface, builder"
+        - label: "`api` — public traits or types"
         - label: "`docs` — rustdoc, examples, guides"
-        - label: "`tests` — coverage, doc-tests"
-        - label: "`ci` — pipeline, codecov, clippy"
+        - label: "`tests` — unit tests, integration tests, doctests"
+        - label: "`ci` — GitHub Actions, coverage, semver-checks"
 
   - type: dropdown
     id: priority
@@ -121,7 +124,8 @@ body:
       label: "Breaking change?"
       description: >
         If yes, replace `type: feature` with `type: breaking`
-        and verify the `chrom-rs` constraint.
+        and update the version constraints accordingly.
+        `cargo-semver-checks` will be run in CI to confirm.
       options:
         - "No — backward-compatible"
         - "Yes — requires a minor or major version bump"
@@ -133,10 +137,8 @@ body:
     attributes:
       label: "Pre-submission checklist"
       options:
-        - label: "The feature does not already exist (checked docs.rs + open issues)"
+        - label: "The feature does not already exist (checked docs and open issues)"
           required: true
-        - label: >
-            The backward-compatibility constraint has been assessed
-            (`chrom-rs` depends on `dynamic-cli = "0.1.1"`)
+        - label: "The backward-compatibility constraint has been assessed"
           required: true
         - label: "A DD issue is created or referenced if architecture choices are involved"

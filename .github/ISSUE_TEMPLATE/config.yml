@@ -2,15 +2,15 @@ blank_issues_enabled: true
 
 contact_links:
   - name: "💬 General question or idea"
-    url: https://github.com/biface/dcli/discussions
+    url: https://github.com/biface/REPO/discussions
     about: >
       For usage questions, informal proposals, or experience reports —
       please use Discussions rather than opening an issue.
 
   - name: "📖 API Documentation"
-    url: https://docs.rs/dynamic-cli
+    url: https://docs.rs/CRATE
     about: "Check the full documentation on docs.rs before opening an issue."
 
   - name: "📦 crates.io"
-    url: https://crates.io/crates/dynamic-cli
-    about: "Published versions and dependencies."
+    url: https://crates.io/crates/CRATE
+    about: "Published versions and release history."

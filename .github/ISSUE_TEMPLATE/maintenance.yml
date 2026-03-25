@@ -15,13 +15,13 @@ body:
         Select the primary type, then replace `status: triage`
         with the matching `type:` label after creation.
       options:
-        - "chore      — dependencies, housekeeping, configuration"
-        - "docs       — rustdoc, README, guides, examples"
-        - "test       — adding or fixing tests, coverage"
-        - "refactor   — restructuring without behaviour change"
-        - "ci         — GitHub Actions, codecov, clippy config"
-        - "perf       — performance optimisation"
-        - "deprecation — mark obsolete code with `#[deprecated]`"
+        - "chore       — dependencies, housekeeping, configuration"
+        - "docs        — rustdoc, README, guides, examples"
+        - "test        — adding or fixing tests, coverage"
+        - "refactor    — restructuring without behaviour change"
+        - "ci          — cargo, GitHub Actions, pipeline config"
+        - "perf        — performance optimisation"
+        - "deprecation — mark obsolete code with deprecation warnings"
     validations:
       required: true
 
@@ -31,8 +31,8 @@ body:
       label: "Description"
       description: "What needs to be done, and why now?"
       placeholder: >
-        Update `rustyline` from `14.0` to `15.x` following the upstream
-        changelog. Verify the REPL interface behaves identically after the update.
+        Update `serde` from `1.0.195` to `1.0.197` following the upstream
+        changelog. Verify serialisation behaviour is identical after the update.
     validations:
       required: true
 
@@ -42,11 +42,12 @@ body:
       label: "Completion criteria"
       description: "Objective conditions to close this issue."
       placeholder: |
-        - [ ] `cargo test --all-features` passes
-        - [ ] `cargo clippy -- -D warnings`: 0 warnings
-        - [ ] `cargo test --doc` passes
+        - [ ] `cargo test` passes
+        - [ ] `cargo clippy -- -D warnings`: 0 errors
+        - [ ] `cargo fmt --check`: no diff
+        - [ ] Coverage ≥ threshold defined in `.cargo/config.toml`
         - [ ] `CHANGELOG.md` updated if necessary
-        - [ ] `Cargo.lock` committed if a dependency was updated
+        - [ ] `Cargo.toml` and `Cargo.lock` committed if a dependency was updated
       render: markdown
     validations:
       required: true
@@ -57,7 +58,7 @@ body:
       label: "Urgency (optional)"
       description: >
         Why this task now rather than later?
-        E.g.: vulnerability, blocking technical debt, prerequisite for a feature.
+        E.g.: vulnerability (CVE, RUSTSEC), blocking technical debt, prerequisite for a feature.
     validations:
       required: false
 
@@ -67,11 +68,10 @@ body:
       label: "Affected scopes"
       description: "Apply the matching `scope:` labels manually after creation."
       options:
-        - label: "`api` — public interface & prelude"
-        - label: "`cli` — parser, interface, builder"
+        - label: "`api` — public traits or types"
         - label: "`docs` — rustdoc, examples, guides"
-        - label: "`tests` — coverage, doc-tests"
-        - label: "`ci` — pipeline, codecov, clippy"
+        - label: "`tests` — unit tests, integration tests, doctests"
+        - label: "`ci` — GitHub Actions, coverage, semver-checks"
 
   - type: dropdown
     id: priority
@@ -106,10 +106,10 @@ body:
       label: "Ecosystem layer"
       description: "Apply the matching `ecosystem:` label after creation."
       options:
-        - "language — Rust idioms"
-        - "framework — dynamic-cli architecture"
-        - "ops — crates.io publishing"
-        - "pipeline — toolchain, CI"
+        - "language — Rust idioms, borrow checker, traits, generics, MSRV"
+        - "framework — nalgebra, faer, rayon, thiserror"
+        - "ops — crates.io publishing, packaging, NOTICE"
+        - "pipeline — cargo, cargo-llvm-cov, clippy, cargo-semver-checks, GitHub Actions"
     validations:
       required: false
 
@@ -119,10 +119,11 @@ body:
       label: "Dependency update detail (optional)"
       description: "Fill in only for a dependency-update `type: chore`."
       placeholder: |
-        | Crate     | Before | After | Breaking? |
-        |-----------|--------|-------|-----------|
-        | rustyline | 14.0   | 15.x  | TBD       |
-        | colored   | 3.0    | 3.x   | No        |
+        | Crate    | Before   | After    | Breaking? | Advisory            |
+        |----------|----------|----------|-----------|---------------------|
+        | serde    | 1.0.195  | 1.0.197  | No        | —                   |
+        | thiserror| 1.x      | 2.x      | Yes       | —                   |
+        | openssl  | 0.10.64  | 0.10.66  | No        | RUSTSEC-2024-XXXX   |
       render: markdown
     validations:
       required: false

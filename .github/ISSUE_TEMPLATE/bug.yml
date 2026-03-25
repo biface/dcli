@@ -1,7 +1,6 @@
 name: "🐛 Bug"
 description: >
-  Report an incorrect behaviour, a panic, or an unexpected result
-  in dynamic-cli.
+  Report an incorrect behaviour, a panic, or an unexpected result.
 title: "[BUG] "
 labels:
   - "type: bug"
@@ -15,8 +14,8 @@ body:
       label: "Summary"
       description: "One sentence: what happens vs what should happen."
       placeholder: >
-        When calling `CliBuilder::build()` with an empty YAML config,
-        the program panics instead of returning `Err`.
+        When calling `MyStruct::build()` with an empty config,
+        the function panics instead of returning a typed `Err`.
     validations:
       required: true
 
@@ -25,7 +24,7 @@ body:
     attributes:
       label: "Expected behaviour"
       placeholder: >
-        Return `Err(DynamicCliError::ConfigError(…))` with an explicit message.
+        Return `Err(ConfigError::MissingKey(...))` with an explicit message.
     validations:
       required: true
 
@@ -36,7 +35,8 @@ body:
       placeholder: |
         ```
         thread 'main' panicked at 'called `Option::unwrap()` on a `None` value',
-        src/config/mod.rs:42:10
+        src/core.rs:42:25
+        note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
         ```
       render: markdown
     validations:
@@ -48,17 +48,14 @@ body:
       label: "Reproduction steps"
       description: >
         Minimal Rust code reproducing the issue (MCVE).
-        A failing unit test is ideal.
+        A failing `#[test]` is ideal.
       placeholder: |
         ```rust
-        use dynamic_cli::prelude::*;
-
         #[test]
-        fn repro_empty_config() {
-            let result = CliBuilder::new()
-                .config_file("non_existent.yaml")
-                .build();
-            assert!(result.is_err()); // panics here instead of returning Err
+        fn test_repro_empty_config() {
+            let result = MyStruct::build(Config::default());
+            assert!(matches!(result, Err(ConfigError::MissingKey(_))));
+            // currently panics instead
         }
         ```
       render: markdown
@@ -66,19 +63,32 @@ body:
       required: true
 
   - type: input
-    id: rust-version
+    id: rustc-version
     attributes:
-      label: "Rust version"
+      label: "Rust toolchain version"
       description: "Output of `rustc --version`."
-      placeholder: "rustc 1.85.0 (4d91de4e4 2025-02-17)"
+      placeholder: "rustc 1.78.0 (9b00956e5 2024-04-29)"
     validations:
       required: true
 
   - type: input
-    id: dcli-version
+    id: crate-version
     attributes:
-      label: "dynamic-cli version"
+      label: "Crate version"
+      description: "Version listed in `Cargo.toml` or output of `cargo pkgid`."
       placeholder: "0.1.1"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "Environment"
+      description: "OS, relevant dependencies and their versions."
+      placeholder: |
+        - OS: Ubuntu 24.04 / macOS 15 / Windows 11
+        - cargo: 1.78.0
+        - Relevant deps: serde==1.0.197, thiserror==1.0.61
     validations:
       required: true
 
@@ -100,11 +110,10 @@ body:
       label: "Affected module(s)"
       description: "Apply the matching `scope:` labels manually after creation."
       options:
-        - label: "`api` — public interface & prelude"
-        - label: "`cli` — parser, interface, builder"
+        - label: "`api` — public traits or types"
         - label: "`docs` — rustdoc, examples"
-        - label: "`tests` — coverage"
-        - label: "`ci` — pipeline"
+        - label: "`tests` — unit tests, integration tests, doctests"
+        - label: "`ci` — GitHub Actions, pipeline"
 
   - type: dropdown
     id: priority
@@ -112,7 +121,7 @@ body:
       label: "Severity"
       description: "`priority: high` is applied by default. Adjust if needed."
       options:
-        - "high — panic, data corruption, public regression"
+        - "high — panic, unsoundness, data corruption, public regression"
         - "medium — incorrect behaviour, workaround available"
         - "low — cosmetic, imprecise error message"
     validations:
@@ -124,7 +133,7 @@ body:
       label: "Estimated fix effort"
       description: "Apply the matching `effort:` label after creation."
       options:
-        - "XS — typo, missing guard clause"
+        - "XS — typo, missing guard"
         - "S  — localised fix (1 module)"
         - "M  — multi-module fix"
         - "L  — refactoring required"
@@ -147,6 +156,8 @@ body:
     id: extra
     attributes:
       label: "Additional context"
-      description: "Full logs, backtrace, YAML config used, etc."
+      description: >
+        Full backtrace (`RUST_BACKTRACE=1`), logs, config files used,
+        `cargo tree` output, etc.
     validations:
       required: false
