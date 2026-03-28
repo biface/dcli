@@ -120,7 +120,9 @@ impl SimpleRpnContext {
     }
 
     fn binary_op<F>(&mut self, operation: F, operator_name: &str) -> Result<()>
-    where F: FnOnce(f64, f64) -> f64 {
+    where
+        F: FnOnce(f64, f64) -> f64,
+    {
         let x = self.pop()?;
         let y = self.pop()?;
         let result = operation(x, y);
@@ -130,7 +132,9 @@ impl SimpleRpnContext {
     }
 
     fn single_op<F>(&mut self, operation: F, operator_name: &str) -> Result<()>
-    where F: FnOnce(f64) -> f64 {
+    where
+        F: FnOnce(f64) -> f64,
+    {
         let x = self.pop()?;
         let result = operation(x);
         self.push(result);
@@ -176,24 +180,20 @@ impl CommandHandler for PushCommand {
 
         // Parse the value arguments
         let cli_value = args.get("value").ok_or_else(|| {
-            DynamicCliError::Parse(
-                dynamic_cli::error::ParseError::MissingArgument {
-                    argument: "value".to_string(),
-                    command: "push".to_string(),
-                }
-            )
+            DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
+                argument: "value".to_string(),
+                command: "push".to_string(),
+            })
         })?;
 
         // convert in float
         let value = cli_value.parse::<f64>().map_err(|_| {
-            DynamicCliError::Parse(
-                dynamic_cli::error::ParseError::TypeParseError {
-                    arg_name: "value".to_string(),
-                    expected_type: "float".to_string(),
-                    value: cli_value.clone(),
-                    details: Some("not a valid number".to_string()),
-                }
-            )
+            DynamicCliError::Parse(dynamic_cli::error::ParseError::TypeParseError {
+                arg_name: "value".to_string(),
+                expected_type: "float".to_string(),
+                value: cli_value.clone(),
+                details: Some("not a valid number".to_string()),
+            })
         })?;
 
         rpn_context.push_x(value);
@@ -215,11 +215,9 @@ impl CommandHandler for PopCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
         let value = rpn_ctx.pop();
@@ -242,11 +240,9 @@ impl CommandHandler for LastXCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
         let value = rpn_ctx.last_x();
@@ -268,13 +264,10 @@ impl CommandHandler for SwapCommand {
         context: &mut dyn ExecutionContext,
         args: &HashMap<String, String>,
     ) -> Result<()> {
-
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
         rpn_ctx.swap();
@@ -297,11 +290,9 @@ impl CommandHandler for PeekCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
         match rpn_ctx.peek() {
@@ -326,11 +317,9 @@ impl CommandHandler for ShowCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
         rpn_ctx.display();
@@ -351,11 +340,9 @@ impl CommandHandler for ClearCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
         rpn_ctx.clear();
         rpn_ctx.display();
@@ -376,13 +363,11 @@ impl CommandHandler for AddCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
-        rpn_ctx.binary_op(|a , b| a + b, "+")?;
+        rpn_ctx.binary_op(|a, b| a + b, "+")?;
         Ok(())
     }
 }
@@ -400,14 +385,12 @@ impl CommandHandler for SubCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
-        rpn_ctx.binary_op(|a , b| a - b, "-")?;
+        rpn_ctx.binary_op(|a, b| a - b, "-")?;
         Ok(())
     }
 }
@@ -425,13 +408,11 @@ impl CommandHandler for MulCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
-        rpn_ctx.binary_op(|a , b| a * b, "*")?;
+        rpn_ctx.binary_op(|a, b| a * b, "*")?;
         Ok(())
     }
 }
@@ -449,14 +430,12 @@ impl CommandHandler for DivCommand {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
-        rpn_ctx.binary_op(|a , b| a / b, "/")?;
+        rpn_ctx.binary_op(|a, b| a / b, "/")?;
         Ok(())
     }
 }
@@ -474,14 +453,12 @@ impl CommandHandler for LnFunction {
         args: &HashMap<String, String>,
     ) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
-            DynamicCliError::Execution(
-                dynamic_cli::error::ExecutionError::ContextDowncastFailed {
-                    expected_type: "RPN Calculator context".to_string(),
-                }
-            )
+            DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
+                expected_type: "RPN Calculator context".to_string(),
+            })
         })?;
 
-        rpn_ctx.single_op(|a | a.ln(), "ln")?;
+        rpn_ctx.single_op(|a| a.ln(), "ln")?;
         Ok(())
     }
 }
@@ -523,8 +500,8 @@ fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::consts::PI;
     use super::*;
+    use std::f64::consts::PI;
     #[test]
     fn test_rpn_context_push_pop() {
         let mut ctx_test = SimpleRpnContext::default();
@@ -582,14 +559,18 @@ mod tests {
     #[test]
     fn test_push_command() {
         let ctx_test = SimpleRpnContext::default();
-        let mut rpn_execution_test : Box<dyn ExecutionContext> = Box::new(ctx_test);
+        let mut rpn_execution_test: Box<dyn ExecutionContext> = Box::new(ctx_test);
         let mut _args = HashMap::new();
-        let handler = PushCommand ;
+        let handler = PushCommand;
 
         _args.insert("value".to_string(), "45.0".to_string());
-        handler.execute(rpn_execution_test.as_mut(), &_args).unwrap();
+        handler
+            .execute(rpn_execution_test.as_mut(), &_args)
+            .unwrap();
 
-        let ctx_test = dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref()).unwrap();
+        let ctx_test =
+            dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
+                .unwrap();
         assert_eq!(ctx_test.peek(), Some(45.0));
     }
 
@@ -597,40 +578,52 @@ mod tests {
     fn test_ln_command() {
         let mut ctx_test = SimpleRpnContext::default();
         ctx_test.push_x(1.0);
-        let mut rpn_execution_test : Box<dyn ExecutionContext> = Box::new(ctx_test);
+        let mut rpn_execution_test: Box<dyn ExecutionContext> = Box::new(ctx_test);
         let args = HashMap::new();
         let handler = LnFunction;
 
         handler.execute(rpn_execution_test.as_mut(), &args).unwrap();
-        let ctx_test = dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref()).unwrap();
+        let ctx_test =
+            dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
+                .unwrap();
         assert_eq!(ctx_test.peek(), Some(0.0));
     }
 
     #[test]
     fn test_sequence_command() {
         let ctx_test = SimpleRpnContext::default();
-        let mut rpn_execution_test : Box<dyn ExecutionContext> = Box::new(ctx_test);
+        let mut rpn_execution_test: Box<dyn ExecutionContext> = Box::new(ctx_test);
         let mut _args = HashMap::new();
 
         // Pushes values
 
-        let push_cmd = PushCommand ;
+        let push_cmd = PushCommand;
         _args.insert("value".to_string(), "45.0".to_string());
-        push_cmd.execute(rpn_execution_test.as_mut(), &_args).unwrap();
-        let ctx_copy = dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref()).unwrap();
+        push_cmd
+            .execute(rpn_execution_test.as_mut(), &_args)
+            .unwrap();
+        let ctx_copy =
+            dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
+                .unwrap();
         assert_eq!(ctx_copy.peek(), Some(45.0));
         _args.insert("value".to_string(), "5".to_string());
-        push_cmd.execute(rpn_execution_test.as_mut(), &_args).unwrap();
-        let ctx_copy = dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref()).unwrap();
+        push_cmd
+            .execute(rpn_execution_test.as_mut(), &_args)
+            .unwrap();
+        let ctx_copy =
+            dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
+                .unwrap();
         assert_eq!(ctx_copy.peek(), Some(5.0));
         assert_eq!(ctx_copy.last_x(), 5.0);
 
-        let add_command = AddCommand ;
-        add_command.execute(rpn_execution_test.as_mut(), &_args).unwrap();
-        let ctx_test = dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref()).unwrap();
+        let add_command = AddCommand;
+        add_command
+            .execute(rpn_execution_test.as_mut(), &_args)
+            .unwrap();
+        let ctx_test =
+            dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
+                .unwrap();
         assert_eq!(ctx_test.peek(), Some(50.0));
         assert_eq!(ctx_test.last_x(), 5.0);
-
     }
-
 }
