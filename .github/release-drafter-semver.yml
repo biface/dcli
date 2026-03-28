@@ -1,0 +1,30 @@
+name: Release Drafter (SemVer)
+
+# -----------------------------------------------------------------------------
+# Activate this workflow in projects using the vX.Y.Z versioning scheme.
+# In projects using CalVer, use release-drafter-calver.yml instead.
+# -----------------------------------------------------------------------------
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update_release_draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter-semver.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
