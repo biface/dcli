@@ -1,18 +1,16 @@
 name: Code Coverage
 
-# Génère et publie le rapport de couverture de code sur codecov.io
-# Utilise cargo-llvm-cov pour une couverture précise
+# Generates and publishes the code coverage report to codecov.io
+# Uses cargo-llvm-cov for precise LLVM-based coverage
 
 on:
   push:
     branches:
       - master
-      - main
-      - 'feature/**'      # Toutes les branches feature/solver, feature/physics, etc.
+      - 'feature/**'      # all feature/* branches
   pull_request:
     branches:
       - master
-      - main
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,16 +20,16 @@ jobs:
   coverage:
     name: Generate Coverage Report
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-          
+
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -39,7 +37,7 @@ jobs:
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-registry-
-          
+
       - name: Cache cargo index
         uses: actions/cache@v4
         with:
@@ -47,7 +45,7 @@ jobs:
           key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-index-
-          
+
       - name: Cache cargo build
         uses: actions/cache@v4
         with:
@@ -55,31 +53,54 @@ jobs:
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-build-
-          
+
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-        
-      - name: Generate code coverage
+
+      # ── Run 1 : default features ──────────────────────────────────────────
+      # Active for all versions. Covers the 11 core modules:
+      # error, config, context, executor, registry, parser,
+      # validator, interface, builder, utils, prelude.
+      # v0.2.0+ also covers: help
+      - name: Generate code coverage — default features
         run: |
-          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-          
+          cargo llvm-cov --all-targets --workspace \
+            --lcov --output-path lcov-default.info
+
+      # ── Run 2 : all features ──────────────────────────────────────────────
+      # Activate at v0.5.0 when Cargo.toml declares optional features.
+      # Replace lcov-default.info with lcov-all.info in the upload step below.
+      #
+      # - name: Generate code coverage — all features
+      #   run: |
+      #     cargo llvm-cov --all-targets --all-features --workspace \
+      #       --lcov --output-path lcov-all.info
+
+      # ── Run 3 : async feature ─────────────────────────────────────────────
+      # Activate at v0.5.0 when Cargo.toml declares: [features] async = [...]
+      #
+      # - name: Generate code coverage — async feature
+      #   run: |
+      #     cargo llvm-cov --all-targets --features async --workspace \
+      #       --lcov --output-path lcov-async.info
+
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: lcov.info
+          files: lcov-default.info
           fail_ci_if_error: false
           flags: unittests
           name: codecov-umbrella
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
-          
+
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage-report
-          path: lcov.info
+          path: lcov-default.info
           retention-days: 30
-          
+
       - name: Display coverage summary
         run: |
           echo "📊 Coverage Report Generated"

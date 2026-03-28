@@ -1,0 +1,33 @@
+name: Release Drafter (SemVer)
+
+# -----------------------------------------------------------------------------
+# dynamic-cli uses the vX.Y.Z SemVer versioning scheme.
+# This workflow updates a release draft on every push to master and every PR event.
+# The draft is published manually when the milestone is closed.
+#
+# Configuration: .github/release-drafter-semver.yml
+# -----------------------------------------------------------------------------
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  update_release_draft:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          config-name: release-drafter-semver.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

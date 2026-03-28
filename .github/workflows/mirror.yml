@@ -1,0 +1,30 @@
+name: Mirror to GitLab
+
+on:
+  push:
+    branches: ['**']   # all branches
+    tags: ['**']       # all tags (includes releases)
+  delete:              # also synchronise branch/tag deletions
+
+jobs:
+  mirror:
+    name: Push mirror
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history required
+
+      - name: Push mirror to GitLab
+        run: |
+          git remote add gitlab \
+            https://oauth2:${GITLAB_TOKEN}@gitlab.com/open-works/dcli.git
+
+          # --mirror also pushes refs/remotes/* which GitLab rejects.
+          # Push branches and tags explicitly instead.
+          git push gitlab \
+            --prune \
+            "+refs/heads/*:refs/heads/*" \
+            "+refs/tags/*:refs/tags/*"
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
