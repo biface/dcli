@@ -134,13 +134,11 @@ impl DefaultHelpFormatter {
     }
 
     /// Resolve a command by name or alias. Returns `None` if not found.
-    fn find_command<'a>(
-        config: &'a CommandsConfig,
-        name: &str,
-    ) -> Option<&'a CommandDefinition> {
-        config.commands.iter().find(|cmd| {
-            cmd.name == name || cmd.aliases.iter().any(|a| a == name)
-        })
+    fn find_command<'a>(config: &'a CommandsConfig, name: &str) -> Option<&'a CommandDefinition> {
+        config
+            .commands
+            .iter()
+            .find(|cmd| cmd.name == name || cmd.aliases.iter().any(|a| a == name))
     }
 
     /// Format the ARGUMENTS section of a command.
@@ -581,7 +579,10 @@ mod tests {
         assert!(out.contains("OPTIONS:"), "should have OPTIONS section");
         assert!(out.contains("-l"), "should show short flag");
         assert!(out.contains("--loud"), "should show long flag");
-        assert!(out.contains("Use uppercase"), "should show option description");
+        assert!(
+            out.contains("Use uppercase"),
+            "should show option description"
+        );
     }
 
     #[test]
@@ -650,7 +651,10 @@ mod tests {
         let out = make_formatter().format_command(&config, "nonexistent");
 
         // Should list alternatives so the user can self-correct.
-        assert!(out.contains("hello"), "should list available command 'hello'");
+        assert!(
+            out.contains("hello"),
+            "should list available command 'hello'"
+        );
         assert!(
             out.contains("process"),
             "should list available command 'process'"

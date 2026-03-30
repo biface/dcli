@@ -248,8 +248,8 @@ mod tests {
     /// Verify that help types are accessible from the prelude
     #[test]
     fn test_help_prelude_imports() {
-        use crate::prelude::*;
         use crate::config::schema::{CommandsConfig, Metadata};
+        use crate::prelude::*;
 
         let config = CommandsConfig {
             metadata: Metadata {

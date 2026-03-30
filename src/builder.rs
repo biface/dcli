@@ -418,7 +418,7 @@ impl CliBuilder {
             context,
             prompt,
             config,
-            help_formatter: self.help_formatter
+            help_formatter: self.help_formatter,
         })
     }
 }
@@ -898,7 +898,9 @@ mod tests {
     fn test_run_cli_help_global() {
         let config = create_test_config();
         let context = Box::new(TestContext::default());
-        let handler = Box::new(TestHandler { name: "test".to_string() });
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
 
         let app = CliBuilder::new()
             .config(config)
@@ -916,7 +918,9 @@ mod tests {
     fn test_run_cli_help_command() {
         let config = create_test_config();
         let context = Box::new(TestContext::default());
-        let handler = Box::new(TestHandler { name: "test".to_string() });
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
 
         let app = CliBuilder::new()
             .config(config)
@@ -934,7 +938,9 @@ mod tests {
     fn test_run_cli_help_unknown_command_still_ok() {
         let config = create_test_config();
         let context = Box::new(TestContext::default());
-        let handler = Box::new(TestHandler { name: "test".to_string() });
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
 
         let app = CliBuilder::new()
             .config(config)
