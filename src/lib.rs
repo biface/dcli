@@ -93,12 +93,12 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod executor;
+pub mod help;
 pub mod interface;
 pub mod parser;
 pub mod registry;
 pub mod utils;
 pub mod validator;
-
 // ============================================================================
 // PUBLIC RE-EXPORTS (For convenience)
 // ============================================================================
@@ -130,6 +130,9 @@ pub use interface::{CliInterface, ReplInterface};
 
 // Builder types
 pub use builder::{CliApp, CliBuilder};
+
+// Helper system
+pub use help::{DefaultHelpFormatter, HelpFormatter};
 
 // Utility functions
 pub use utils::{
@@ -190,6 +193,9 @@ pub mod prelude {
     // Builder
     pub use crate::builder::{CliApp, CliBuilder};
 
+    // Help system — re-exported so framework users need only `use dynamic_cli::prelude::*`
+    pub use crate::help::{DefaultHelpFormatter, HelpFormatter};
+
     // Utilities (most commonly used)
     pub use crate::utils::{detect_type, is_blank, normalize, parse_bool, parse_float, parse_int};
 }
@@ -237,5 +243,29 @@ mod tests {
         let _registry = CommandRegistry::new();
 
         // If this compiles, re-exports are working
+    }
+
+    /// Verify that help types are accessible from the prelude
+    #[test]
+    fn test_help_prelude_imports() {
+        use crate::prelude::*;
+        use crate::config::schema::{CommandsConfig, Metadata};
+
+        let config = CommandsConfig {
+            metadata: Metadata {
+                version: "1.0.0".to_string(),
+                prompt: "test".to_string(),
+                prompt_suffix: " > ".to_string(),
+            },
+            commands: vec![],
+            global_options: vec![],
+        };
+
+        // DefaultHelpFormatter accessible from prelude
+        let f = DefaultHelpFormatter::new();
+        let _ = f.format_app(&config);
+
+        // Trait object usable (object-safe by design)
+        let _: Box<dyn HelpFormatter> = Box::new(DefaultHelpFormatter::new());
     }
 }

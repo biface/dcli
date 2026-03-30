@@ -48,6 +48,7 @@ use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{ConfigError, DynamicCliError, Result};
 use crate::executor::CommandHandler;
+use crate::help::{DefaultHelpFormatter, HelpFormatter};
 use crate::interface::{CliInterface, ReplInterface};
 use crate::registry::CommandRegistry;
 use std::collections::HashMap;
@@ -105,6 +106,9 @@ pub struct CliBuilder {
 
     /// REPL prompt (if None, will use config default or "cli")
     prompt: Option<String>,
+
+    /// Custom help formatter. None = DefaultHelpFormatter used lazily.
+    help_formatter: Option<Box<dyn HelpFormatter>>,
 }
 
 impl CliBuilder {
@@ -124,6 +128,7 @@ impl CliBuilder {
             context: None,
             handlers: HashMap::new(),
             prompt: None,
+            help_formatter: None,
         }
     }
 
@@ -271,6 +276,44 @@ impl CliBuilder {
         self
     }
 
+    /// Set a custom help formatter.
+    ///
+    /// By default, [`DefaultHelpFormatter`] is used lazily when `--help` is
+    /// detected. Call this method to supply your own implementation.
+    ///
+    /// The formatter is stored and transferred to [`CliApp`] during `build()`.
+    /// It is instantiated **only** when `--help` is detected in `run_cli()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `formatter` - Boxed implementation of [`HelpFormatter`]
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::CliBuilder;
+    /// use dynamic_cli::help::{HelpFormatter, DefaultHelpFormatter};
+    /// use dynamic_cli::config::schema::CommandsConfig;
+    ///
+    /// struct MyFormatter;
+    ///
+    /// impl HelpFormatter for MyFormatter {
+    ///     fn format_app(&self, config: &CommandsConfig) -> String {
+    ///         format!("Help for {}", config.metadata.prompt)
+    ///     }
+    ///     fn format_command(&self, config: &CommandsConfig, command: &str) -> String {
+    ///         format!("Help for command '{command}'")
+    ///     }
+    /// }
+    ///
+    /// let builder = CliBuilder::new()
+    ///     .help_formatter(Box::new(MyFormatter));
+    /// ```
+    pub fn help_formatter(mut self, formatter: Box<dyn HelpFormatter>) -> Self {
+        self.help_formatter = Some(formatter);
+        self
+    }
+
     /// Build the application
     ///
     /// Performs the following steps:
@@ -374,6 +417,8 @@ impl CliBuilder {
             registry,
             context,
             prompt,
+            config,
+            help_formatter: self.help_formatter
         })
     }
 }
@@ -427,6 +472,12 @@ pub struct CliApp {
 
     /// REPL prompt
     prompt: String,
+
+    /// Full configuration - needed by the help formatter
+    config: CommandsConfig,
+
+    /// Custom help formatter, or None to use DefaultHelpFormatter
+    help_formatter: Option<Box<dyn HelpFormatter>>,
 }
 
 impl std::fmt::Debug for CliApp {
@@ -435,6 +486,7 @@ impl std::fmt::Debug for CliApp {
             .field("prompt", &self.prompt)
             .field("registry", &"<CommandRegistry>")
             .field("context", &"<ExecutionContext>")
+            .field("help_formatter", &"<Option<Box<dyn HelpFormatter>>>")
             .finish()
     }
 }
@@ -478,6 +530,26 @@ impl CliApp {
     /// # }
     /// ```
     pub fn run_cli(self, args: Vec<String>) -> Result<()> {
+        // Intercept --help before command dispatch.
+        // The formatter is instantiated lazily, only when --help is detected.
+        match args.as_slice() {
+            [flag] if flag == "--help" => {
+                let formatter: Box<dyn HelpFormatter> = self
+                    .help_formatter
+                    .unwrap_or_else(|| Box::new(DefaultHelpFormatter::new()));
+                print!("{}", formatter.format_app(&self.config));
+                return Ok(());
+            }
+            [flag, command] if flag == "--help" => {
+                let formatter: Box<dyn HelpFormatter> = self
+                    .help_formatter
+                    .unwrap_or_else(|| Box::new(DefaultHelpFormatter::new()));
+                print!("{}", formatter.format_command(&self.config, command));
+                return Ok(());
+            }
+            _ => {}
+        }
+
         let cli = CliInterface::new(self.registry, self.context);
         cli.run(args)
     }
@@ -810,5 +882,69 @@ mod tests {
 
         // Prompt should be overridden
         assert_eq!(app.prompt, "custom");
+    }
+
+    #[test]
+    fn test_builder_with_help_formatter() {
+        use crate::help::DefaultHelpFormatter;
+
+        let formatter = Box::new(DefaultHelpFormatter::new());
+        let builder = CliBuilder::new().help_formatter(formatter);
+
+        assert!(builder.help_formatter.is_some());
+    }
+
+    #[test]
+    fn test_run_cli_help_global() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestHandler { name: "test".to_string() });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_handler("test_handler", handler)
+            .build()
+            .unwrap();
+
+        // --help should return Ok(()) without dispatching to any handler.
+        let result = app.run_cli(vec!["--help".to_string()]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_cli_help_command() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestHandler { name: "test".to_string() });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_handler("test_handler", handler)
+            .build()
+            .unwrap();
+
+        // --help <command> should return Ok(()) without dispatching.
+        let result = app.run_cli(vec!["--help".to_string(), "test".to_string()]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_run_cli_help_unknown_command_still_ok() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestHandler { name: "test".to_string() });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_handler("test_handler", handler)
+            .build()
+            .unwrap();
+
+        // --help with an unknown command name: formatter handles it gracefully.
+        let result = app.run_cli(vec!["--help".to_string(), "ghost".to_string()]);
+        assert!(result.is_ok());
     }
 }
