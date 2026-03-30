@@ -194,48 +194,44 @@ async = ["tokio", "async-trait"]
 
 ---
 
-## [0.2.0] - Planned (Q1-Q2 2026)
+## [0.2.0] - In progress (target Q2 2026)
 
 **Theme**: Built-in Help & Error Improvements  
-**Estimated Effort**: 3-4 weeks  
-**Dependencies**: v0.1.0
+**Dependencies**: v0.1.1
 
-### Planned
+### Added (issue #12)
 
 #### Built-in Help System
-- **Auto-generated help**: Generate help from configuration
-  ```bash
-  myapp help                 # List all commands
-  myapp help <command>       # Detailed help for specific command
-  myapp <command> --help     # Same as above
-  ```
-- **Rich formatting**: Colored, formatted help output
-- **Usage examples**: Show example usage from config
-- **Command categories**: Group related commands
+- New `help` module with a `HelpFormatter` trait and a `DefaultHelpFormatter`
+  implementation. Both are re-exported from the crate root and from `prelude`.
+- `CliBuilder::help_formatter(Box<dyn HelpFormatter>) -> Self` — optional
+  method to supply a custom formatter. Fully backward-compatible (additive).
+- `CliApp::run_cli()` intercepts `--help` and `--help <command>` before
+  command dispatch and prints formatted help to the terminal.
+  The formatter is instantiated lazily, only when `--help` is detected.
+- `DefaultHelpFormatter` produces aligned, colored output (via `colored`)
+  listing all commands, their arguments, options, and aliases.
+  Output is English-only; other languages are supported via custom
+  `HelpFormatter` implementations.
+- `CliApp` retains the `CommandsConfig` after `build()` to make it available
+  to the formatter at runtime (additive private field — no downstream breakage).
 
-#### Help Content
-- Command description and purpose
-- Required and optional arguments
-- Options with short/long forms
-- Default values
-- Validation rules
-- Examples from configuration or handlers
+### Fixed (issue #12)
 
-#### REPL Help
-- `help` command in REPL mode
-- Tab completion for help topics
-- Quick reference card
+- Pre-existing clippy warning `borrowed_box` on `CommandRegistry::get_handler()`
+  suppressed with a justified `#[allow(clippy::borrowed_box)]` attribute.
+  Changing the return type would be a breaking API change.
 
-#### Enhanced Error Messages
-- **Better context**: Show which command/argument caused error
-- **Suggestions improvements**: Better typo detection algorithm
-- **Error codes**: Unique error codes for debugging
-- **Actionable messages**: Tell user exactly how to fix
+### Planned (remaining)
 
-#### Documentation
-- Help system API for custom help handlers
-- Best practices for writing help text
-- Accessibility considerations
+#### REPL Help (issue #14)
+- `--help` and `--help <command>` support in REPL mode
+  (interception in `ReplInterface::run()`, reusing the stored `HelpFormatter`)
+
+#### Enhanced Error Messages (issue #13)
+- **Better context**: Show which command/argument caused the error
+- **Actionable messages**: Tell the user exactly how to fix
+- **Consistent suggestions**: Improved coverage across all error variants
 
 **Breaking Changes**: None
 
@@ -475,7 +471,7 @@ dynamic-cli/
 | Version   | Theme             | Key Features                 | Effort    | Status                |
 |-----------|-------------------|------------------------------|-----------|-----------------------|
 | **0.1.0** | Initial Release   | Complete framework           | -         | ✅ Released            |
-| **0.2.0** | Help & Errors     | Built-in help, better errors | 3-4 weeks | 🔵 Planned Q1-Q2 2026 |
+| **0.2.0** | Help & Errors     | Built-in help, better errors | 3-4 weeks | 🔵 In progress Q2 2026 |
 | **0.3.0** | Shell Integration | Completions, history         | 3-4 weeks | 🔵 Planned Q2 2026    |
 | **0.4.0** | Extensibility     | Plugin system                | 4-6 weeks | 🔵 Planned Q3 2026    |
 | **0.5.0** | Async Support     | Async handlers (optional)    | 4-6 weeks | 🔵 Planned Q4 2026    |
@@ -550,6 +546,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-01-12  
+**Last Updated**: 2026-03-30  
 **Current Version**: 0.1.1  
-**Next Release**: 0.2.0 (Planned Q1-Q2 2026)
+**Next Release**: 0.2.0 (In progress — target Q2 2026)
