@@ -411,6 +411,10 @@ impl CommandRegistry {
     ///     // Same handler
     /// }
     /// ```
+    // The return type &Box<dyn CommandHandler> is intentional: callers receive a
+    // reference to the owned box, which preserves the indirection needed for
+    // dynamic dispatch without transferring ownership.
+    #[allow(clippy::borrowed_box)]
     pub fn get_handler(&self, name: &str) -> Option<&Box<dyn CommandHandler>> {
         let canonical_name = self.resolve_name(name)?;
         self.commands
