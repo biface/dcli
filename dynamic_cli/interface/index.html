@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="User interface module"><title>dynamic_cli::interface - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module interface</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module interface</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#choosing-an-interface" title="Choosing an Interface">Choosing an Interface</a><ul><li><a href="#cli-interface" title="CLI Interface">CLI Interface</a></li><li><a href="#repl-interface" title="REPL Interface">REPL Interface</a></li></ul></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#error-handling" title="Error Handling">Error Handling</a><ul><li><a href="#cli-interface-1" title="CLI Interface">CLI Interface</a></li><li><a href="#repl-interface-1" title="REPL Interface">REPL Interface</a></li></ul></li><li><a href="#examples" title="Examples">Examples</a><ul><li><a href="#complete-cli-application" title="Complete CLI Application">Complete CLI Application</a></li><li><a href="#complete-repl-application" title="Complete REPL Application">Complete REPL Application</a></li></ul></li><li><a href="#module-structure" title="Module Structure">Module Structure</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>interface</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/interface/mod.rs.html#1-307">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>User interface module</p>
+<p>This module provides two main interfaces for interacting with the CLI framework:</p>
+<ul>
+<li><a href="cli/struct.CliInterface.html" title="struct dynamic_cli::interface::cli::CliInterface"><code>CliInterface</code></a>: One-shot command execution from command-line arguments</li>
+<li><a href="repl/struct.ReplInterface.html" title="struct dynamic_cli::interface::repl::ReplInterface"><code>ReplInterface</code></a>: Interactive REPL (Read-Eval-Print Loop) with history</li>
+</ul>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>The <code>interface</code> module is the user-facing layer of the framework. It handles:</p>
+<ul>
+<li>Parsing user input (CLI args or REPL lines)</li>
+<li>Executing commands through the registry</li>
+<li>Displaying results and errors</li>
+<li>Managing command history (REPL only)</li>
+</ul>
+<h2 id="choosing-an-interface"><a class="doc-anchor" href="#choosing-an-interface">§</a>Choosing an Interface</h2><h3 id="cli-interface"><a class="doc-anchor" href="#cli-interface">§</a>CLI Interface</h3>
+<p>Use <a href="cli/struct.CliInterface.html" title="struct dynamic_cli::interface::cli::CliInterface"><code>CliInterface</code></a> when:</p>
+<ul>
+<li>Running single commands from scripts</li>
+<li>Building traditional CLI tools</li>
+<li>No interaction is needed</li>
+<li>Each invocation is independent</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::interface::CliInterface;
+<span class="kw">use </span>dynamic_cli::prelude::<span class="kw-2">*</span>;
+
+<span class="kw">let </span>registry = CommandRegistry::new();
+<span class="kw">let </span>context = Box::new(MyContext::default());
+
+<span class="kw">let </span>cli = CliInterface::new(registry, context);
+cli.run(std::env::args().skip(<span class="number">1</span>).collect())<span class="question-mark">?</span>;</code></pre></div><h3 id="repl-interface"><a class="doc-anchor" href="#repl-interface">§</a>REPL Interface</h3>
+<p>Use <a href="repl/struct.ReplInterface.html" title="struct dynamic_cli::interface::repl::ReplInterface"><code>ReplInterface</code></a> when:</p>
+<ul>
+<li>Building interactive tools</li>
+<li>Users need to run multiple commands</li>
+<li>Context/state is preserved between commands</li>
+<li>Command history and line editing are desired</li>
+</ul>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::interface::ReplInterface;
+<span class="kw">use </span>dynamic_cli::prelude::<span class="kw-2">*</span>;
+
+<span class="kw">let </span>registry = CommandRegistry::new();
+<span class="kw">let </span>context = Box::new(MyContext::default());
+
+<span class="kw">let </span>repl = ReplInterface::new(registry, context, <span class="string">"myapp"</span>.to_string())<span class="question-mark">?</span>;
+repl.run()<span class="question-mark">?</span>; <span class="comment">// Enters interactive loop</span></code></pre></div><h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2>
+<p>Both interfaces follow the same flow:</p>
+<div class="example-wrap"><pre class="language-text"><code>User Input → Parser → Validator → Executor → Handler
+                                       ↓
+                                 ExecutionContext</code></pre></div>
+<p><strong>Key differences</strong>:</p>
+<div><table><thead><tr><th>Aspect</th><th>CLI</th><th>REPL</th></tr></thead><tbody>
+<tr><td>Input</td><td>Command-line args</td><td>Interactive lines</td></tr>
+<tr><td>Parser</td><td><a href="../parser/cli_parser/struct.CliParser.html" title="struct dynamic_cli::parser::cli_parser::CliParser"><code>CliParser</code></a></td><td><a href="../parser/repl_parser/struct.ReplParser.html" title="struct dynamic_cli::parser::repl_parser::ReplParser"><code>ReplParser</code></a></td></tr>
+<tr><td>History</td><td>None</td><td>Persistent to disk</td></tr>
+<tr><td>Errors</td><td>Exit process</td><td>Display and continue</td></tr>
+<tr><td>Lifecycle</td><td>One command, exit</td><td>Loop until user quits</td></tr>
+</tbody></table>
+</div><h2 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h2><h3 id="cli-interface-1"><a class="doc-anchor" href="#cli-interface-1">§</a>CLI Interface</h3>
+<p>Errors cause the process to exit with specific codes:</p>
+<ul>
+<li><code>0</code>: Success</li>
+<li><code>1</code>: Execution error</li>
+<li><code>2</code>: Parse/validation error</li>
+<li><code>3</code>: Other errors</li>
+</ul>
+<h3 id="repl-interface-1"><a class="doc-anchor" href="#repl-interface-1">§</a>REPL Interface</h3>
+<p>Errors are displayed but the REPL continues:</p>
+<ul>
+<li>Parse errors → show suggestions, continue</li>
+<li>Validation errors → explain issue, continue</li>
+<li>Execution errors → display error, continue</li>
+<li>Critical errors → exit REPL</li>
+</ul>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2><h3 id="complete-cli-application"><a class="doc-anchor" href="#complete-cli-application">§</a>Complete CLI Application</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>dynamic_cli::config::loader::load_config;
+<span class="kw">use </span>dynamic_cli::interface::CliInterface;
+<span class="kw">use </span>std::collections::HashMap;
+
+<span class="comment">// Define context
+</span><span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>AppContext {
+    data: Vec&lt;String&gt;,
+}
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>AppContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+}
+
+<span class="comment">// Define handler
+</span><span class="kw">struct </span>AddCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>AddCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; dynamic_cli::Result&lt;()&gt; {
+        <span class="kw">let </span>ctx = dynamic_cli::context::downcast_mut::&lt;AppContext&gt;(context).unwrap();
+        <span class="kw">let </span>item = args.get(<span class="string">"item"</span>).unwrap();
+        ctx.data.push(item.clone());
+        <span class="macro">println!</span>(<span class="string">"Added: {}"</span>, item);
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="kw">fn </span>main() -&gt; dynamic_cli::Result&lt;()&gt; {
+    <span class="comment">// Load configuration
+    </span><span class="kw">let </span>config = load_config(<span class="string">"commands.yaml"</span>)<span class="question-mark">?</span>;
+     
+    <span class="comment">// Build registry
+    </span><span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+    registry.register(
+        config.commands[<span class="number">0</span>].clone(),
+        Box::new(AddCommand),
+    )<span class="question-mark">?</span>;
+     
+    <span class="comment">// Create and run CLI
+    </span><span class="kw">let </span>context = Box::new(AppContext::default());
+    <span class="kw">let </span>cli = CliInterface::new(registry, context);
+    cli.run(std::env::args().skip(<span class="number">1</span>).collect())
+}</code></pre></div><h3 id="complete-repl-application"><a class="doc-anchor" href="#complete-repl-application">§</a>Complete REPL Application</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>dynamic_cli::config::loader::load_config;
+<span class="kw">use </span>dynamic_cli::interface::ReplInterface;
+<span class="kw">use </span>std::collections::HashMap;
+
+<span class="comment">// Same context and handler as above
+
+</span><span class="kw">fn </span>main() -&gt; dynamic_cli::Result&lt;()&gt; {
+    <span class="comment">// Load configuration
+    </span><span class="kw">let </span>config = load_config(<span class="string">"commands.yaml"</span>)<span class="question-mark">?</span>;
+     
+    <span class="comment">// Build registry
+    </span><span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+    registry.register(
+        config.commands[<span class="number">0</span>].clone(),
+        Box::new(AddCommand),
+    )<span class="question-mark">?</span>;
+     
+    <span class="comment">// Create and run REPL
+    </span><span class="kw">let </span>context = Box::new(AppContext::default());
+    <span class="kw">let </span>repl = ReplInterface::new(registry, context, <span class="string">"myapp"</span>.to_string())<span class="question-mark">?</span>;
+    repl.run() <span class="comment">// Interactive loop
+</span>}</code></pre></div><h2 id="module-structure"><a class="doc-anchor" href="#module-structure">§</a>Module Structure</h2>
+<ul>
+<li><a href="cli/index.html" title="mod dynamic_cli::interface::cli"><code>cli</code></a>: CLI interface implementation</li>
+<li><a href="repl/index.html" title="mod dynamic_cli::interface::repl"><code>repl</code></a>: REPL interface implementation</li>
+</ul>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.CliInterface"><code>pub use cli::<a class="struct" href="cli/struct.CliInterface.html" title="struct dynamic_cli::interface::cli::CliInterface">CliInterface</a>;</code></dt><dt id="reexport.ReplInterface"><code>pub use repl::<a class="struct" href="repl/struct.ReplInterface.html" title="struct dynamic_cli::interface::repl::ReplInterface">ReplInterface</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="cli/index.html" title="mod dynamic_cli::interface::cli">cli</a></dt><dd>CLI (Command-Line Interface) implementation</dd><dt><a class="mod" href="repl/index.html" title="mod dynamic_cli::interface::repl">repl</a></dt><dd>REPL (Read-Eval-Print Loop) implementation</dd></dl></section></div></main></body></html>

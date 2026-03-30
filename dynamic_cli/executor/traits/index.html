@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Command handler trait and related types"><title>dynamic_cli::executor::traits - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module traits</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module traits</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#design-principles" title="Design Principles">Design Principles</a><ul><li><a href="#object-safety" title="Object Safety">Object Safety</a></li><li><a href="#simple-type-signatures" title="Simple Type Signatures">Simple Type Signatures</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li></ul></li><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#traits">Module Items</a></h3><ul class="block"><li><a href="#traits" title="Traits">Traits</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In dynamic_<wbr>cli::<wbr>executor</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">dynamic_cli</a>::<wbr><a href="../index.html">executor</a></div><h1>Module <span>traits</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/dynamic_cli/executor/traits.rs.html#1-750">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Command handler trait and related types</p>
+<p>This module defines the core trait that all command implementations must implement.
+The trait is designed to be object-safe, meaning it can be used as a trait object
+(<code>&amp;dyn CommandHandler</code>), which is critical for dynamic command registration.</p>
+<h2 id="design-principles"><a class="doc-anchor" href="#design-principles">§</a>Design Principles</h2><h3 id="object-safety"><a class="doc-anchor" href="#object-safety">§</a>Object Safety</h3>
+<p>The <code>CommandHandler</code> trait is intentionally kept simple and object-safe:</p>
+<ul>
+<li>No generic methods (would prevent trait object usage)</li>
+<li>No associated types with type parameters</li>
+<li>All methods use concrete types or trait objects</li>
+</ul>
+<p>This allows the registry to store handlers as <code>Box&lt;dyn CommandHandler&gt;</code>,
+enabling dynamic command registration at runtime.</p>
+<h3 id="simple-type-signatures"><a class="doc-anchor" href="#simple-type-signatures">§</a>Simple Type Signatures</h3>
+<p>Arguments are passed as <code>HashMap&lt;String, String&gt;</code> rather than generic types.
+This design choice:</p>
+<ul>
+<li>Maintains object safety</li>
+<li>Provides flexibility in argument types</li>
+<li>Delegates type parsing to the parser module</li>
+</ul>
+<h3 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h3>
+<p>All handlers must be <code>Send + Sync</code> to support:</p>
+<ul>
+<li>Shared access across threads</li>
+<li>Potential async execution in the future</li>
+<li>Safe usage in multi-threaded contexts</li>
+</ul>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="comment">// Define a simple command handler
+</span><span class="kw">struct </span>HelloCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>HelloCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>name = args.get(<span class="string">"name"</span>).map(|s| s.as_str()).unwrap_or(<span class="string">"World"</span>);
+        <span class="macro">println!</span>(<span class="string">"Hello, {}!"</span>, name);
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.CommandHandler.html" title="trait dynamic_cli::executor::traits::CommandHandler">Command<wbr>Handler</a></dt><dd>Trait for command implementations</dd></dl></section></div></main></body></html>

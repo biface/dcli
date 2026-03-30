@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Command-line and REPL parsing"><title>dynamic_cli::parser - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module parser</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module parser</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#module-structure" title="Module Structure">Module Structure</a></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#design-principles" title="Design Principles">Design Principles</a><ul><li><a href="#1-separation-of-concerns" title="1. Separation of Concerns">1. Separation of Concerns</a></li><li><a href="#2-composability" title="2. Composability">2. Composability</a></li><li><a href="#3-error-clarity" title="3. Error Clarity">3. Error Clarity</a></li></ul></li><li><a href="#usage-examples" title="Usage Examples">Usage Examples</a><ul><li><a href="#cli-mode-direct-argument-parsing" title="CLI Mode (Direct Argument Parsing)">CLI Mode (Direct Argument Parsing)</a></li><li><a href="#repl-mode-interactive-parsing" title="REPL Mode (Interactive Parsing)">REPL Mode (Interactive Parsing)</a></li><li><a href="#type-parsing-low-level" title="Type Parsing (Low-Level)">Type Parsing (Low-Level)</a></li></ul></li><li><a href="#error-handling" title="Error Handling">Error Handling</a></li><li><a href="#performance-considerations" title="Performance Considerations">Performance Considerations</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li><li><a href="#future-extensions" title="Future Extensions">Future Extensions</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>parser</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/parser/mod.rs.html#1-557">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Command-line and REPL parsing</p>
+<p>This module provides comprehensive parsing functionality for both
+traditional command-line interfaces (CLI) and interactive REPL mode.</p>
+<h2 id="module-structure"><a class="doc-anchor" href="#module-structure">§</a>Module Structure</h2>
+<p>The parser module consists of three main components:</p>
+<ul>
+<li><a href="type_parser/index.html" title="mod dynamic_cli::parser::type_parser"><code>type_parser</code></a>: Type conversion functions (string → typed values)</li>
+<li><a href="cli_parser/index.html" title="mod dynamic_cli::parser::cli_parser"><code>cli_parser</code></a>: CLI argument parser (Unix-style options)</li>
+<li><a href="repl_parser/index.html" title="mod dynamic_cli::parser::repl_parser"><code>repl_parser</code></a>: REPL line parser (interactive mode)</li>
+</ul>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2><div class="example-wrap"><pre class="language-text"><code>┌─────────────────────────────────────────┐
+│         User Input                      │
+│   &quot;process file.txt --verbose&quot;          │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│       ReplParser (REPL mode)            │
+│   - Tokenize line                       │
+│   - Resolve command name via Registry   │
+│   - Delegate to CliParser               │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│       CliParser (CLI mode)              │
+│   - Parse positional arguments          │
+│   - Parse options (-v, --verbose)       │
+│   - Apply defaults                      │
+│   - Use TypeParser for conversion       │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│       TypeParser                        │
+│   - Convert strings to typed values     │
+│   - Validate type constraints           │
+└──────────────┬──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────┐
+│   HashMap&lt;String, String&gt;               │
+│   {&quot;input&quot;: &quot;file.txt&quot;,                 │
+│    &quot;verbose&quot;: &quot;true&quot;}                   │
+└─────────────────────────────────────────┘</code></pre></div><h2 id="design-principles"><a class="doc-anchor" href="#design-principles">§</a>Design Principles</h2><h3 id="1-separation-of-concerns"><a class="doc-anchor" href="#1-separation-of-concerns">§</a>1. Separation of Concerns</h3>
+<p>Each parser has a specific responsibility:</p>
+<ul>
+<li><strong>TypeParser</strong>: Handles type conversion only</li>
+<li><strong>CliParser</strong>: Handles CLI syntax (options, arguments)</li>
+<li><strong>ReplParser</strong>: Handles REPL-specific concerns (tokenization, command resolution)</li>
+</ul>
+<h3 id="2-composability"><a class="doc-anchor" href="#2-composability">§</a>2. Composability</h3>
+<p>Parsers compose naturally:</p>
+<ul>
+<li>ReplParser uses CliParser for argument parsing</li>
+<li>CliParser uses TypeParser for type conversion</li>
+<li>Each can be used independently when needed</li>
+</ul>
+<h3 id="3-error-clarity"><a class="doc-anchor" href="#3-error-clarity">§</a>3. Error Clarity</h3>
+<p>All parsers provide detailed error messages with:</p>
+<ul>
+<li>Clear descriptions of what went wrong</li>
+<li>Suggestions for typos (via Levenshtein distance)</li>
+<li>Hints for correct usage</li>
+</ul>
+<h2 id="usage-examples"><a class="doc-anchor" href="#usage-examples">§</a>Usage Examples</h2><h3 id="cli-mode-direct-argument-parsing"><a class="doc-anchor" href="#cli-mode-direct-argument-parsing">§</a>CLI Mode (Direct Argument Parsing)</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::parser::cli_parser::CliParser;
+<span class="kw">use </span>dynamic_cli::config::schema::{CommandDefinition, ArgumentDefinition, ArgumentType};
+
+<span class="kw">let </span>definition = CommandDefinition {
+    name: <span class="string">"process"</span>.to_string(),
+    aliases: <span class="macro">vec!</span>[],
+    description: <span class="string">"Process files"</span>.to_string(),
+    required: <span class="bool-val">false</span>,
+    arguments: <span class="macro">vec!</span>[
+        ArgumentDefinition {
+            name: <span class="string">"input"</span>.to_string(),
+            arg_type: ArgumentType::Path,
+            required: <span class="bool-val">true</span>,
+            description: <span class="string">"Input file"</span>.to_string(),
+            validation: <span class="macro">vec!</span>[],
+        }
+    ],
+    options: <span class="macro">vec!</span>[],
+    implementation: <span class="string">"handler"</span>.to_string(),
+};
+
+<span class="kw">let </span>parser = CliParser::new(<span class="kw-2">&amp;</span>definition);
+<span class="kw">let </span>args = <span class="macro">vec!</span>[<span class="string">"input.txt"</span>.to_string()];
+<span class="kw">let </span>parsed = parser.parse(<span class="kw-2">&amp;</span>args).unwrap();
+
+<span class="macro">assert_eq!</span>(parsed.get(<span class="string">"input"</span>), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="string">"input.txt"</span>.to_string()));</code></pre></div><h3 id="repl-mode-interactive-parsing"><a class="doc-anchor" href="#repl-mode-interactive-parsing">§</a>REPL Mode (Interactive Parsing)</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::parser::repl_parser::ReplParser;
+<span class="kw">use </span>dynamic_cli::registry::CommandRegistry;
+
+<span class="kw">let </span>registry = CommandRegistry::new();
+<span class="comment">// ... register commands ...
+
+</span><span class="kw">let </span>parser = ReplParser::new(<span class="kw-2">&amp;</span>registry);
+
+<span class="comment">// Parse user input
+</span><span class="kw">let </span>line = <span class="string">"process input.txt --verbose"</span>;
+<span class="kw">let </span>parsed = parser.parse_line(line).unwrap();
+
+<span class="macro">println!</span>(<span class="string">"Command: {}"</span>, parsed.command_name);
+<span class="macro">println!</span>(<span class="string">"Arguments: {:?}"</span>, parsed.arguments);</code></pre></div><h3 id="type-parsing-low-level"><a class="doc-anchor" href="#type-parsing-low-level">§</a>Type Parsing (Low-Level)</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::parser::type_parser::{parse_integer, parse_bool};
+
+<span class="kw">let </span>number = parse_integer(<span class="string">"42"</span>).unwrap();
+<span class="macro">assert_eq!</span>(number, <span class="number">42</span>);
+
+<span class="kw">let </span>flag = parse_bool(<span class="string">"yes"</span>).unwrap();
+<span class="macro">assert_eq!</span>(flag, <span class="bool-val">true</span>);</code></pre></div><h2 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h2>
+<p>All parsing functions return <a href="../error/type.Result.html" title="type dynamic_cli::error::Result"><code>Result&lt;T&gt;</code></a> where errors are instances
+of [<code>ParseError</code>]. Common error scenarios:</p>
+<ul>
+<li>
+<p><strong>Unknown command</strong>: User typed a non-existent command</p>
+<div class="example-wrap"><pre class="language-text"><code>Error: Unknown command: &#39;simulat&#39;
+? Did you mean:
+  • simulate
+  • validation</code></pre></div></li>
+<li>
+<p><strong>Type mismatch</strong>: Value cannot be converted to expected type</p>
+<div class="example-wrap"><pre class="language-text"><code>Error: Failed to parse count as integer: &#39;abc&#39;</code></pre></div></li>
+<li>
+<p><strong>Missing argument</strong>: Required argument not provided</p>
+<div class="example-wrap"><pre class="language-text"><code>Error: Missing required argument: input for command &#39;process&#39;</code></pre></div></li>
+</ul>
+<h2 id="performance-considerations"><a class="doc-anchor" href="#performance-considerations">§</a>Performance Considerations</h2>
+<ul>
+<li><strong>Type parsing</strong>: O(1) for most types, O(n) for string length</li>
+<li><strong>CLI parsing</strong>: O(n) where n = number of arguments</li>
+<li><strong>REPL parsing</strong>: O(m + n) where m = line length (tokenization), n = arguments</li>
+<li><strong>Command resolution</strong>: O(1) via HashMap lookup in registry</li>
+</ul>
+<h2 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h2>
+<p>All parsers are:</p>
+<ul>
+<li><strong>Stateless</strong>: Can be used concurrently from multiple threads</li>
+<li><strong>Borrowing</strong>: Use references to definitions/registry (no ownership)</li>
+<li><strong>Reusable</strong>: Can parse multiple commands with the same parser instance</li>
+</ul>
+<h2 id="future-extensions"><a class="doc-anchor" href="#future-extensions">§</a>Future Extensions</h2>
+<p>Potential enhancements for future versions:</p>
+<ul>
+<li>Support for subcommands (e.g., <code>git commit</code>)</li>
+<li>Environment variable expansion</li>
+<li>Glob pattern matching for paths</li>
+<li>Command history and auto-completion hints</li>
+<li>Streaming parser for very large inputs</li>
+</ul>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.CliParser"><code>pub use cli_parser::<a class="struct" href="cli_parser/struct.CliParser.html" title="struct dynamic_cli::parser::cli_parser::CliParser">CliParser</a>;</code></dt><dt id="reexport.ParsedCommand"><code>pub use repl_parser::<a class="struct" href="repl_parser/struct.ParsedCommand.html" title="struct dynamic_cli::parser::repl_parser::ParsedCommand">ParsedCommand</a>;</code></dt><dt id="reexport.ReplParser"><code>pub use repl_parser::<a class="struct" href="repl_parser/struct.ReplParser.html" title="struct dynamic_cli::parser::repl_parser::ReplParser">ReplParser</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="cli_parser/index.html" title="mod dynamic_cli::parser::cli_parser">cli_<wbr>parser</a></dt><dd>CLI argument parser</dd><dt><a class="mod" href="repl_parser/index.html" title="mod dynamic_cli::parser::repl_parser">repl_<wbr>parser</a></dt><dd>REPL line parser</dd><dt><a class="mod" href="type_parser/index.html" title="mod dynamic_cli::parser::type_parser">type_<wbr>parser</a></dt><dd>Type parsing functions</dd></dl></section></div></main></body></html>

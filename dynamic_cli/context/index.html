@@ -1,0 +1,128 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Execution context module"><title>dynamic_cli::context - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module context</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module context</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#key-concepts" title="Key Concepts">Key Concepts</a><ul><li><a href="#execution-context" title="Execution Context">Execution Context</a></li><li><a href="#type-safe-downcasting" title="Type-Safe Downcasting">Type-Safe Downcasting</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li></ul></li><li><a href="#common-patterns" title="Common Patterns">Common Patterns</a><ul><li><a href="#stateless-context" title="Stateless Context">Stateless Context</a></li><li><a href="#stateful-context" title="Stateful Context">Stateful Context</a></li><li><a href="#error-handling-in-commands" title="Error Handling in Commands">Error Handling in Commands</a></li></ul></li><li><a href="#architecture-notes" title="Architecture Notes">Architecture Notes</a><ul><li><a href="#why-use-trait-objects" title="Why Use Trait Objects?">Why Use Trait Objects?</a></li><li><a href="#why-require-send--sync" title="Why Require Send + Sync?">Why Require Send + Sync?</a></li><li><a href="#performance-considerations" title="Performance Considerations">Performance Considerations</a></li></ul></li><li><a href="#see-also" title="See Also">See Also</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>context</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/context/mod.rs.html#1-491">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Execution context module</p>
+<p>This module provides traits and utilities for managing execution context
+in CLI/REPL applications built with dynamic-cli.</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>The execution context is shared state that persists across command executions.
+Each application defines its own context type that implements the
+<a href="traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext"><code>ExecutionContext</code></a> trait.</p>
+<h2 id="key-concepts"><a class="doc-anchor" href="#key-concepts">§</a>Key Concepts</h2><h3 id="execution-context"><a class="doc-anchor" href="#execution-context">§</a>Execution Context</h3>
+<p>The context holds application-specific state that commands can read and modify:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>std::any::Any;
+
+<span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>AppContext {
+    session_id: String,
+    user_data: Vec&lt;String&gt;,
+    settings: std::collections::HashMap&lt;String, String&gt;,
+}
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>AppContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Any {
+        <span class="self">self
+    </span>}
+
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any {
+        <span class="self">self
+    </span>}
+}</code></pre></div><h3 id="type-safe-downcasting"><a class="doc-anchor" href="#type-safe-downcasting">§</a>Type-Safe Downcasting</h3>
+<p>Since the framework works with trait objects, commands must downcast
+the context to access their specific type:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::context::{ExecutionContext, downcast_mut};
+
+<span class="kw">fn </span>my_command(context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext) -&gt; <span class="prelude-ty">Result</span>&lt;(), String&gt; {
+    <span class="comment">// Downcast to concrete type
+    </span><span class="kw">let </span>app_ctx = downcast_mut::&lt;AppContext&gt;(context)
+        .ok_or(<span class="string">"Invalid context type"</span>)<span class="question-mark">?</span>;
+
+    <span class="comment">// Use the context
+    </span>app_ctx.counter += <span class="number">1</span>;
+
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div><h3 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h3>
+<p>All contexts must be <code>Send + Sync</code> to support:</p>
+<ul>
+<li>Multi-threaded command execution</li>
+<li>Async/await patterns</li>
+<li>Future framework extensibility</li>
+</ul>
+<h2 id="common-patterns"><a class="doc-anchor" href="#common-patterns">§</a>Common Patterns</h2><h3 id="stateless-context"><a class="doc-anchor" href="#stateless-context">§</a>Stateless Context</h3>
+<p>For simple applications that don’t need state:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>std::any::Any;
+
+<span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>EmptyContext;
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>EmptyContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Any { <span class="self">self </span>}
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any { <span class="self">self </span>}
+}</code></pre></div><h3 id="stateful-context"><a class="doc-anchor" href="#stateful-context">§</a>Stateful Context</h3>
+<p>For applications that maintain state:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>std::any::Any;
+<span class="kw">use </span>std::collections::HashMap;
+
+<span class="kw">struct </span>DatabaseContext {
+    connection_pool: Vec&lt;String&gt;, <span class="comment">// Simplified example
+    </span>cache: HashMap&lt;String, String&gt;,
+    transaction_count: u64,
+}
+
+<span class="kw">impl </span>Default <span class="kw">for </span>DatabaseContext {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            connection_pool: <span class="macro">vec!</span>[<span class="string">"conn1"</span>.to_string()],
+            cache: HashMap::new(),
+            transaction_count: <span class="number">0</span>,
+        }
+    }
+}
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>DatabaseContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>Any { <span class="self">self </span>}
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>Any { <span class="self">self </span>}
+}</code></pre></div><h3 id="error-handling-in-commands"><a class="doc-anchor" href="#error-handling-in-commands">§</a>Error Handling in Commands</h3>
+<p>Best practice for handling downcast failures:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::context::{ExecutionContext, downcast_mut};
+
+<span class="kw">fn </span>robust_handler(
+    context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
+    <span class="kw">let </span>ctx = downcast_mut::&lt;MyContext&gt;(context)
+        .ok_or(<span class="string">"Context type mismatch: expected MyContext"</span>)<span class="question-mark">?</span>;
+
+    ctx.value += <span class="number">1</span>;
+    <span class="prelude-val">Ok</span>(())
+}</code></pre></div><h2 id="architecture-notes"><a class="doc-anchor" href="#architecture-notes">§</a>Architecture Notes</h2><h3 id="why-use-trait-objects"><a class="doc-anchor" href="#why-use-trait-objects">§</a>Why Use Trait Objects?</h3>
+<p>The framework uses <code>dyn ExecutionContext</code> because:</p>
+<ol>
+<li>Each application defines its own context type</li>
+<li>The framework can’t know concrete types at compile time</li>
+<li>This provides maximum flexibility for users</li>
+</ol>
+<h3 id="why-require-send--sync"><a class="doc-anchor" href="#why-require-send--sync">§</a>Why Require Send + Sync?</h3>
+<p>Thread safety bounds enable:</p>
+<ul>
+<li>Sharing contexts across threads</li>
+<li>Compatibility with async runtimes (tokio, async-std)</li>
+<li>Future features like parallel command execution</li>
+</ul>
+<h3 id="performance-considerations"><a class="doc-anchor" href="#performance-considerations">§</a>Performance Considerations</h3>
+<ul>
+<li>Downcasting has minimal overhead (type ID comparison)</li>
+<li>Context access is not on the hot path for most commands</li>
+<li>The trait object indirection is negligible compared to I/O operations</li>
+</ul>
+<h2 id="see-also"><a class="doc-anchor" href="#see-also">§</a>See Also</h2>
+<ul>
+<li><a href="traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext"><code>ExecutionContext</code></a>: Core trait for contexts</li>
+<li><a href="traits/fn.downcast_ref.html" title="fn dynamic_cli::context::traits::downcast_ref"><code>downcast_ref()</code></a>: Helper function for immutable downcasting</li>
+<li><a href="traits/fn.downcast_mut.html" title="fn dynamic_cli::context::traits::downcast_mut"><code>downcast_mut()</code></a>: Helper function for mutable downcasting</li>
+</ul>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.downcast_mut"><code>pub use traits::<a class="fn" href="traits/fn.downcast_mut.html" title="fn dynamic_cli::context::traits::downcast_mut">downcast_mut</a>;</code></dt><dt id="reexport.downcast_ref"><code>pub use traits::<a class="fn" href="traits/fn.downcast_ref.html" title="fn dynamic_cli::context::traits::downcast_ref">downcast_ref</a>;</code></dt><dt id="reexport.ExecutionContext"><code>pub use traits::<a class="trait" href="traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext">ExecutionContext</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="traits/index.html" title="mod dynamic_cli::context::traits">traits</a></dt><dd>Execution context traits</dd></dl></section></div></main></body></html>

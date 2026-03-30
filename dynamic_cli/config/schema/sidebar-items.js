@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ArgumentType","ValidationRule"],"fn":["default_prompt_suffix"],"struct":["ArgumentDefinition","CommandDefinition","CommandsConfig","Metadata","OptionDefinition"]};

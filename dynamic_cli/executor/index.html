@@ -1,0 +1,227 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Command execution module"><title>dynamic_cli::executor - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module executor</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module executor</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#module-organization" title="Module Organization">Module Organization</a></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#design-philosophy" title="Design Philosophy">Design Philosophy</a><ul><li><a href="#object-safety" title="Object Safety">Object Safety</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li><li><a href="#simplicity" title="Simplicity">Simplicity</a></li></ul></li><li><a href="#quick-start" title="Quick Start">Quick Start</a></li><li><a href="#examples" title="Examples">Examples</a><ul><li><a href="#basic-command" title="Basic Command">Basic Command</a></li><li><a href="#command-with-validation" title="Command with Validation">Command with Validation</a></li><li><a href="#stateful-command" title="Stateful Command">Stateful Command</a></li></ul></li><li><a href="#advanced-usage" title="Advanced Usage">Advanced Usage</a><ul><li><a href="#dynamic-command-registration" title="Dynamic Command Registration">Dynamic Command Registration</a></li><li><a href="#error-handling-pattern" title="Error Handling Pattern">Error Handling Pattern</a></li></ul></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>executor</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/executor/mod.rs.html#1-652">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Command execution module</p>
+<p>This module provides the core functionality for executing commands in the
+dynamic-cli framework. It defines the <a href="traits/trait.CommandHandler.html" title="trait dynamic_cli::executor::traits::CommandHandler"><code>CommandHandler</code></a> trait that all
+command implementations must satisfy.</p>
+<h2 id="module-organization"><a class="doc-anchor" href="#module-organization">§</a>Module Organization</h2>
+<ul>
+<li><a href="traits/index.html" title="mod dynamic_cli::executor::traits"><code>traits</code></a>: Core trait definitions (<code>CommandHandler</code>)</li>
+<li><code>command_executor</code> (future): Executor logic for running commands</li>
+</ul>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2>
+<p>The execution flow in dynamic-cli follows this pattern:</p>
+<div class="example-wrap"><pre class="language-text"><code>User Input → Parser → Validator → Executor → Command Handler
+                                     ↓
+                                 Context</code></pre></div>
+<ol>
+<li><strong>Parser</strong>: Converts raw input to structured arguments</li>
+<li><strong>Validator</strong>: Checks argument types and constraints</li>
+<li><strong>Executor</strong>: Looks up and invokes the appropriate handler</li>
+<li><strong>Handler</strong>: Executes the command logic with access to context</li>
+</ol>
+<h2 id="design-philosophy"><a class="doc-anchor" href="#design-philosophy">§</a>Design Philosophy</h2><h3 id="object-safety"><a class="doc-anchor" href="#object-safety">§</a>Object Safety</h3>
+<p>The module is designed around object-safe traits to enable dynamic dispatch.
+This allows:</p>
+<ul>
+<li>Runtime registration of commands</li>
+<li>Storing heterogeneous handlers in collections</li>
+<li>Plugin-style architecture where handlers are loaded dynamically</li>
+</ul>
+<h3 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h3>
+<p>All types are <code>Send + Sync</code> to support:</p>
+<ul>
+<li>Multi-threaded CLI applications</li>
+<li>Concurrent command execution (future enhancement)</li>
+<li>Safe shared access to the command registry</li>
+</ul>
+<h3 id="simplicity"><a class="doc-anchor" href="#simplicity">§</a>Simplicity</h3>
+<p>The API is intentionally kept simple:</p>
+<ul>
+<li>Arguments are passed as <code>HashMap&lt;String, String&gt;</code></li>
+<li>Context is accessed through trait objects</li>
+<li>Error handling uses the framework’s standard <code>Result</code> type</li>
+</ul>
+<h2 id="quick-start"><a class="doc-anchor" href="#quick-start">§</a>Quick Start</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="comment">// 1. Define your context
+</span><span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>AppContext {
+    counter: i32,
+}
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>AppContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+}
+
+<span class="comment">// 2. Implement a command handler
+</span><span class="kw">struct </span>IncrementCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>IncrementCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>ctx = dynamic_cli::context::downcast_mut::&lt;AppContext&gt;(context)
+            .ok_or_else(|| ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Wrong context type"</span>)))<span class="question-mark">?</span>;
+         
+        <span class="kw">let </span>amount: i32 = args.get(<span class="string">"amount"</span>)
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(<span class="number">1</span>);
+         
+        ctx.counter += amount;
+        <span class="macro">println!</span>(<span class="string">"Counter is now: {}"</span>, ctx.counter);
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="comment">// 3. Use the handler
+</span><span class="kw">let </span>handler = IncrementCommand;
+<span class="kw">let </span><span class="kw-2">mut </span>context = AppContext::default();
+<span class="kw">let </span><span class="kw-2">mut </span>args = HashMap::new();
+args.insert(<span class="string">"amount"</span>.to_string(), <span class="string">"5"</span>.to_string());
+
+handler.execute(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>args)<span class="question-mark">?</span>;
+<span class="macro">assert_eq!</span>(context.counter, <span class="number">5</span>);</code></pre></div><h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2><h3 id="basic-command"><a class="doc-anchor" href="#basic-command">§</a>Basic Command</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="kw">struct </span>EchoCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>EchoCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(message) = args.get(<span class="string">"message"</span>) {
+            <span class="macro">println!</span>(<span class="string">"{}"</span>, message);
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div><h3 id="command-with-validation"><a class="doc-anchor" href="#command-with-validation">§</a>Command with Validation</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::DynamicCliError::Execution;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="kw">struct </span>DivideCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>DivideCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; dynamic_cli::Result&lt;()&gt; {
+        <span class="kw">let </span>denom = args.get(<span class="string">"denominator"</span>)
+            .ok_or_else(|| {
+                ExecutionError::CommandFailed(
+                    <span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing Denominator"</span>))})<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>value: f64 = denom.parse()
+            .map_err(|<span class="kw">_</span>| {
+                ExecutionError::CommandFailed(
+                    <span class="macro">anyhow::anyhow!</span>(<span class="string">"Invalid Denominator"</span>))})<span class="question-mark">?</span>;
+
+        <span class="kw">if </span>value == <span class="number">0.0 </span>{
+            <span class="kw">return </span><span class="prelude-val">Err</span>(ExecutionError::CommandFailed(
+                    <span class="macro">anyhow::anyhow!</span>(<span class="string">"Cannot divide by zero"</span>)).into());
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div><h3 id="stateful-command"><a class="doc-anchor" href="#stateful-command">§</a>Stateful Command</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="attr">#[derive(Default)]
+</span><span class="kw">struct </span>FileContext {
+    current_file: <span class="prelude-ty">Option</span>&lt;String&gt;,
+}
+
+<span class="kw">impl </span>ExecutionContext <span class="kw">for </span>FileContext {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+    <span class="kw">fn </span>as_any_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>std::any::Any { <span class="self">self </span>}
+}
+
+<span class="kw">struct </span>OpenCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>OpenCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>ctx = dynamic_cli::context::downcast_mut::&lt;FileContext&gt;(context)
+            .ok_or_else(|| ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Wrong context type"</span>)))<span class="question-mark">?</span>;
+         
+        <span class="kw">let </span>filename = args.get(<span class="string">"file"</span>)
+            .ok_or_else(|| { ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing file argument"</span>))})<span class="question-mark">?</span>;
+         
+        ctx.current_file = <span class="prelude-val">Some</span>(filename.clone());
+        <span class="macro">println!</span>(<span class="string">"Opened: {}"</span>, filename);
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div><h2 id="advanced-usage"><a class="doc-anchor" href="#advanced-usage">§</a>Advanced Usage</h2><h3 id="dynamic-command-registration"><a class="doc-anchor" href="#dynamic-command-registration">§</a>Dynamic Command Registration</h3>
+<p>Commands can be registered dynamically at runtime using trait objects:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+
+<span class="comment">// Store commands in a registry
+</span><span class="kw">struct </span>CommandRegistry {
+    handlers: HashMap&lt;String, Box&lt;<span class="kw">dyn </span>CommandHandler&gt;&gt;,
+}
+
+<span class="kw">impl </span>CommandRegistry {
+    <span class="kw">fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            handlers: HashMap::new(),
+        }
+    }
+     
+    <span class="kw">fn </span>register(<span class="kw-2">&amp;mut </span><span class="self">self</span>, name: String, handler: Box&lt;<span class="kw">dyn </span>CommandHandler&gt;) {
+        <span class="self">self</span>.handlers.insert(name, handler);
+    }
+     
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Box&lt;<span class="kw">dyn </span>CommandHandler&gt;&gt; {
+        <span class="self">self</span>.handlers.get(name)
+    }
+}</code></pre></div><h3 id="error-handling-pattern"><a class="doc-anchor" href="#error-handling-pattern">§</a>Error Handling Pattern</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="kw">struct </span>FileCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>FileCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>path = args.get(<span class="string">"path"</span>)
+            .ok_or_else(|| { ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing path argument"</span>))})<span class="question-mark">?</span>;
+         
+        <span class="comment">// Wrap application errors in ExecutionError
+        </span>std::fs::read_to_string(path)
+            .map_err(|e| ExecutionError::CommandFailed(
+                <span class="macro">anyhow::anyhow!</span>(<span class="string">"Failed to read file: {}"</span>, e)
+            ))<span class="question-mark">?</span>;
+         
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.CommandHandler"><code>pub use traits::<a class="trait" href="traits/trait.CommandHandler.html" title="trait dynamic_cli::executor::traits::CommandHandler">CommandHandler</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="traits/index.html" title="mod dynamic_cli::executor::traits">traits</a></dt><dd>Command handler trait and related types</dd></dl></section></div></main></body></html>

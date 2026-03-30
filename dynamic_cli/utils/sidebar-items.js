@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["detect_type","format_bytes","format_duration","format_numbered_list","format_table","get_extension","has_extension","is_blank","is_valid_email","normalize","normalize_path","parse_bool","parse_float","parse_int","truncate"]};

@@ -1,0 +1,187 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Trait for command implementations"><title>CommandHandler in dynamic_cli::executor::traits - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">CommandHandler</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Command<wbr>Handler</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#object-safety" title="Object Safety">Object Safety</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li><li><a href="#execution-flow" title="Execution Flow">Execution Flow</a></li><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.execute" title="execute">execute</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.validate" title="validate">validate</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In dynamic_<wbr>cli::<wbr>executor::<wbr>traits</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">dynamic_cli</a>::<wbr><a href="../index.html">executor</a>::<wbr><a href="index.html">traits</a></div><h1>Trait <span class="trait">Command<wbr>Handler</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/dynamic_cli/executor/traits.rs.html#139-276">Source</a> </span></div><pre class="rust item-decl"><code>pub trait CommandHandler: <a class="trait" href="https://doc.rust-lang.org/1.94.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/1.94.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> {
+    // Required method
+    fn <a href="#tymethod.execute" class="fn">execute</a>(
+        &amp;self,
+        context: &amp;mut dyn <a class="trait" href="../../context/traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext">ExecutionContext</a>,
+        args: &amp;<a class="struct" href="https://doc.rust-lang.org/1.94.0/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+    ) -&gt; <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.94.0/std/primitive.unit.html">()</a>&gt;;
+
+    // Provided method
+    fn <a href="#method.validate" class="fn">validate</a>(&amp;self, _args: &amp;<a class="struct" href="https://doc.rust-lang.org/1.94.0/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;) -&gt; <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.94.0/std/primitive.unit.html">()</a>&gt; { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Trait for command implementations</p>
+<p>Each command in the CLI/REPL application must implement this trait.
+The trait is designed to be object-safe, allowing commands to be
+stored and invoked dynamically through trait objects.</p>
+<h2 id="object-safety"><a class="doc-anchor" href="#object-safety">§</a>Object Safety</h2>
+<p>This trait is intentionally object-safe (can be used as <code>dyn CommandHandler</code>).
+<strong>Do not add methods with generic type parameters</strong>, as this would break
+object safety and prevent dynamic dispatch.</p>
+<h2 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h2>
+<p>Implementations must be <code>Send + Sync</code> to allow:</p>
+<ul>
+<li>Sharing command handlers across threads</li>
+<li>Safe concurrent access to the command registry</li>
+<li>Future async execution support</li>
+</ul>
+<h2 id="execution-flow"><a class="doc-anchor" href="#execution-flow">§</a>Execution Flow</h2>
+<ol>
+<li>Parser converts user input to <code>HashMap&lt;String, String&gt;</code></li>
+<li>Validator checks argument constraints</li>
+<li><code>validate()</code> is called for custom validation (optional)</li>
+<li><code>execute()</code> is called with validated arguments</li>
+</ol>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="kw">struct </span>GreetCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>GreetCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>name = args.get(<span class="string">"name"</span>)
+            .ok_or_else(|| {
+                ExecutionError::CommandFailed(
+                    <span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing 'name' argument"</span>)
+             )
+         })<span class="question-mark">?</span>;
+         
+        <span class="kw">let </span>greeting = <span class="kw">if let </span><span class="prelude-val">Some</span>(formal) = args.get(<span class="string">"formal"</span>) {
+            <span class="kw">if </span>formal == <span class="string">"true" </span>{
+                <span class="macro">format!</span>(<span class="string">"Good day, {}."</span>, name)
+            } <span class="kw">else </span>{
+                <span class="macro">format!</span>(<span class="string">"Hi, {}!"</span>, name)
+            }
+        } <span class="kw">else </span>{
+            <span class="macro">format!</span>(<span class="string">"Hello, {}!"</span>, name)
+        };
+         
+        <span class="macro">println!</span>(<span class="string">"{}"</span>, greeting);
+        <span class="prelude-val">Ok</span>(())
+    }
+     
+    <span class="kw">fn </span>validate(<span class="kw-2">&amp;</span><span class="self">self</span>, args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="comment">// Custom validation: name must not be empty
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(name) = args.get(<span class="string">"name"</span>) {
+            <span class="kw">if </span>name.trim().is_empty() {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ExecutionError::CommandFailed(
+                        <span class="macro">anyhow::anyhow!</span>(<span class="string">"Name cannot be empty"</span>)
+                ).into());
+            }
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.execute" class="method"><a class="src rightside" href="../../../src/dynamic_cli/executor/traits.rs.html#208-212">Source</a><h4 class="code-header">fn <a href="#tymethod.execute" class="fn">execute</a>(
+    &amp;self,
+    context: &amp;mut dyn <a class="trait" href="../../context/traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext">ExecutionContext</a>,
+    args: &amp;<a class="struct" href="https://doc.rust-lang.org/1.94.0/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+) -&gt; <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.94.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Execute the command with the given context and arguments</p>
+<p>This is the main entry point for command execution. It receives:</p>
+<ul>
+<li>A mutable reference to the execution context (for shared state)</li>
+<li>A map of argument names to their string values</li>
+</ul>
+<h5 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h5>
+<ul>
+<li>
+<p><code>context</code> - Mutable execution context for sharing state between commands.
+Use <code>downcast_ref</code> or <code>downcast_mut</code> from the <code>context</code> module
+to access your specific context type.</p>
+</li>
+<li>
+<p><code>args</code> - Parsed and validated arguments as name-value pairs.
+All values are strings; type conversion should be done
+within the handler if needed.</p>
+</li>
+</ul>
+<h5 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h5>
+<ul>
+<li><code>Ok(())</code> if execution succeeds</li>
+<li><code>Err(DynamicCliError)</code> if execution fails</li>
+</ul>
+<h5 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h5>
+<p>Implementations should return errors for:</p>
+<ul>
+<li>Invalid argument values (caught by validate, but can be rechecked)</li>
+<li>Execution failures (I/O errors, computation errors, etc.)</li>
+<li>Invalid context state</li>
+</ul>
+<p>Use <code>ExecutionError::CommandFailed</code> to wrap application-specific errors:</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="prelude-val">Err</span>(ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Details"</span>)).into())</code></pre></div><h5 id="example-1"><a class="doc-anchor" href="#example-1">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct </span>FileCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>FileCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>path = args.get(<span class="string">"path"</span>)
+            .ok_or_else(|| {
+               ExecutionError::CommandFailed(
+                      <span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing path argument"</span>)
+            )
+         })<span class="question-mark">?</span>;
+         
+        <span class="comment">// Perform the actual work
+        </span><span class="kw">let </span>content = std::fs::read_to_string(path)
+            .map_err(|e| {
+               ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Failed to read file: {}"</span>, e))
+        })<span class="question-mark">?</span>;
+         
+        <span class="macro">println!</span>(<span class="string">"File contains {} bytes"</span>, content.len());
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.validate" class="method"><a class="src rightside" href="../../../src/dynamic_cli/executor/traits.rs.html#273-275">Source</a><h4 class="code-header">fn <a href="#method.validate" class="fn">validate</a>(&amp;self, _args: &amp;<a class="struct" href="https://doc.rust-lang.org/1.94.0/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.94.0/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;) -&gt; <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.94.0/std/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Optional custom validation for arguments</p>
+<p>This method is called after the standard validation (type checking,
+required arguments, etc.) but before execution. It allows commands
+to implement custom validation logic.</p>
+<h5 id="default-implementation"><a class="doc-anchor" href="#default-implementation">§</a>Default Implementation</h5>
+<p>The default implementation accepts all arguments (returns <code>Ok(())</code>).
+Override this method only if you need custom validation.</p>
+<h5 id="arguments-1"><a class="doc-anchor" href="#arguments-1">§</a>Arguments</h5>
+<ul>
+<li><code>args</code> - The arguments to validate</li>
+</ul>
+<h5 id="returns-1"><a class="doc-anchor" href="#returns-1">§</a>Returns</h5>
+<ul>
+<li><code>Ok(())</code> if validation succeeds</li>
+<li><code>Err(DynamicCliError)</code> if validation fails</li>
+</ul>
+<h5 id="example-2"><a class="doc-anchor" href="#example-2">§</a>Example</h5>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">struct </span>RangeCommand;
+
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>RangeCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="comment">// Execution logic here
+        </span><span class="prelude-val">Ok</span>(())
+    }
+     
+    <span class="kw">fn </span>validate(<span class="kw-2">&amp;</span><span class="self">self</span>, args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="comment">// Custom validation: ensure min &lt; max
+        </span><span class="kw">if let </span>(<span class="prelude-val">Some</span>(min), <span class="prelude-val">Some</span>(max)) = (args.get(<span class="string">"min"</span>), args.get(<span class="string">"max"</span>)) {
+            <span class="kw">let </span>min_val: f64 = min.parse()
+                .map_err(|<span class="kw">_</span>| {
+                    ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Invalid min value"</span>))
+            })<span class="question-mark">?</span>;
+            <span class="kw">let </span>max_val: f64 = max.parse()
+                .map_err(|<span class="kw">_</span>| {ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Invalid max value"</span>))})<span class="question-mark">?</span>;
+             
+            <span class="kw">if </span>min_val &gt;= max_val {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"min must be less than max"</span>)).into());
+            }
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../../trait.impl/dynamic_cli/executor/traits/trait.CommandHandler.js" async></script></section></div></main></body></html>

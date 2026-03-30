@@ -1,0 +1,165 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Command registry module"><title>dynamic_cli::registry - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module registry</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module registry</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#architecture" title="Architecture">Architecture</a><ul><li><a href="#flow" title="Flow">Flow</a></li></ul></li><li><a href="#design-principles" title="Design Principles">Design Principles</a><ul><li><a href="#separation-of-concerns" title="Separation of Concerns">Separation of Concerns</a></li><li><a href="#efficient-lookup" title="Efficient Lookup">Efficient Lookup</a></li><li><a href="#validation" title="Validation">Validation</a></li></ul></li><li><a href="#quick-start" title="Quick Start">Quick Start</a></li><li><a href="#examples" title="Examples">Examples</a><ul><li><a href="#basic-registration" title="Basic Registration">Basic Registration</a></li><li><a href="#command-with-multiple-aliases" title="Command with Multiple Aliases">Command with Multiple Aliases</a></li><li><a href="#listing-all-commands" title="Listing All Commands">Listing All Commands</a></li><li><a href="#error-handling" title="Error Handling">Error Handling</a></li></ul></li><li><a href="#integration-with-other-modules" title="Integration with Other Modules">Integration with Other Modules</a><ul><li><a href="#with-config-module" title="With Config Module">With Config Module</a></li><li><a href="#with-executor-module" title="With Executor Module">With Executor Module</a></li></ul></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>registry</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/registry/mod.rs.html#1-572">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Command registry module</p>
+<p>This module provides the central registry for storing and managing commands.
+The registry maintains the mapping between command names/aliases and their
+definitions and handlers.</p>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2>
+<p>The registry serves as a lookup table for the executor:</p>
+<div class="example-wrap"><pre class="language-text"><code>Configuration → Registry → Executor
+    (YAML)        (Store)    (Execute)</code></pre></div><h3 id="flow"><a class="doc-anchor" href="#flow">§</a>Flow</h3>
+<ol>
+<li><strong>Initialization</strong>: Commands are registered during application startup</li>
+<li><strong>Lookup</strong>: During execution, the executor queries the registry</li>
+<li><strong>Dispatch</strong>: The registry returns the appropriate handler</li>
+</ol>
+<h2 id="design-principles"><a class="doc-anchor" href="#design-principles">§</a>Design Principles</h2><h3 id="separation-of-concerns"><a class="doc-anchor" href="#separation-of-concerns">§</a>Separation of Concerns</h3>
+<p>The registry separates:</p>
+<ul>
+<li><strong>Definition</strong> (from config module): What the command accepts</li>
+<li><strong>Implementation</strong> (from executor module): What the command does</li>
+<li><strong>Lookup</strong> (this module): How to find commands</li>
+</ul>
+<h3 id="efficient-lookup"><a class="doc-anchor" href="#efficient-lookup">§</a>Efficient Lookup</h3>
+<p>The registry uses HashMaps for O(1) lookup by:</p>
+<ul>
+<li>Command name</li>
+<li>Command alias</li>
+</ul>
+<p>This ensures fast command resolution even with many registered commands.</p>
+<h3 id="validation"><a class="doc-anchor" href="#validation">§</a>Validation</h3>
+<p>The registry validates during registration:</p>
+<ul>
+<li>No duplicate command names</li>
+<li>No duplicate aliases</li>
+<li>No conflicts between names and aliases</li>
+</ul>
+<h2 id="quick-start"><a class="doc-anchor" href="#quick-start">§</a>Quick Start</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::registry::CommandRegistry;
+<span class="kw">use </span>dynamic_cli::config::schema::CommandDefinition;
+<span class="kw">use </span>dynamic_cli::executor::CommandHandler;
+<span class="kw">use </span>std::collections::HashMap;
+
+<span class="comment">// 1. Create a registry
+</span><span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+
+<span class="comment">// 2. Define a command
+</span><span class="kw">let </span>definition = CommandDefinition {
+    name: <span class="string">"hello"</span>.to_string(),
+    aliases: <span class="macro">vec!</span>[<span class="string">"hi"</span>.to_string()],
+    description: <span class="string">"Say hello"</span>.to_string(),
+    required: <span class="bool-val">false</span>,
+    arguments: <span class="macro">vec!</span>[],
+    options: <span class="macro">vec!</span>[],
+    implementation: <span class="string">"hello_handler"</span>.to_string(),
+};
+
+<span class="comment">// 3. Create a handler
+</span><span class="kw">struct </span>HelloCommand;
+<span class="kw">impl </span>CommandHandler <span class="kw">for </span>HelloCommand {
+    <span class="kw">fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _ctx: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>dynamic_cli::context::ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; dynamic_cli::Result&lt;()&gt; {
+        <span class="kw">let </span>default_world = <span class="string">"World"</span>.to_string();
+        <span class="kw">let </span>name = args.get(<span class="string">"name"</span>).unwrap_or(<span class="kw-2">&amp;</span>default_world);
+        <span class="macro">println!</span>(<span class="string">"Hello, {}!"</span>, name);
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="comment">// 4. Register the command
+</span>registry.register(definition, Box::new(HelloCommand))<span class="question-mark">?</span>;
+
+<span class="comment">// 5. Use the registry
+</span><span class="kw">if let </span><span class="prelude-val">Some</span>(handler) = registry.get_handler(<span class="string">"hello"</span>) {
+    <span class="comment">// Execute the command
+</span>}
+
+<span class="comment">// Works with aliases too!
+</span><span class="kw">if let </span><span class="prelude-val">Some</span>(handler) = registry.get_handler(<span class="string">"hi"</span>) {
+    <span class="comment">// Same handler
+</span>}</code></pre></div><h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2><h3 id="basic-registration"><a class="doc-anchor" href="#basic-registration">§</a>Basic Registration</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::registry::CommandRegistry;
+
+<span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+
+registry.register(definition, Box::new(TestCmd))<span class="question-mark">?</span>;</code></pre></div><h3 id="command-with-multiple-aliases"><a class="doc-anchor" href="#command-with-multiple-aliases">§</a>Command with Multiple Aliases</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>definition = CommandDefinition {
+    name: <span class="string">"simulate"</span>.to_string(),
+    aliases: <span class="macro">vec!</span>[
+        <span class="string">"sim"</span>.to_string(),
+        <span class="string">"run"</span>.to_string(),
+        <span class="string">"exec"</span>.to_string(),
+    ],
+    description: <span class="string">"Run a simulation"</span>.to_string(),
+    required: <span class="bool-val">false</span>,
+    arguments: <span class="macro">vec!</span>[],
+    options: <span class="macro">vec!</span>[],
+    implementation: <span class="string">"simulate_handler"</span>.to_string(),
+};
+
+registry.register(definition, Box::new(SimCmd))<span class="question-mark">?</span>;
+
+<span class="comment">// All these work:
+</span><span class="macro">assert!</span>(registry.contains(<span class="string">"simulate"</span>));
+<span class="macro">assert!</span>(registry.contains(<span class="string">"sim"</span>));
+<span class="macro">assert!</span>(registry.contains(<span class="string">"run"</span>));
+<span class="macro">assert!</span>(registry.contains(<span class="string">"exec"</span>));</code></pre></div><h3 id="listing-all-commands"><a class="doc-anchor" href="#listing-all-commands">§</a>Listing All Commands</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Get all commands for help text
+</span><span class="kw">for </span>cmd <span class="kw">in </span>registry.list_commands() {
+    <span class="macro">println!</span>(<span class="string">"{}: {}"</span>, cmd.name, cmd.description);
+}</code></pre></div><h3 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="comment">// Try to register duplicate
+</span><span class="kw">let </span>result = registry.register(def2, Box::new(TestCmd));
+
+<span class="kw">match </span>result {
+    <span class="prelude-val">Err</span>(DynamicCliError::Registry(RegistryError::DuplicateRegistration { name })) =&gt; {
+        <span class="macro">eprintln!</span>(<span class="string">"Command '{}' already registered"</span>, name);
+    }
+    <span class="kw">_ </span>=&gt; {}
+}</code></pre></div><h2 id="integration-with-other-modules"><a class="doc-anchor" href="#integration-with-other-modules">§</a>Integration with Other Modules</h2><h3 id="with-config-module"><a class="doc-anchor" href="#with-config-module">§</a>With Config Module</h3>
+<p>The registry stores <code>CommandDefinition</code> from the config module:</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::config::loader::load_config;
+<span class="kw">use </span>dynamic_cli::registry::CommandRegistry;
+
+<span class="kw">let </span>config = load_config(<span class="string">"commands.yaml"</span>)<span class="question-mark">?</span>;
+<span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+
+<span class="kw">for </span>cmd_def <span class="kw">in </span>config.commands {
+    <span class="kw">let </span>handler = create_handler(<span class="kw-2">&amp;</span>cmd_def.implementation);
+    registry.register(cmd_def, handler)<span class="question-mark">?</span>;
+}</code></pre></div><h3 id="with-executor-module"><a class="doc-anchor" href="#with-executor-module">§</a>With Executor Module</h3>
+<p>The executor queries the registry to find handlers:</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::registry::CommandRegistry;
+
+<span class="kw">fn </span>execute_command(
+    registry: <span class="kw-2">&amp;</span>CommandRegistry,
+    command_name: <span class="kw-2">&amp;</span>str,
+    context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+    args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    <span class="kw">let </span>handler = registry.get_handler(command_name)
+        .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">"Unknown command"</span>))<span class="question-mark">?</span>;
+     
+    handler.execute(context, args)
+}</code></pre></div><h2 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h2>
+<p>The registry is designed for setup-once, use-many pattern:</p>
+
+<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::sync::Arc;
+
+<span class="comment">// Setup phase (single-threaded)
+</span><span class="kw">let </span><span class="kw-2">mut </span>registry = CommandRegistry::new();
+<span class="comment">// ... register commands ...
+
+// Usage phase (can be multi-threaded)
+</span><span class="kw">let </span>registry = Arc::new(registry);
+<span class="kw">let </span>registry_clone = registry.clone();
+
+std::thread::spawn(<span class="kw">move </span>|| {
+    <span class="comment">// Safe to use in multiple threads
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(handler) = registry_clone.get_handler(<span class="string">"test"</span>) {
+        <span class="comment">// ...
+    </span>}
+});</code></pre></div></div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.CommandRegistry"><code>pub use command_registry::<a class="struct" href="command_registry/struct.CommandRegistry.html" title="struct dynamic_cli::registry::command_registry::CommandRegistry">CommandRegistry</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="command_registry/index.html" title="mod dynamic_cli::registry::command_registry">command_<wbr>registry</a></dt><dd>Command registry implementation</dd></dl></section></div></main></body></html>

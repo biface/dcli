@@ -1,0 +1,129 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Argument validation module"><title>dynamic_cli::validator - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-77263533.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.94.0 (4a4ef493e 2026-03-02)" data-channel="1.94.0" data-search-js="search-9e2438ea.js" data-stringdex-js="stringdex-b897f86f.js" data-settings-js="settings-c38705f0.js" ><script src="../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-7bab91a1.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-ffcac47a.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module validator</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.1.1</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module validator</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#submodules" title="Submodules">Submodules</a></li><li><a href="#usage-example" title="Usage Example">Usage Example</a></li><li><a href="#integration-with-other-modules" title="Integration with Other Modules">Integration with Other Modules</a><ul><li><a href="#with-parser-module" title="With Parser Module">With Parser Module</a></li><li><a href="#with-config-module" title="With Config Module">With Config Module</a></li><li><a href="#with-error-module" title="With Error Module">With Error Module</a></li></ul></li><li><a href="#complete-workflow-example" title="Complete Workflow Example">Complete Workflow Example</a></li><li><a href="#design-philosophy" title="Design Philosophy">Design Philosophy</a><ul><li><a href="#fail-fast" title="Fail Fast">Fail Fast</a></li><li><a href="#clear-error-messages" title="Clear Error Messages">Clear Error Messages</a></li><li><a href="#type-appropriate-validation" title="Type-Appropriate Validation">Type-Appropriate Validation</a></li><li><a href="#no-side-effects" title="No Side Effects">No Side Effects</a></li></ul></li></ul><h3><a href="#reexports">Module Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate dynamic_<wbr>cli</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">dynamic_cli</a></div><h1>Module <span>validator</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/dynamic_cli/validator/mod.rs.html#1-496">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Argument validation module</p>
+<p>This module provides functions to validate parsed arguments against
+the rules defined in the configuration. It completes the parsing
+layer by ensuring values meet all specified constraints.</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>The validator module works with <a href="../config/schema/enum.ValidationRule.html" title="enum dynamic_cli::config::schema::ValidationRule"><code>ValidationRule</code></a> definitions from
+the configuration to validate parsed argument values. It supports:</p>
+<ul>
+<li><strong>File validation</strong>: Existence checks and extension restrictions</li>
+<li><strong>Range validation</strong>: Numeric bounds (min/max)</li>
+<li><strong>Type-specific validation</strong>: Applied after type parsing</li>
+</ul>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2><div class="example-wrap"><pre class="language-text"><code>Configuration (YAML/JSON)
+    ↓
+ValidationRule definitions
+    ↓
+Parsed arguments (HashMap&lt;String, String&gt;)
+    ↓
+Validators (this module)
+    ↓
+Validated values (Result&lt;(), ValidationError&gt;)</code></pre></div><h2 id="submodules"><a class="doc-anchor" href="#submodules">§</a>Submodules</h2>
+<ul>
+<li><a href="file_validator/index.html" title="mod dynamic_cli::validator::file_validator"><code>file_validator</code></a>: File existence and extension validation</li>
+<li><a href="range_validator/index.html" title="mod dynamic_cli::validator::range_validator"><code>range_validator</code></a>: Numeric range validation</li>
+</ul>
+<h2 id="usage-example"><a class="doc-anchor" href="#usage-example">§</a>Usage Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::validator::{file_validator, range_validator};
+<span class="kw">use </span>dynamic_cli::config::schema::ValidationRule;
+<span class="kw">use </span>std::path::Path;
+
+<span class="comment">// Validate file exists
+</span><span class="kw">let </span>path = Path::new(<span class="string">"config.yaml"</span>);
+file_validator::validate_file_exists(path, <span class="string">"config"</span>)<span class="question-mark">?</span>;
+
+<span class="comment">// Validate file extension
+</span>file_validator::validate_file_extension(
+    path,
+    <span class="string">"config"</span>,
+    <span class="kw-2">&amp;</span>[<span class="string">"yaml"</span>.to_string(), <span class="string">"yml"</span>.to_string()]
+)<span class="question-mark">?</span>;
+
+<span class="comment">// Validate numeric range
+</span>range_validator::validate_range(<span class="number">75.0</span>, <span class="string">"percentage"</span>, <span class="prelude-val">Some</span>(<span class="number">0.0</span>), <span class="prelude-val">Some</span>(<span class="number">100.0</span>))<span class="question-mark">?</span>;</code></pre></div><h2 id="integration-with-other-modules"><a class="doc-anchor" href="#integration-with-other-modules">§</a>Integration with Other Modules</h2><h3 id="with-parser-module"><a class="doc-anchor" href="#with-parser-module">§</a>With Parser Module</h3>
+<p>The validator works with values after they’ve been parsed:</p>
+<div class="example-wrap"><pre class="language-text"><code>User Input: &quot;simulate input.dat --threshold 0.5&quot;
+    ↓ [parser]
+HashMap { &quot;input&quot;: &quot;input.dat&quot;, &quot;threshold&quot;: &quot;0.5&quot; }
+    ↓ [validator]
+Validated ✓</code></pre></div><h3 id="with-config-module"><a class="doc-anchor" href="#with-config-module">§</a>With Config Module</h3>
+<p>Validation rules come from the configuration:</p>
+<div class="example-wrap"><pre class="language-yaml"><code>arguments:
+  - name: input
+    arg_type: path
+    validation:
+      - must_exist: true
+      - extensions: [dat, csv]
+  - name: threshold
+    arg_type: float
+    validation:
+      - min: 0.0
+        max: 1.0</code></pre></div><h3 id="with-error-module"><a class="doc-anchor" href="#with-error-module">§</a>With Error Module</h3>
+<p>All validation errors use <a href="../error/enum.ValidationError.html" title="enum dynamic_cli::error::ValidationError"><code>ValidationError</code></a>:</p>
+<ul>
+<li><code>FileNotFound</code> - File doesn’t exist</li>
+<li><code>InvalidExtension</code> - Wrong file extension</li>
+<li><code>OutOfRange</code> - Value outside min/max bounds</li>
+<li><code>CustomConstraint</code> - Custom validation failed</li>
+</ul>
+<h2 id="complete-workflow-example"><a class="doc-anchor" href="#complete-workflow-example">§</a>Complete Workflow Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>dynamic_cli::config::schema::{ArgumentDefinition, ArgumentType, ValidationRule};
+<span class="kw">use </span>dynamic_cli::validator::{file_validator, validate_file_exists, validate_file_extension};
+<span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>std::path::Path;
+
+<span class="comment">// Define an argument with validation rules
+</span><span class="kw">let </span>arg_def = ArgumentDefinition {
+    name: <span class="string">"input_file"</span>.to_string(),
+    arg_type: ArgumentType::Path,
+    required: <span class="bool-val">true</span>,
+    description: <span class="string">"Input data file"</span>.to_string(),
+    validation: <span class="macro">vec!</span>[
+        ValidationRule::MustExist { must_exist: <span class="bool-val">true </span>},
+        ValidationRule::Extensions {
+            extensions: <span class="macro">vec!</span>[<span class="string">"csv"</span>.to_string(), <span class="string">"tsv"</span>.to_string()],
+        },
+    ],
+};
+
+<span class="comment">// Parse arguments
+</span><span class="kw">let </span><span class="kw-2">mut </span>args = HashMap::new();
+args.insert(<span class="string">"input_file"</span>.to_string(), <span class="string">"data.csv"</span>.to_string());
+
+<span class="comment">// Validate (would check if file exists in real scenario)
+</span><span class="kw">if let </span><span class="prelude-val">Some</span>(value) = args.get(<span class="kw-2">&amp;</span>arg_def.name) {
+    <span class="kw">let </span>path = Path::new(value);
+    <span class="kw">for </span>rule <span class="kw">in </span><span class="kw-2">&amp;</span>arg_def.validation {
+        <span class="kw">match </span>rule {
+            ValidationRule::MustExist { must_exist } <span class="kw">if </span><span class="kw-2">*</span>must_exist =&gt; {
+                validate_file_exists(path, <span class="kw-2">&amp;</span>arg_def.name)<span class="question-mark">?</span>;
+            },
+            ValidationRule::Extensions { extensions } =&gt; {
+                validate_file_extension(path, <span class="kw-2">&amp;</span>arg_def.name, extensions)<span class="question-mark">?</span>;
+            },
+            <span class="kw">_ </span>=&gt; {}
+        }
+    }
+}</code></pre></div><h2 id="design-philosophy"><a class="doc-anchor" href="#design-philosophy">§</a>Design Philosophy</h2><h3 id="fail-fast"><a class="doc-anchor" href="#fail-fast">§</a>Fail Fast</h3>
+<p>Validation happens early, before command execution, to catch
+errors as soon as possible. This prevents wasted computation
+and provides immediate feedback to users.</p>
+<h3 id="clear-error-messages"><a class="doc-anchor" href="#clear-error-messages">§</a>Clear Error Messages</h3>
+<p>All validation errors include:</p>
+<ul>
+<li>The argument name that failed</li>
+<li>The actual value provided</li>
+<li>The expected constraint</li>
+<li>Helpful context for fixing the issue</li>
+</ul>
+<h3 id="type-appropriate-validation"><a class="doc-anchor" href="#type-appropriate-validation">§</a>Type-Appropriate Validation</h3>
+<p>Validation rules are matched to argument types:</p>
+<ul>
+<li><code>Path</code> arguments: file existence, extensions</li>
+<li><code>Integer</code>/<code>Float</code> arguments: range constraints</li>
+<li>All types: custom constraints</li>
+</ul>
+<h3 id="no-side-effects"><a class="doc-anchor" href="#no-side-effects">§</a>No Side Effects</h3>
+<p>Validators only check values - they don’t modify files,
+create directories, or perform any side effects.</p>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.validate_file_exists"><code>pub use file_validator::<a class="fn" href="file_validator/fn.validate_file_exists.html" title="fn dynamic_cli::validator::file_validator::validate_file_exists">validate_file_exists</a>;</code></dt><dt id="reexport.validate_file_extension"><code>pub use file_validator::<a class="fn" href="file_validator/fn.validate_file_extension.html" title="fn dynamic_cli::validator::file_validator::validate_file_extension">validate_file_extension</a>;</code></dt><dt id="reexport.validate_range"><code>pub use range_validator::<a class="fn" href="range_validator/fn.validate_range.html" title="fn dynamic_cli::validator::range_validator::validate_range">validate_range</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="file_validator/index.html" title="mod dynamic_cli::validator::file_validator">file_<wbr>validator</a></dt><dd>File validation functions</dd><dt><a class="mod" href="range_validator/index.html" title="mod dynamic_cli::validator::range_validator">range_<wbr>validator</a></dt><dd>Numeric range validation functions</dd></dl></section></div></main></body></html>

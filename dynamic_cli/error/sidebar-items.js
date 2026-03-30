@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ConfigError","DynamicCliError","ExecutionError","ParseError","RegistryError","ValidationError"],"fn":["display_error","find_similar_strings","format_error"],"mod":["display","suggestions","types"],"type":["Result"]};
