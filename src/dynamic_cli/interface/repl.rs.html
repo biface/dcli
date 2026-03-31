@@ -283,10 +283,10 @@
 <a href=#283 id=283 data-nosnippet>283</a>            </span>.registry
 <a href=#284 id=284 data-nosnippet>284</a>            .get_handler(<span class="kw-2">&amp;</span>parsed.command_name)
 <a href=#285 id=285 data-nosnippet>285</a>            .ok_or_else(|| {
-<a href=#286 id=286 data-nosnippet>286</a>                DynamicCliError::Execution(ExecutionError::HandlerNotFound {
-<a href=#287 id=287 data-nosnippet>287</a>                    command: parsed.command_name.clone(),
-<a href=#288 id=288 data-nosnippet>288</a>                    implementation: <span class="string">"unknown"</span>.to_string(),
-<a href=#289 id=289 data-nosnippet>289</a>                })
+<a href=#286 id=286 data-nosnippet>286</a>                DynamicCliError::Execution(ExecutionError::handler_not_found(
+<a href=#287 id=287 data-nosnippet>287</a>                    <span class="kw-2">&amp;</span>parsed.command_name,
+<a href=#288 id=288 data-nosnippet>288</a>                    <span class="string">"unknown"</span>,
+<a href=#289 id=289 data-nosnippet>289</a>                ))
 <a href=#290 id=290 data-nosnippet>290</a>            })<span class="question-mark">?</span>;
 <a href=#291 id=291 data-nosnippet>291</a>
 <a href=#292 id=292 data-nosnippet>292</a>        <span class="comment">// Execute (handler references registry, context is borrowed mutably)

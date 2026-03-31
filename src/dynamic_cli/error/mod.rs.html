@@ -20,21 +20,22 @@
 <a href=#20 id=20 data-nosnippet>20</a>//! fn load_config() -&gt; Result&lt;(), DynamicCliError&gt; {
 <a href=#21 id=21 data-nosnippet>21</a>//!     Err(ConfigError::FileNotFound {
 <a href=#22 id=22 data-nosnippet>22</a>//!         path: "config.yaml".into(),
-<a href=#23 id=23 data-nosnippet>23</a>//!     }.into())
-<a href=#24 id=24 data-nosnippet>24</a>//! }
-<a href=#25 id=25 data-nosnippet>25</a>//! ```
-<a href=#26 id=26 data-nosnippet>26</a>
-<a href=#27 id=27 data-nosnippet>27</a></span><span class="kw">mod </span>display;
-<a href=#28 id=28 data-nosnippet>28</a><span class="kw">mod </span>suggestions;
-<a href=#29 id=29 data-nosnippet>29</a><span class="kw">mod </span>types;
-<a href=#30 id=30 data-nosnippet>30</a>
-<a href=#31 id=31 data-nosnippet>31</a><span class="comment">// Public re-exports
-<a href=#32 id=32 data-nosnippet>32</a></span><span class="kw">pub use </span>display::{display_error, format_error};
-<a href=#33 id=33 data-nosnippet>33</a><span class="kw">pub use </span>suggestions::find_similar_strings;
-<a href=#34 id=34 data-nosnippet>34</a><span class="kw">pub use </span>types::<span class="kw-2">*</span>;
-<a href=#35 id=35 data-nosnippet>35</a>
-<a href=#36 id=36 data-nosnippet>36</a><span class="doccomment">/// Specialized Result type for dynamic-cli
-<a href=#37 id=37 data-nosnippet>37</a>///
-<a href=#38 id=38 data-nosnippet>38</a>/// Uses [`DynamicCliError`] as the default error type.
-<a href=#39 id=39 data-nosnippet>39</a></span><span class="kw">pub type </span><span class="prelude-ty">Result</span>&lt;T&gt; = std::result::Result&lt;T, DynamicCliError&gt;;
+<a href=#23 id=23 data-nosnippet>23</a>//!         suggestion: None,
+<a href=#24 id=24 data-nosnippet>24</a>//!     }.into())
+<a href=#25 id=25 data-nosnippet>25</a>//! }
+<a href=#26 id=26 data-nosnippet>26</a>//! ```
+<a href=#27 id=27 data-nosnippet>27</a>
+<a href=#28 id=28 data-nosnippet>28</a></span><span class="kw">mod </span>display;
+<a href=#29 id=29 data-nosnippet>29</a><span class="kw">mod </span>suggestions;
+<a href=#30 id=30 data-nosnippet>30</a><span class="kw">mod </span>types;
+<a href=#31 id=31 data-nosnippet>31</a>
+<a href=#32 id=32 data-nosnippet>32</a><span class="comment">// Public re-exports
+<a href=#33 id=33 data-nosnippet>33</a></span><span class="kw">pub use </span>display::{display_error, format_error};
+<a href=#34 id=34 data-nosnippet>34</a><span class="kw">pub use </span>suggestions::find_similar_strings;
+<a href=#35 id=35 data-nosnippet>35</a><span class="kw">pub use </span>types::<span class="kw-2">*</span>;
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="doccomment">/// Specialized Result type for dynamic-cli
+<a href=#38 id=38 data-nosnippet>38</a>///
+<a href=#39 id=39 data-nosnippet>39</a>/// Uses [`DynamicCliError`] as the default error type.
+<a href=#40 id=40 data-nosnippet>40</a></span><span class="kw">pub type </span><span class="prelude-ty">Result</span>&lt;T&gt; = std::result::Result&lt;T, DynamicCliError&gt;;
 </code></pre></div></section></main></body></html>

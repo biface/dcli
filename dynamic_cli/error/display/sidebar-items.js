@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["display_error","format_config_error","format_error","format_parse_error"],"mod":["color"]};
+window.SIDEBAR_ITEMS = {"fn":["append_suggestion","color_arg_name","color_bullet","color_dimmed","color_error","color_info","color_question","color_suggestion","color_type_name","color_value","display_error","format_config_error","format_error","format_execution_error","format_parse_error","format_registry_error","format_validation_error"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["arg_name","bullet","dimmed","error","info","question","suggestion","type_name","value"]};
