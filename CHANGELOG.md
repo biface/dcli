@@ -222,16 +222,35 @@ async = ["tokio", "async-trait"]
   suppressed with a justified `#[allow(clippy::borrowed_box)]` attribute.
   Changing the return type would be a breaking API change.
 
+### Added (issue #13)
+
+#### Enhanced Error Messages
+- `suggestion: Option<String>` field added to 20 error variants across
+  `ConfigError`, `ParseError`, `ValidationError`, `ExecutionError`, and
+  `RegistryError`. Suggestions surface actionable hints to the user without
+  changing the `Display` string (machine-readable messages remain stable).
+- New helper constructors that populate `suggestion` automatically:
+  `ParseError::missing_argument()`, `ParseError::missing_option()`,
+  `ParseError::too_many_arguments()`, `ConfigError::file_not_found()`,
+  `ConfigError::unsupported_format()`, `ExecutionError::handler_not_found()`,
+  `RegistryError::missing_handler()`.
+- `display.rs`: `ValidationError`, `ExecutionError`, and `RegistryError` now
+  render an `ℹ  <suggestion>` line when a suggestion is present, consistent
+  with the existing `ParseError` and `ConfigError` formatting.
+- `display.rs`: `colored` dependency is now unconditional (aligned with
+  `DefaultHelpFormatter`); the `colored-output` feature flag has been removed.
+
+### Fixed (issue #13)
+
+- `colored-output` feature flag removed from `Cargo.toml`; `colored = "3.0"`
+  is now an unconditional dependency, consistent with its usage in
+  `DefaultHelpFormatter`.
+
 ### Planned (remaining)
 
 #### REPL Help (issue #14)
 - `--help` and `--help <command>` support in REPL mode
   (interception in `ReplInterface::run()`, reusing the stored `HelpFormatter`)
-
-#### Enhanced Error Messages (issue #13)
-- **Better context**: Show which command/argument caused the error
-- **Actionable messages**: Tell the user exactly how to fix
-- **Consistent suggestions**: Improved coverage across all error variants
 
 **Breaking Changes**: None
 
@@ -546,6 +565,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-03-30  
+**Last Updated**: 2026-03-31  
 **Current Version**: 0.1.1  
 **Next Release**: 0.2.0 (In progress — target Q2 2026)
