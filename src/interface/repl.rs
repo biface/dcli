@@ -283,10 +283,10 @@ impl ReplInterface {
             .registry
             .get_handler(&parsed.command_name)
             .ok_or_else(|| {
-                DynamicCliError::Execution(ExecutionError::HandlerNotFound {
-                    command: parsed.command_name.clone(),
-                    implementation: "unknown".to_string(),
-                })
+                DynamicCliError::Execution(ExecutionError::handler_not_found(
+                    &parsed.command_name,
+                    "unknown",
+                ))
             })?;
 
         // Execute (handler references registry, context is borrowed mutably)

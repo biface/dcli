@@ -107,6 +107,9 @@ pub fn validate_range(
             value,
             min: min.unwrap_or(f64::NEG_INFINITY),
             max: max.unwrap_or(f64::INFINITY),
+            suggestion: Some(
+                "Provide at least one of 'min' or 'max' in the validation rule.".to_string(),
+            ),
         }
         .into());
     }
@@ -119,6 +122,10 @@ pub fn validate_range(
                 value,
                 min: min_val,
                 max: max.unwrap_or(f64::INFINITY),
+                suggestion: Some(format!(
+                    "Value must be greater than or equal to {}.",
+                    min_val
+                )),
             }
             .into());
         }
@@ -132,6 +139,7 @@ pub fn validate_range(
                 value,
                 min: min.unwrap_or(f64::NEG_INFINITY),
                 max: max_val,
+                suggestion: Some(format!("Value must be less than or equal to {}.", max_val)),
             }
             .into());
         }
@@ -171,6 +179,7 @@ mod tests {
                 value,
                 min,
                 max,
+                ..
             }) => {
                 assert_eq!(arg_name, "percentage");
                 assert_eq!(value, -10.0);
@@ -192,6 +201,7 @@ mod tests {
                 value,
                 min,
                 max,
+                ..
             }) => {
                 assert_eq!(arg_name, "percentage");
                 assert_eq!(value, 150.0);
@@ -229,6 +239,7 @@ mod tests {
                 value,
                 min,
                 max,
+                ..
             }) => {
                 assert_eq!(arg_name, "count");
                 assert_eq!(value, -5.0);
@@ -266,6 +277,7 @@ mod tests {
                 value,
                 min,
                 max,
+                ..
             }) => {
                 assert_eq!(arg_name, "probability");
                 assert_eq!(value, 1.5);

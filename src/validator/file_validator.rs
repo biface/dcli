@@ -68,6 +68,7 @@ pub fn validate_file_exists(path: &Path, arg_name: &str) -> Result<()> {
         return Err(ValidationError::FileNotFound {
             path: path.to_path_buf(),
             arg_name: arg_name.to_string(),
+            suggestion: Some("Check that the file exists and the path is correct.".to_string()),
         }
         .into());
     }
@@ -210,6 +211,7 @@ mod tests {
             crate::error::DynamicCliError::Validation(ValidationError::FileNotFound {
                 path,
                 arg_name,
+                ..
             }) => {
                 assert_eq!(arg_name, "missing_file");
                 assert_eq!(path, nonexistent);

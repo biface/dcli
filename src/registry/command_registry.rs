@@ -209,6 +209,7 @@ impl CommandRegistry {
         if self.commands.contains_key(cmd_name) {
             return Err(RegistryError::DuplicateRegistration {
                 name: cmd_name.clone(),
+                suggestion: None,
             }
             .into());
         }
@@ -219,6 +220,7 @@ impl CommandRegistry {
             return Err(RegistryError::DuplicateAlias {
                 alias: cmd_name.clone(),
                 existing_command: existing_cmd.clone(),
+                suggestion: None,
             }
             .into());
         }
@@ -230,6 +232,7 @@ impl CommandRegistry {
                 return Err(RegistryError::DuplicateAlias {
                     alias: alias.clone(),
                     existing_command: alias.clone(),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -240,6 +243,7 @@ impl CommandRegistry {
                 return Err(RegistryError::DuplicateAlias {
                     alias: alias.clone(),
                     existing_command: existing_cmd.clone(),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -634,6 +638,7 @@ mod tests {
         match result.unwrap_err() {
             crate::error::DynamicCliError::Registry(RegistryError::DuplicateRegistration {
                 name,
+                ..
             }) => {
                 assert_eq!(name, "test");
             }
@@ -655,6 +660,7 @@ mod tests {
             crate::error::DynamicCliError::Registry(RegistryError::DuplicateAlias {
                 alias,
                 existing_command,
+                ..
             }) => {
                 assert_eq!(alias, "c");
                 assert_eq!(existing_command, "cmd1");

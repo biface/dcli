@@ -163,9 +163,7 @@ impl CliInterface {
 
         // Get command definition
         let definition = self.registry.get_definition(resolved_name).ok_or_else(|| {
-            DynamicCliError::Registry(crate::error::RegistryError::MissingHandler {
-                command: resolved_name.to_string(),
-            })
+            DynamicCliError::Registry(crate::error::RegistryError::missing_handler(resolved_name))
         })?;
 
         // Parse arguments using CLI parser
@@ -174,10 +172,10 @@ impl CliInterface {
 
         // Get handler and execute command
         let handler = self.registry.get_handler(resolved_name).ok_or_else(|| {
-            DynamicCliError::Execution(crate::error::ExecutionError::HandlerNotFound {
-                command: resolved_name.to_string(),
-                implementation: definition.implementation.clone(),
-            })
+            DynamicCliError::Execution(crate::error::ExecutionError::handler_not_found(
+                resolved_name,
+                &definition.implementation,
+            ))
         })?;
 
         handler.execute(&mut *self.context, &parsed_args)?;

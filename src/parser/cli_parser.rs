@@ -331,11 +331,11 @@ impl<'a> CliParser<'a> {
         result: &mut HashMap<String, String>,
     ) -> Result<()> {
         if index >= self.definition.arguments.len() {
-            return Err(ParseError::TooManyArguments {
-                command: self.definition.name.clone(),
-                expected: self.definition.arguments.len(),
-                got: index + 1,
-            }
+            return Err(ParseError::too_many_arguments(
+                &self.definition.name,
+                self.definition.arguments.len(),
+                index + 1,
+            )
             .into());
         }
 
@@ -364,11 +364,7 @@ impl<'a> CliParser<'a> {
     fn validate_required_arguments(&self, result: &HashMap<String, String>) -> Result<()> {
         for arg in &self.definition.arguments {
             if arg.required && !result.contains_key(&arg.name) {
-                return Err(ParseError::MissingArgument {
-                    argument: arg.name.clone(),
-                    command: self.definition.name.clone(),
-                }
-                .into());
+                return Err(ParseError::missing_argument(&arg.name, &self.definition.name).into());
             }
         }
         Ok(())
@@ -378,14 +374,14 @@ impl<'a> CliParser<'a> {
     fn validate_required_options(&self, result: &HashMap<String, String>) -> Result<()> {
         for option in &self.definition.options {
             if option.required && !result.contains_key(&option.name) {
-                return Err(ParseError::MissingOption {
-                    option: option
+                return Err(ParseError::missing_option(
+                    &option
                         .long
                         .clone()
                         .or(option.short.clone())
                         .unwrap_or_default(),
-                    command: self.definition.name.clone(),
-                }
+                    &self.definition.name,
+                )
                 .into());
             }
         }

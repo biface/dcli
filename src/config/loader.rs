@@ -61,19 +61,14 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<CommandsConfig> {
 
     // Check if file exists
     if !path.exists() {
-        return Err(ConfigError::FileNotFound {
-            path: path.to_path_buf(),
-        }
-        .into());
+        return Err(ConfigError::file_not_found(path.to_path_buf()).into());
     }
 
     // Detect format from extension
     let extension = path
         .extension()
         .and_then(|ext| ext.to_str())
-        .ok_or_else(|| ConfigError::UnsupportedFormat {
-            extension: "<none>".to_string(),
-        })?;
+        .ok_or_else(|| ConfigError::unsupported_format("<none>"))?;
 
     // Read file content
     let content = fs::read_to_string(path).map_err(DynamicCliError::from)?;
@@ -82,10 +77,7 @@ pub fn load_config<P: AsRef<Path>>(path: P) -> Result<CommandsConfig> {
     match extension.to_lowercase().as_str() {
         "yaml" | "yml" => load_yaml(&content),
         "json" => load_json(&content),
-        other => Err(ConfigError::UnsupportedFormat {
-            extension: other.to_string(),
-        }
-        .into()),
+        other => Err(ConfigError::unsupported_format(other).into()),
     }
 }
 
@@ -344,7 +336,7 @@ global_options: []
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            DynamicCliError::Config(ConfigError::FileNotFound { path }) => {
+            DynamicCliError::Config(ConfigError::FileNotFound { path, .. }) => {
                 assert!(path.to_str().unwrap().contains("nonexistent_file.yaml"));
             }
             other => panic!("Expected FileNotFound error, got {:?}", other),
@@ -360,7 +352,7 @@ global_options: []
 
         assert!(result.is_err());
         match result.unwrap_err() {
-            DynamicCliError::Config(ConfigError::UnsupportedFormat { extension }) => {
+            DynamicCliError::Config(ConfigError::UnsupportedFormat { extension, .. }) => {
                 assert_eq!(extension, "txt");
             }
             other => panic!("Expected UnsupportedFormat error, got {:?}", other),

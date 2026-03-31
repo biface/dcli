@@ -234,7 +234,7 @@
 //! let result = registry.register(def2, Box::new(TestCmd));
 //!
 //! match result {
-//!     Err(DynamicCliError::Registry(RegistryError::DuplicateRegistration { name })) => {
+//!     Err(DynamicCliError::Registry(RegistryError::DuplicateRegistration { name, .. })) => {
 //!         eprintln!("Command '{}' already registered", name);
 //!     }
 //!     _ => {}
@@ -562,7 +562,7 @@ mod tests {
         // Error type is correct
         match result {
             Err(crate::error::DynamicCliError::Registry(
-                crate::error::RegistryError::DuplicateRegistration { name },
+                crate::error::RegistryError::DuplicateRegistration { name, .. },
             )) => {
                 assert_eq!(name, "test");
             }

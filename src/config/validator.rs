@@ -86,6 +86,7 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
         if !seen_names.insert(command.name.clone()) {
             return Err(ConfigError::DuplicateCommand {
                 name: command.name.clone(),
+                suggestion: None,
             }
             .into());
         }
@@ -95,6 +96,7 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
             if !seen_names.insert(alias.clone()) {
                 return Err(ConfigError::DuplicateCommand {
                     name: alias.clone(),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -105,6 +107,7 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
             return Err(ConfigError::InvalidSchema {
                 reason: "Command name cannot be empty".to_string(),
                 path: Some(format!("commands[{}].name", idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -114,6 +117,7 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
             return Err(ConfigError::InvalidSchema {
                 reason: "Command implementation cannot be empty".to_string(),
                 path: Some(format!("commands[{}].implementation", idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -245,6 +249,7 @@ fn validate_argument_ordering(args: &[ArgumentDefinition], context: &str) -> Res
                     arg.name
                 ),
                 path: Some(format!("{}.arguments[{}]", context, idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -262,6 +267,7 @@ fn validate_argument_names(args: &[ArgumentDefinition], context: &str) -> Result
             return Err(ConfigError::InvalidSchema {
                 reason: "Argument name cannot be empty".to_string(),
                 path: Some(format!("{}.arguments[{}]", context, idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -270,6 +276,7 @@ fn validate_argument_names(args: &[ArgumentDefinition], context: &str) -> Result
             return Err(ConfigError::InvalidSchema {
                 reason: format!("Duplicate argument name: '{}'", arg.name),
                 path: Some(format!("{}.arguments", context)),
+                suggestion: None,
             }
             .into());
         }
@@ -293,6 +300,7 @@ fn validate_argument_validation_rules(args: &[ArgumentDefinition], _context: &st
                                 arg.name,
                                 arg.arg_type.as_str()
                             ),
+                            suggestion: None,
                         }.into());
                     }
                 }
@@ -306,6 +314,7 @@ fn validate_argument_validation_rules(args: &[ArgumentDefinition], _context: &st
                                 arg.name,
                                 arg.arg_type.as_str()
                             ),
+                            suggestion: None,
                         }
                         .into());
                     }
@@ -318,6 +327,7 @@ fn validate_argument_validation_rules(args: &[ArgumentDefinition], _context: &st
                                     "Invalid range for argument '{}': min ({}) > max ({})",
                                     arg.name, min_val, max_val
                                 ),
+                                suggestion: None,
                             }
                             .into());
                         }
@@ -340,6 +350,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
             return Err(ConfigError::InvalidSchema {
                 reason: "Option name cannot be empty".to_string(),
                 path: Some(format!("{}.options[{}]", context, idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -349,6 +360,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
             return Err(ConfigError::InvalidSchema {
                 reason: format!("Duplicate option name: '{}'", opt.name),
                 path: Some(format!("{}.options", context)),
+                suggestion: None,
             }
             .into());
         }
@@ -361,6 +373,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
                     opt.name
                 ),
                 path: Some(format!("{}.options[{}]", context, idx)),
+                suggestion: None,
             }
             .into());
         }
@@ -375,6 +388,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
                         opt.name,
                         opt.choices.join(", ")
                     ),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -384,6 +398,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
         if opt.option_type == ArgumentType::Bool && !opt.choices.is_empty() {
             return Err(ConfigError::Inconsistency {
                 details: format!("Boolean option '{}' cannot have choices", opt.name),
+                suggestion: None,
             }
             .into());
         }
@@ -407,6 +422,7 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         short, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -418,6 +434,7 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         short, existing, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -429,6 +446,7 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                 return Err(ConfigError::InvalidSchema {
                     reason: format!("Long option for '{}' cannot be empty", opt.name),
                     path: Some(format!("{}.options", context)),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -440,6 +458,7 @@ fn validate_option_flags(options: &[OptionDefinition], context: &str) -> Result<
                         long, existing, opt.name
                     ),
                     path: Some(format!("{}.options", context)),
+                    suggestion: None,
                 }
                 .into());
             }
@@ -462,6 +481,7 @@ fn check_name_conflicts(
             return Err(ConfigError::InvalidSchema {
                 reason: format!("Option '{}' has the same name as an argument", opt.name),
                 path: Some(format!("{}.options", context)),
+                suggestion: None,
             }
             .into());
         }
@@ -508,7 +528,9 @@ mod tests {
         let result = validate_config(&config);
         assert!(result.is_err());
         match result.unwrap_err() {
-            crate::error::DynamicCliError::Config(ConfigError::DuplicateCommand { name }) => {
+            crate::error::DynamicCliError::Config(ConfigError::DuplicateCommand {
+                name, ..
+            }) => {
                 assert_eq!(name, "test");
             }
             other => panic!("Expected DuplicateCommand error, got {:?}", other),

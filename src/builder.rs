@@ -371,6 +371,7 @@ impl CliBuilder {
             return Err(DynamicCliError::Config(ConfigError::InvalidSchema {
                 reason: "No configuration provided. Use config_file() or config()".to_string(),
                 path: None,
+                suggestion: None,
             }));
         };
 
@@ -379,6 +380,7 @@ impl CliBuilder {
             DynamicCliError::Config(ConfigError::InvalidSchema {
                 reason: "No execution context provided. Use context()".to_string(),
                 path: None,
+                suggestion: None,
             })
         })?;
 
@@ -398,6 +400,7 @@ impl CliBuilder {
                         command_def.name, command_def.implementation
                     ),
                     path: None,
+                    suggestion: None,
                 }));
             }
 

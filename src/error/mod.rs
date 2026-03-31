@@ -20,6 +20,7 @@
 //! fn load_config() -> Result<(), DynamicCliError> {
 //!     Err(ConfigError::FileNotFound {
 //!         path: "config.yaml".into(),
+//!         suggestion: None,
 //!     }.into())
 //! }
 //! ```
