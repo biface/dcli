@@ -31,7 +31,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # Terminal coloring and formatting
-colored = { version = "3.0", optional = true }
+colored = { version = "3.0"}
 
 # REPL interface (Session 7 - NOW ACTIVE)
 rustyline = "14.0"
@@ -48,10 +48,6 @@ tempfile = "3.13"
 # assert_cmd = "2.1"
 # predicates = "3.1"
 
-[features]
-default = ["colored-output"]
-# Enable colored error output
-colored-output = ["colored"]
 
 # Future features (not yet implemented)
 # async-execution = ["tokio"]
