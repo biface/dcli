@@ -60,6 +60,7 @@ impl CommandHandler for ListCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "FileManagerContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -74,6 +75,7 @@ impl CommandHandler for ListCommand {
                 dynamic_cli::error::ValidationError::FileNotFound {
                     path: path.to_path_buf(),
                     arg_name: "directory".to_string(),
+                    suggestion: None,
                 },
             ));
         }
@@ -83,6 +85,7 @@ impl CommandHandler for ListCommand {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "directory".to_string(),
                     reason: "Path must be a directory".to_string(),
+                    suggestion: None,
                 },
             ));
         }
@@ -157,6 +160,7 @@ impl CommandHandler for InfoCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "FileManagerContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -170,6 +174,7 @@ impl CommandHandler for InfoCommand {
                 dynamic_cli::error::ValidationError::FileNotFound {
                     path: path.to_path_buf(),
                     arg_name: "file".to_string(),
+                    suggestion: None,
                 },
             ));
         }
@@ -227,6 +232,7 @@ impl CommandHandler for SearchCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "FileManagerContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -242,6 +248,7 @@ impl CommandHandler for SearchCommand {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "directory".to_string(),
                     reason: "Must be an existing directory".to_string(),
+                    suggestion: None,
                 },
             ));
         }
@@ -305,6 +312,7 @@ impl CommandHandler for StatsCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "FileManagerContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;

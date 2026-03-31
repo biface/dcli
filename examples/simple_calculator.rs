@@ -56,6 +56,7 @@ impl CommandHandler for AddCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -90,6 +91,7 @@ impl CommandHandler for SubtractCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -121,6 +123,7 @@ impl CommandHandler for MultiplyCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -152,6 +155,7 @@ impl CommandHandler for DivideCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -192,6 +196,7 @@ impl CommandHandler for HistoryCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -221,6 +226,7 @@ impl CommandHandler for ClearCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;
@@ -247,6 +253,7 @@ impl CommandHandler for LastCommand {
                 DynamicCliError::Execution(
                     dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                         expected_type: "CalculatorContext".to_string(),
+                        suggestion: None,
                     },
                 )
             })?;

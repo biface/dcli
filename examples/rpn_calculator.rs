@@ -175,6 +175,7 @@ impl CommandHandler for PushCommand {
         let rpn_context = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -183,6 +184,7 @@ impl CommandHandler for PushCommand {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
                 argument: "value".to_string(),
                 command: "push".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -217,6 +219,7 @@ impl CommandHandler for PopCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -242,6 +245,7 @@ impl CommandHandler for LastXCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -267,6 +271,7 @@ impl CommandHandler for SwapCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -292,6 +297,7 @@ impl CommandHandler for PeekCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -319,6 +325,7 @@ impl CommandHandler for ShowCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -342,6 +349,7 @@ impl CommandHandler for ClearCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
         rpn_ctx.clear();
@@ -365,6 +373,7 @@ impl CommandHandler for AddCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
         rpn_ctx.binary_op(|a, b| a + b, "+")?;
@@ -387,6 +396,7 @@ impl CommandHandler for SubCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -410,6 +420,7 @@ impl CommandHandler for MulCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
         rpn_ctx.binary_op(|a, b| a * b, "*")?;
@@ -432,6 +443,7 @@ impl CommandHandler for DivCommand {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -455,6 +467,7 @@ impl CommandHandler for LnFunction {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
+                suggestion: None,
             })
         })?;
 

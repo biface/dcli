@@ -21,7 +21,7 @@
 
 use dynamic_cli::context::downcast_mut;
 use dynamic_cli::prelude::*;
-use dynamic_cli::utils::{format_numbered_list, is_blank, parse_int};
+use dynamic_cli::utils::{is_blank, parse_int};
 use std::collections::HashMap;
 
 // ============================================================================
@@ -47,6 +47,7 @@ impl Priority {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "priority".to_string(),
                     reason: format!("Invalid priority '{}'. Must be: low, medium, or high", s),
+                    suggestion: None,
                 },
             )),
         }
@@ -149,6 +150,7 @@ impl TaskRunnerContext {
             DynamicCliError::Validation(dynamic_cli::error::ValidationError::CustomConstraint {
                 arg_name: "id".to_string(),
                 reason: format!("Task with ID {} not found", id),
+                suggestion: None,
             })
         })?;
 
@@ -157,6 +159,7 @@ impl TaskRunnerContext {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "id".to_string(),
                     reason: format!("Task {} is already completed", id),
+                    suggestion: None,
                 },
             ));
         }
@@ -173,6 +176,7 @@ impl TaskRunnerContext {
             DynamicCliError::Validation(dynamic_cli::error::ValidationError::CustomConstraint {
                 arg_name: "id".to_string(),
                 reason: format!("Task with ID {} not found", id),
+                suggestion: None,
             })
         })?;
 
@@ -252,6 +256,7 @@ impl CommandHandler for AddCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -260,6 +265,7 @@ impl CommandHandler for AddCommand {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
                 argument: "description".to_string(),
                 command: "add".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -268,6 +274,7 @@ impl CommandHandler for AddCommand {
                 dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "description".to_string(),
                     reason: "Description cannot be empty".to_string(),
+                    suggestion: None,
                 },
             ));
         }
@@ -298,13 +305,13 @@ impl CommandHandler for ListCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
         // Check if --all flag is present
         let show_all = args.get("all").map(|v| v == "true").unwrap_or(false);
 
-        // FIXED: Clone tasks before filtering to avoid move issues
         let tasks = if show_all {
             ctx.all_tasks()
         } else {
@@ -320,7 +327,6 @@ impl CommandHandler for ListCommand {
             return Ok(());
         }
 
-        // Display header
         if show_all {
             println!("\nAll Tasks ({}):", tasks.len());
         } else {
@@ -328,7 +334,6 @@ impl CommandHandler for ListCommand {
         }
         println!("{}", "=".repeat(60));
 
-        // Display tasks
         for task in &tasks {
             println!("  [{}] {}", task.id, task.format());
         }
@@ -351,19 +356,19 @@ impl CommandHandler for CompleteCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
-        // Parse task ID
         let id_str = args.get("id").ok_or_else(|| {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
                 argument: "id".to_string(),
                 command: "complete".to_string(),
+                suggestion: None,
             })
         })?;
         let id = parse_int(id_str, "id")? as usize;
 
-        // FIXED: Get description before calling complete_task (which borrows mutably)
         let description = ctx
             .tasks
             .iter()
@@ -373,10 +378,10 @@ impl CommandHandler for CompleteCommand {
                 DynamicCliError::Validation(dynamic_cli::error::ValidationError::CustomConstraint {
                     arg_name: "id".to_string(),
                     reason: format!("Task with ID {} not found", id),
+                    suggestion: None,
                 })
             })?;
 
-        // Complete the task
         ctx.complete_task(id)?;
 
         println!("✓ Task {} completed: {}", id, description);
@@ -397,19 +402,19 @@ impl CommandHandler for DeleteCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
-        // Parse task ID
         let id_str = args.get("id").ok_or_else(|| {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
                 argument: "id".to_string(),
                 command: "delete".to_string(),
+                suggestion: None,
             })
         })?;
         let id = parse_int(id_str, "id")? as usize;
 
-        // Delete task
         let description = ctx.delete_task(id)?;
 
         println!("✓ Task {} deleted: {}", id, description);
@@ -430,6 +435,7 @@ impl CommandHandler for ClearCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
@@ -457,6 +463,7 @@ impl CommandHandler for StatsCommand {
         let ctx = downcast_mut::<TaskRunnerContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "TaskRunnerContext".to_string(),
+                suggestion: None,
             })
         })?;
 
