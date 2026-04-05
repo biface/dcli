@@ -591,7 +591,10 @@ impl CliApp {
     /// # }
     /// ```
     pub fn run_repl(self) -> Result<()> {
-        let repl = ReplInterface::new(self.registry, self.context, self.prompt)?;
+        let mut repl = ReplInterface::new(self.registry, self.context, self.prompt)?;
+        if let Some(formatter) = self.help_formatter {
+            repl = repl.with_help(self.config, formatter);
+        }
         repl.run()
     }
 

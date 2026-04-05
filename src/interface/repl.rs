@@ -28,8 +28,10 @@
 //! # }
 //! ```
 
+use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
+use crate::help::HelpFormatter;
 use crate::parser::ReplParser;
 use crate::registry::CommandRegistry;
 use rustyline::error::ReadlineError;
@@ -79,6 +81,14 @@ pub struct ReplInterface {
 
     /// History file path
     history_path: Option<PathBuf>,
+
+    /// Application configuration — used by the help formatter.
+    /// `None` when no formatter has been supplied.
+    config: Option<CommandsConfig>,
+
+    /// Help formatter — renders `--help` output.
+    /// `None` when the application was built without a formatter.
+    help_formatter: Option<Box<dyn HelpFormatter>>,
 }
 
 impl ReplInterface {
@@ -133,12 +143,109 @@ impl ReplInterface {
             prompt: format!("{} > ", prompt),
             editor,
             history_path,
+            config: None,
+            help_formatter: None,
         };
 
         // Load history if available
         repl.load_history();
 
         Ok(repl)
+    }
+
+    /// Attach a help formatter and configuration to this REPL.
+    ///
+    /// When supplied, the REPL will intercept `--help` and `--help <command>`
+    /// (and their `-h` short forms, as well as `<command> --help`) before
+    /// dispatch and print formatted help instead of executing a command.
+    ///
+    /// This method is called automatically by [`CliBuilder`] when a formatter
+    /// has been registered. It can also be called directly when constructing
+    /// a `ReplInterface` manually.
+    ///
+    /// # Arguments
+    ///
+    /// * `config`    - The loaded application configuration (commands, metadata)
+    /// * `formatter` - A boxed [`HelpFormatter`] implementation
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use dynamic_cli::interface::ReplInterface;
+    /// use dynamic_cli::help::DefaultHelpFormatter;
+    /// use dynamic_cli::prelude::*;
+    ///
+    /// # #[derive(Default)]
+    /// # struct MyContext;
+    /// # impl ExecutionContext for MyContext {
+    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
+    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// # }
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// # let config = dynamic_cli::config::loader::load_config("commands.yaml")?;
+    /// let registry = CommandRegistry::new();
+    /// let context = Box::new(MyContext::default());
+    ///
+    /// let repl = ReplInterface::new(registry, context, "myapp".to_string())?
+    ///     .with_help(config, Box::new(DefaultHelpFormatter::new()));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_help(mut self, config: CommandsConfig, formatter: Box<dyn HelpFormatter>) -> Self {
+        self.config = Some(config);
+        self.help_formatter = Some(formatter);
+        self
+    }
+
+    /// Try to handle a `--help` / `-h` request.
+    ///
+    /// Returns `Some(output)` when the line is a help request and a formatter
+    /// is available, `None` otherwise (normal command processing continues).
+    ///
+    /// Recognized patterns (case-sensitive):
+    ///
+    /// | Input              | Output                    |
+    /// |--------------------|---------------------------|
+    /// | `--help`           | Application-level help    |
+    /// | `-h`               | Application-level help    |
+    /// | `--help <command>` | Per-command help          |
+    /// | `-h <command>`     | Per-command help          |
+    /// | `<command> --help` | Per-command help          |
+    /// | `<command> -h`     | Per-command help          |
+    fn try_handle_help(&self, line: &str) -> Option<String> {
+        let (config, formatter) = match (&self.config, &self.help_formatter) {
+            (Some(c), Some(f)) => (c, f.as_ref()),
+            _ => return None,
+        };
+
+        let trimmed = line.trim();
+
+        // "--help" or "-h" alone → application-level help
+        if trimmed == "--help" || trimmed == "-h" {
+            return Some(formatter.format_app(config));
+        }
+
+        // "--help <command>" or "-h <command>" → per-command help
+        if let Some(rest) = trimmed
+            .strip_prefix("--help ")
+            .or_else(|| trimmed.strip_prefix("-h "))
+        {
+            let cmd = rest.trim();
+            if !cmd.is_empty() {
+                return Some(formatter.format_command(config, cmd));
+            }
+        }
+
+        // "<command> --help" or "<command> -h" → per-command help
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let last = *parts.last().unwrap();
+            if last == "--help" || last == "-h" {
+                return Some(formatter.format_command(config, parts[0]));
+            }
+        }
+
+        None
     }
 
     /// Get the history file path
@@ -271,7 +378,16 @@ impl ReplInterface {
     /// Execute a single line of input
     ///
     /// Parses the line and executes the corresponding command.
+    /// `--help` and `-h` requests are intercepted before dispatch
+    /// and handled by the configured [`HelpFormatter`] if one is present.
     fn execute_line(&mut self, line: &str) -> Result<()> {
+        // Intercept --help / -h before the parser so the registry
+        // is never consulted for help requests.
+        if let Some(output) = self.try_handle_help(line) {
+            print!("{}", output);
+            return Ok(());
+        }
+
         // Create parser (borrows registry immutably)
         let parser = ReplParser::new(&self.registry);
 
@@ -478,5 +594,182 @@ mod tests {
         // Empty line should return an error from parser
         let result = repl.execute_line("");
         assert!(result.is_err());
+    }
+
+    // -------------------------------------------------------------------------
+    // with_help / try_handle_help
+    // -------------------------------------------------------------------------
+
+    /// Minimal config for help tests.
+    fn make_help_config() -> crate::config::schema::CommandsConfig {
+        use crate::config::schema::{CommandDefinition, CommandsConfig, Metadata};
+        CommandsConfig {
+            metadata: Metadata {
+                version: "1.0.0".to_string(),
+                prompt: "testapp".to_string(),
+                prompt_suffix: " > ".to_string(),
+            },
+            commands: vec![CommandDefinition {
+                name: "hello".to_string(),
+                aliases: vec!["hi".to_string()],
+                description: "Say hello".to_string(),
+                required: false,
+                arguments: vec![],
+                options: vec![],
+                implementation: "hello_handler".to_string(),
+            }],
+            global_options: vec![],
+        }
+    }
+
+    #[test]
+    fn test_try_handle_help_without_formatter_returns_none() {
+        // No formatter attached → try_handle_help must be a no-op.
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
+
+        assert!(repl.try_handle_help("--help").is_none());
+        assert!(repl.try_handle_help("-h").is_none());
+    }
+
+    #[test]
+    fn test_try_handle_help_global() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        let out = repl.try_handle_help("--help");
+        assert!(out.is_some());
+        let out = out.unwrap();
+        assert!(out.contains("testapp"), "should contain app prompt");
+        assert!(out.contains("hello"), "should list commands");
+    }
+
+    #[test]
+    fn test_try_handle_help_short_flag() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // -h alone → same as --help
+        let out = repl.try_handle_help("-h");
+        assert!(out.is_some());
+        assert!(out.unwrap().contains("testapp"));
+    }
+
+    #[test]
+    fn test_try_handle_help_with_command_prefix() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // "--help hello" → per-command help
+        let out = repl.try_handle_help("--help hello");
+        assert!(out.is_some());
+        assert!(out.unwrap().contains("hello"));
+
+        // "-h hello" → per-command help
+        let out2 = repl.try_handle_help("-h hello");
+        assert!(out2.is_some());
+    }
+
+    #[test]
+    fn test_try_handle_help_command_suffix() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // "hello --help" → per-command help
+        let out = repl.try_handle_help("hello --help");
+        assert!(out.is_some());
+        assert!(out.unwrap().contains("hello"));
+
+        // "hello -h" → per-command help
+        let out2 = repl.try_handle_help("hello -h");
+        assert!(out2.is_some());
+    }
+
+    #[test]
+    fn test_try_handle_help_alias() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // "hi" is an alias for "hello"
+        let out = repl.try_handle_help("--help hi");
+        assert!(out.is_some());
+        // The formatter resolves aliases, output should mention hello
+        assert!(out.unwrap().contains("hello"));
+    }
+
+    #[test]
+    fn test_execute_line_help_intercepted() {
+        use crate::help::DefaultHelpFormatter;
+        colored::control::set_override(false);
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let mut repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // "--help" must succeed (print help, not dispatch)
+        let result = repl.execute_line("--help");
+        assert!(result.is_ok(), "help request must not return an error");
+    }
+
+    #[test]
+    fn test_execute_line_normal_command_still_works_with_formatter() {
+        use crate::help::DefaultHelpFormatter;
+
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+
+        let mut repl = ReplInterface::new(registry, context, "test".to_string())
+            .unwrap()
+            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+
+        // Normal commands must still execute normally
+        let result = repl.execute_line("test");
+        assert!(result.is_ok());
     }
 }
