@@ -199,6 +199,25 @@ async = ["tokio", "async-trait"]
 **Theme**: Built-in Help & Error Improvements  
 **Dependencies**: v0.1.1
 
+### Added (issue #14)
+
+#### REPL Help Support
+- `ReplInterface` now intercepts `--help`, `-h`, `--help <command>`, `-h <command>`,
+  `<command> --help`, and `<command> -h` in `execute_line()` before dispatch.
+  Formatted help is printed via the configured `HelpFormatter`; normal command
+  execution is unaffected.
+- New `ReplInterface::with_help(config, formatter)` builder method — attaches
+  a `CommandsConfig` and a `Box<dyn HelpFormatter>` to the REPL. Called
+  automatically by `CliBuilder::run_repl()` when a formatter is registered.
+- `CliBuilder::run_repl()` now wires `with_help()` automatically when a
+  formatter has been supplied via `CliBuilder::help_formatter()`.
+
+#### Coverage
+- Overall line coverage: **95.76%** (target ≥ 85 %)
+- All v0.2.0 modules exceed target:
+  `help/mod.rs` 98.92%, `error/types.rs` 97.38%,
+  `error/display.rs` 92.98%, `interface/repl.rs` 91.46%
+
 ### Added (issue #12)
 
 #### Built-in Help System
@@ -221,36 +240,6 @@ async = ["tokio", "async-trait"]
 - Pre-existing clippy warning `borrowed_box` on `CommandRegistry::get_handler()`
   suppressed with a justified `#[allow(clippy::borrowed_box)]` attribute.
   Changing the return type would be a breaking API change.
-
-### Added (issue #13)
-
-#### Enhanced Error Messages
-- `suggestion: Option<String>` field added to 20 error variants across
-  `ConfigError`, `ParseError`, `ValidationError`, `ExecutionError`, and
-  `RegistryError`. Suggestions surface actionable hints to the user without
-  changing the `Display` string (machine-readable messages remain stable).
-- New helper constructors that populate `suggestion` automatically:
-  `ParseError::missing_argument()`, `ParseError::missing_option()`,
-  `ParseError::too_many_arguments()`, `ConfigError::file_not_found()`,
-  `ConfigError::unsupported_format()`, `ExecutionError::handler_not_found()`,
-  `RegistryError::missing_handler()`.
-- `display.rs`: `ValidationError`, `ExecutionError`, and `RegistryError` now
-  render an `ℹ  <suggestion>` line when a suggestion is present, consistent
-  with the existing `ParseError` and `ConfigError` formatting.
-- `display.rs`: `colored` dependency is now unconditional (aligned with
-  `DefaultHelpFormatter`); the `colored-output` feature flag has been removed.
-
-### Fixed (issue #13)
-
-- `colored-output` feature flag removed from `Cargo.toml`; `colored = "3.0"`
-  is now an unconditional dependency, consistent with its usage in
-  `DefaultHelpFormatter`.
-
-### Planned (remaining)
-
-#### REPL Help (issue #14)
-- `--help` and `--help <command>` support in REPL mode
-  (interception in `ReplInterface::run()`, reusing the stored `HelpFormatter`)
 
 **Breaking Changes**: None
 
@@ -565,6 +554,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-03-31  
-**Current Version**: 0.1.1  
-**Next Release**: 0.2.0 (In progress — target Q2 2026)
+**Last Updated**: 2026-04-05  
+**Current Version**: 0.2.0 (pending publish)  
+**Next Release**: 0.3.0 (planned Q4 2026)
