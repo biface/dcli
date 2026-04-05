@@ -20,11 +20,13 @@ jobs:
           git remote add gitlab \
             https://oauth2:${GITLAB_TOKEN}@gitlab.com/open-works/dcli.git
 
-          # --mirror also pushes refs/remotes/* which GitLab rejects.
-          # Push branches and tags explicitly instead.
+          # Push branches without force — GitLab forbids force-push on the
+          # default branch and rejects --prune when it would delete it.
           git push gitlab \
-            --prune \
-            "+refs/heads/*:refs/heads/*" \
-            "+refs/tags/*:refs/tags/*"
+            "refs/heads/*:refs/heads/*"
+
+          # Push tags with force so re-created tags are synced correctly.
+          git push gitlab --force \
+            "refs/tags/*:refs/tags/*"
         env:
           GITLAB_TOKEN: ${{ secrets.GITLAB_MIRROR_TOKEN }}
