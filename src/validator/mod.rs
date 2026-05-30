@@ -343,6 +343,7 @@ mod tests {
                     extensions: vec!["dat".to_string(), "bin".to_string()],
                 },
             ],
+            secure: false,
         };
 
         // Validate according to definition
@@ -376,6 +377,7 @@ mod tests {
                 min: Some(-273.15), // Absolute zero
                 max: None,
             }],
+            secure: false,
         };
 
         // Valid temperatures

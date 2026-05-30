@@ -248,14 +248,20 @@ impl ReplInterface {
         None
     }
 
-    /// Get the history file path
+    /// Get the history file path for this application.
     ///
-    /// Uses the user's config directory to store command history.
+    /// Each application gets its own isolated history file under the
+    /// XDG data directory:
+    ///
+    /// - Linux/macOS: `~/.local/share/<app_name>/history`
+    /// - Windows:     `%LOCALAPPDATA%\<app_name>\history`
+    ///
+    /// Using `data_local_dir` (XDG `$XDG_DATA_HOME`) rather than
+    /// `config_dir` keeps history data separate from configuration files
+    /// and avoids sharing a single history across different applications
+    /// built on `dynamic-cli`.
     fn get_history_path(app_name: &str) -> Option<PathBuf> {
-        dirs::config_dir().map(|config_dir| {
-            let app_dir = config_dir.join(app_name);
-            app_dir.join("history.txt")
-        })
+        dirs::data_local_dir().map(|data_dir| data_dir.join(app_name).join("history"))
     }
 
     /// Load command history from file
@@ -328,22 +334,18 @@ impl ReplInterface {
                         continue;
                     }
 
-                    // Add to history
-                    let _ = self.editor.add_history_entry(line);
-
                     // Check for built-in exit commands
                     if line == "exit" || line == "quit" {
                         println!("Goodbye!");
                         break;
                     }
 
-                    // Parse and execute command
+                    // Parse and execute command.
+                    // History is written inside execute_line(), after successful
+                    // parsing and only when no secure argument is present.
                     match self.execute_line(line) {
-                        Ok(()) => {
-                            // Command executed successfully
-                        }
+                        Ok(()) => {}
                         Err(e) => {
-                            // Display error but continue REPL
                             display_error(&e);
                         }
                     }
@@ -375,11 +377,44 @@ impl ReplInterface {
         Ok(())
     }
 
+    /// Check whether a parsed command involves at least one secure argument.
+    ///
+    /// Looks up the command definition in `self.config` (if available) and
+    /// returns `true` when any argument name present in `parsed_args` is
+    /// marked `secure: true` in the YAML schema.
+    ///
+    /// Returns `false` when no configuration is attached (history written
+    /// as normal) or when no secure argument is found.
+    fn has_secure_arg(
+        &self,
+        command_name: &str,
+        parsed_args: &std::collections::HashMap<String, String>,
+    ) -> bool {
+        let config = match &self.config {
+            Some(c) => c,
+            None => return false,
+        };
+
+        let cmd_def = match config.commands.iter().find(|c| c.name == command_name) {
+            Some(d) => d,
+            None => return false,
+        };
+
+        cmd_def
+            .arguments
+            .iter()
+            .any(|arg| arg.secure && parsed_args.contains_key(&arg.name))
+    }
+
     /// Execute a single line of input
     ///
     /// Parses the line and executes the corresponding command.
     /// `--help` and `-h` requests are intercepted before dispatch
     /// and handled by the configured [`HelpFormatter`] if one is present.
+    ///
+    /// History is written here — after successful parsing — so that:
+    /// - Failed or invalid commands are never persisted.
+    /// - Lines containing a `secure: true` argument are silently omitted.
     fn execute_line(&mut self, line: &str) -> Result<()> {
         // Intercept --help / -h before the parser so the registry
         // is never consulted for help requests.
@@ -393,6 +428,12 @@ impl ReplInterface {
 
         // Parse command (parser is dropped after this, releasing the borrow)
         let parsed = parser.parse_line(line)?;
+
+        // Write to history only on successful parse and when no secure
+        // argument is present in the parsed command.
+        if !self.has_secure_arg(&parsed.command_name, &parsed.arguments) {
+            let _ = self.editor.add_history_entry(line);
+        }
 
         // Now we can borrow registry again to get the handler
         let handler = self
@@ -558,6 +599,7 @@ mod tests {
                 required: true,
                 description: "Name".to_string(),
                 validation: vec![],
+                secure: false,
             }],
             options: vec![],
             implementation: "greet_handler".to_string(),

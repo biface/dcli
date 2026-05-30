@@ -94,6 +94,7 @@
 //!             required: true,
 //!             description: "Input file".to_string(),
 //!             validation: vec![],
+//!             secure: false,
 //!         }
 //!     ],
 //!     options: vec![],
@@ -234,6 +235,7 @@ mod tests {
                     required: true,
                     description: "Input data file".to_string(),
                     validation: vec![],
+                    secure: false,
                 },
                 ArgumentDefinition {
                     name: "output".to_string(),
@@ -241,6 +243,7 @@ mod tests {
                     required: false,
                     description: "Output report file".to_string(),
                     validation: vec![],
+                    secure: false,
                 },
             ],
             options: vec![

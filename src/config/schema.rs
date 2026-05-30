@@ -145,6 +145,22 @@ pub struct CommandDefinition {
 ///   - must_exist: true
 ///   - extensions: [yaml, yml]
 /// ```
+///
+/// To prevent a sensitive argument value from being written to the REPL
+/// history file, set `secure: true`:
+///
+/// ```yaml
+/// name: password
+/// arg_type: string
+/// required: true
+/// description: "User password"
+/// secure: true
+/// ```
+///
+/// When a command line contains at least one argument marked `secure: true`,
+/// the entire line is silently omitted from the history file. The command
+/// name itself is not filtered — only lines with a secure argument value
+/// are suppressed.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct ArgumentDefinition {
     /// Argument name (used in error messages and documentation)
@@ -162,6 +178,13 @@ pub struct ArgumentDefinition {
     /// Validation rules to apply
     #[serde(default)]
     pub validation: Vec<ValidationRule>,
+
+    /// Whether this argument carries a sensitive value.
+    ///
+    /// When `true`, any REPL command line that provides a value for this
+    /// argument is not written to the history file. Defaults to `false`.
+    #[serde(default)]
+    pub secure: bool,
 }
 
 /// Definition of a named option (flag)

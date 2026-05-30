@@ -432,6 +432,7 @@ mod tests {
                         required: true,
                         description: "Name to greet".to_string(),
                         validation: vec![],
+                        secure: false,
                     }],
                     options: vec![OptionDefinition {
                         name: "loud".to_string(),

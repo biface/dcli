@@ -208,6 +208,7 @@ pub fn validate_command(cmd: &CommandDefinition) -> Result<()> {
 ///         required: true,
 ///         description: "Count".to_string(),
 ///         validation: vec![],
+///         secure: false,
 ///     }
 /// ];
 ///
@@ -593,6 +594,7 @@ mod tests {
                 required: false,
                 description: "Optional".to_string(),
                 validation: vec![],
+                secure: false,
             },
             ArgumentDefinition {
                 name: "required".to_string(),
@@ -600,6 +602,7 @@ mod tests {
                 required: true, // Required after optional!
                 description: "Required".to_string(),
                 validation: vec![],
+                secure: false,
             },
         ];
 
@@ -616,6 +619,7 @@ mod tests {
                 required: true,
                 description: "Arg 1".to_string(),
                 validation: vec![],
+                secure: false,
             },
             ArgumentDefinition {
                 name: "arg1".to_string(), // Duplicate!
@@ -623,6 +627,7 @@ mod tests {
                 required: true,
                 description: "Arg 1 again".to_string(),
                 validation: vec![],
+                secure: false,
             },
         ];
 
@@ -640,6 +645,7 @@ mod tests {
             validation: vec![
                 ValidationRule::MustExist { must_exist: true }, // Wrong for integer!
             ],
+            secure: false,
         }];
 
         let result = validate_argument_validation_rules(&args, "test");
@@ -657,6 +663,7 @@ mod tests {
                 min: Some(100.0),
                 max: Some(0.0), // min > max!
             }],
+            secure: false,
         }];
 
         let result = validate_argument_validation_rules(&args, "test");
@@ -751,6 +758,7 @@ mod tests {
             required: true,
             description: "Output".to_string(),
             validation: vec![],
+            secure: false,
         }];
 
         let options = vec![OptionDefinition {
@@ -786,6 +794,7 @@ mod tests {
                         extensions: vec!["csv".to_string()],
                     },
                 ],
+                secure: false,
             }],
             options: vec![OptionDefinition {
                 name: "output".to_string(),
