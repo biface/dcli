@@ -185,17 +185,22 @@ pub use range_validator::validate_range;
 mod tests {
     use super::*;
     use crate::config::schema::{ArgumentDefinition, ArgumentType, ValidationRule};
-    use std::fs;
     use std::io::Write;
     use std::path::Path;
-    use tempfile::TempDir;
+    use tempfile::NamedTempFile;
 
-    /// Helper to create a temporary file
-    fn create_temp_file(dir: &TempDir, name: &str, content: &str) -> std::path::PathBuf {
-        let path = dir.path().join(name);
-        let mut file = fs::File::create(&path).unwrap();
-        write!(file, "{}", content).unwrap();
-        path
+    /// Helper: create a NamedTempFile with a given extension and content.
+    ///
+    /// Uses `NamedTempFile` directly instead of `TempDir` + `File::create`
+    /// to avoid the `File::create` race condition under parallel test execution.
+    fn temp_file_with_ext(ext: &str, content: &str) -> NamedTempFile {
+        let mut f = tempfile::Builder::new()
+            .suffix(&format!(".{}", ext))
+            .tempfile()
+            .expect("failed to create NamedTempFile");
+        f.write_all(content.as_bytes())
+            .expect("failed to write to NamedTempFile");
+        f
     }
 
     // ========================================================================
@@ -204,63 +209,42 @@ mod tests {
 
     #[test]
     fn test_validate_configuration_file_argument() {
-        let temp_dir = TempDir::new().unwrap();
-        let config_path = create_temp_file(&temp_dir, "config.yaml", "test: value");
-
-        // Define validation rules
+        let f = temp_file_with_ext("yaml", "test: value");
         let extensions = vec!["yaml".to_string(), "yml".to_string()];
-
-        // Validate - both checks should pass
-        assert!(validate_file_exists(&config_path, "config").is_ok());
-        assert!(validate_file_extension(&config_path, "config", &extensions).is_ok());
+        assert!(validate_file_exists(f.path(), "config").is_ok());
+        assert!(validate_file_extension(f.path(), "config", &extensions).is_ok());
     }
 
     #[test]
     fn test_validate_data_file_with_wrong_extension() {
-        let temp_dir = TempDir::new().unwrap();
-        let data_path = create_temp_file(&temp_dir, "data.txt", "some data");
-
+        let f = temp_file_with_ext("txt", "some data");
         let extensions = vec!["csv".to_string(), "tsv".to_string()];
-
-        // File exists
-        assert!(validate_file_exists(&data_path, "data").is_ok());
-
-        // But wrong extension
-        assert!(validate_file_extension(&data_path, "data", &extensions).is_err());
+        assert!(validate_file_exists(f.path(), "data").is_ok());
+        assert!(validate_file_extension(f.path(), "data", &extensions).is_err());
     }
 
     #[test]
     fn test_validate_missing_file() {
         let missing_path = Path::new("/nonexistent/file.dat");
-
-        // Should fail existence check
         assert!(validate_file_exists(missing_path, "input").is_err());
-
-        // Extension check would pass (but we stop at existence)
         let extensions = vec!["dat".to_string()];
         assert!(validate_file_extension(missing_path, "input", &extensions).is_ok());
     }
 
     #[test]
     fn test_validate_percentage_argument() {
-        // Valid percentages
         assert!(validate_range(0.0, "percentage", Some(0.0), Some(100.0)).is_ok());
         assert!(validate_range(50.0, "percentage", Some(0.0), Some(100.0)).is_ok());
         assert!(validate_range(100.0, "percentage", Some(0.0), Some(100.0)).is_ok());
-
-        // Invalid percentages
         assert!(validate_range(-1.0, "percentage", Some(0.0), Some(100.0)).is_err());
         assert!(validate_range(101.0, "percentage", Some(0.0), Some(100.0)).is_err());
     }
 
     #[test]
     fn test_validate_threshold_argument() {
-        // Common ML/science threshold: 0.0 to 1.0
         assert!(validate_range(0.0, "threshold", Some(0.0), Some(1.0)).is_ok());
         assert!(validate_range(0.5, "threshold", Some(0.0), Some(1.0)).is_ok());
         assert!(validate_range(1.0, "threshold", Some(0.0), Some(1.0)).is_ok());
-
-        // Out of bounds
         assert!(validate_range(-0.1, "threshold", Some(0.0), Some(1.0)).is_err());
         assert!(validate_range(1.1, "threshold", Some(0.0), Some(1.0)).is_err());
     }
@@ -271,27 +255,22 @@ mod tests {
 
     #[test]
     fn test_validate_argument_with_multiple_rules() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = create_temp_file(&temp_dir, "data.csv", "col1,col2\n1,2\n");
-
-        // Simulate ArgumentDefinition with multiple validation rules
+        let f = temp_file_with_ext("csv", "col1,col2\n1,2\n");
         let rules = vec![
             ValidationRule::MustExist { must_exist: true },
             ValidationRule::Extensions {
                 extensions: vec!["csv".to_string(), "tsv".to_string()],
             },
         ];
-
-        // Apply all rules
         for rule in &rules {
             match rule {
                 ValidationRule::MustExist { must_exist } => {
                     if *must_exist {
-                        assert!(validate_file_exists(&file_path, "data").is_ok());
+                        assert!(validate_file_exists(f.path(), "data").is_ok());
                     }
                 }
                 ValidationRule::Extensions { extensions } => {
-                    assert!(validate_file_extension(&file_path, "data", extensions).is_ok());
+                    assert!(validate_file_extension(f.path(), "data", extensions).is_ok());
                 }
                 _ => {}
             }
@@ -300,26 +279,20 @@ mod tests {
 
     #[test]
     fn test_validate_fails_at_first_invalid_rule() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = create_temp_file(&temp_dir, "data.txt", "content");
-
+        let f = temp_file_with_ext("txt", "content");
         let rules = vec![
             ValidationRule::MustExist { must_exist: true },
             ValidationRule::Extensions {
                 extensions: vec!["csv".to_string()], // Wrong extension!
             },
         ];
-
-        // First rule passes
         if let ValidationRule::MustExist { must_exist } = &rules[0] {
             if *must_exist {
-                assert!(validate_file_exists(&file_path, "data").is_ok());
+                assert!(validate_file_exists(f.path(), "data").is_ok());
             }
         }
-
-        // Second rule fails
         if let ValidationRule::Extensions { extensions } = &rules[1] {
-            assert!(validate_file_extension(&file_path, "data", extensions).is_err());
+            assert!(validate_file_extension(f.path(), "data", extensions).is_err());
         }
     }
 
@@ -329,10 +302,7 @@ mod tests {
 
     #[test]
     fn test_validate_with_argument_definition() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = create_temp_file(&temp_dir, "input.dat", "data");
-
-        // Create an ArgumentDefinition similar to config
+        let f = temp_file_with_ext("dat", "data");
         let arg_def = ArgumentDefinition {
             name: "input_file".to_string(),
             arg_type: ArgumentType::Path,
@@ -346,21 +316,19 @@ mod tests {
             ],
             secure: false,
         };
-
-        // Validate according to definition
-        let value = file_path.to_str().unwrap();
-
+        let value = f.path().to_str().unwrap();
         for rule in &arg_def.validation {
             match rule {
                 ValidationRule::MustExist { must_exist } => {
                     if *must_exist {
-                        let path = Path::new(value);
-                        assert!(validate_file_exists(path, &arg_def.name).is_ok());
+                        assert!(validate_file_exists(Path::new(value), &arg_def.name).is_ok());
                     }
                 }
                 ValidationRule::Extensions { extensions } => {
-                    let path = Path::new(value);
-                    assert!(validate_file_extension(path, &arg_def.name, extensions).is_ok());
+                    assert!(
+                        validate_file_extension(Path::new(value), &arg_def.name, extensions)
+                            .is_ok()
+                    );
                 }
                 _ => {}
             }
@@ -375,29 +343,22 @@ mod tests {
             required: true,
             description: "Temperature in Celsius".to_string(),
             validation: vec![ValidationRule::Range {
-                min: Some(-273.15), // Absolute zero
+                min: Some(-273.15),
                 max: None,
             }],
             secure: false,
         };
-
-        // Valid temperatures
-        let values = vec!["0.0", "25.0", "100.0", "-273.15"];
-
-        for value in values {
-            let num_value: f64 = value.parse().unwrap();
-
+        for value in &["0.0", "25.0", "100.0", "-273.15"] {
+            let num: f64 = value.parse().unwrap();
             for rule in &arg_def.validation {
                 if let ValidationRule::Range { min, max } = rule {
-                    assert!(validate_range(num_value, &arg_def.name, *min, *max).is_ok());
+                    assert!(validate_range(num, &arg_def.name, *min, *max).is_ok());
                 }
             }
         }
-
-        // Invalid temperature (below absolute zero)
-        let invalid_value: f64 = "-300.0".parse().unwrap();
+        let invalid: f64 = "-300.0".parse().unwrap();
         if let ValidationRule::Range { min, max } = &arg_def.validation[0] {
-            assert!(validate_range(invalid_value, &arg_def.name, *min, *max).is_err());
+            assert!(validate_range(invalid, &arg_def.name, *min, *max).is_err());
         }
     }
 
@@ -409,31 +370,22 @@ mod tests {
     fn test_validate_parsed_arguments() {
         use std::collections::HashMap;
 
-        let temp_dir = TempDir::new().unwrap();
-        let input_path = create_temp_file(&temp_dir, "data.csv", "1,2,3");
-
-        // Simulated parsed arguments from parser module
+        let f = temp_file_with_ext("csv", "1,2,3");
         let mut parsed_args = HashMap::new();
-        parsed_args.insert(
-            "input".to_string(),
-            input_path.to_str().unwrap().to_string(),
-        );
+        parsed_args.insert("input".to_string(), f.path().to_str().unwrap().to_string());
         parsed_args.insert("threshold".to_string(), "0.75".to_string());
 
-        // Validation rules from config
         let input_rules = vec![
             ValidationRule::MustExist { must_exist: true },
             ValidationRule::Extensions {
                 extensions: vec!["csv".to_string()],
             },
         ];
-
         let threshold_rules = vec![ValidationRule::Range {
             min: Some(0.0),
             max: Some(1.0),
         }];
 
-        // Validate input file
         if let Some(value) = parsed_args.get("input") {
             let path = Path::new(value);
             for rule in &input_rules {
@@ -449,12 +401,11 @@ mod tests {
             }
         }
 
-        // Validate threshold
         if let Some(value) = parsed_args.get("threshold") {
-            let num_value: f64 = value.parse().unwrap();
+            let num: f64 = value.parse().unwrap();
             for rule in &threshold_rules {
                 if let ValidationRule::Range { min, max } = rule {
-                    assert!(validate_range(num_value, "threshold", *min, *max).is_ok());
+                    assert!(validate_range(num, "threshold", *min, *max).is_ok());
                 }
             }
         }
@@ -462,38 +413,30 @@ mod tests {
 
     #[test]
     fn test_error_messages_are_descriptive() {
-        // Test that error messages contain helpful information
-
-        // File not found error
         let result = validate_file_exists(Path::new("/missing/file.txt"), "config");
         assert!(result.is_err());
-        let error = result.unwrap_err();
-        let error_msg = format!("{}", error);
-        assert!(error_msg.contains("File not found"));
-        assert!(error_msg.contains("config"));
-        assert!(error_msg.contains("/missing/file.txt"));
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("File not found"));
+        assert!(msg.contains("config"));
+        assert!(msg.contains("/missing/file.txt"));
 
-        // Invalid extension error
         let result = validate_file_extension(
             Path::new("file.txt"),
             "data",
-            &vec!["csv".to_string(), "json".to_string()],
+            &["csv".to_string(), "json".to_string()],
         );
         assert!(result.is_err());
-        let error = result.unwrap_err();
-        let error_msg = format!("{}", error);
-        assert!(error_msg.contains("Invalid file extension"));
-        assert!(error_msg.contains("data"));
-        assert!(error_msg.contains("csv"));
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("Invalid file extension"));
+        assert!(msg.contains("data"));
+        assert!(msg.contains("csv"));
 
-        // Out of range error
         let result = validate_range(150.0, "percentage", Some(0.0), Some(100.0));
         assert!(result.is_err());
-        let error = result.unwrap_err();
-        let error_msg = format!("{}", error);
-        assert!(error_msg.contains("percentage"));
-        assert!(error_msg.contains("150"));
-        assert!(error_msg.contains("0"));
-        assert!(error_msg.contains("100"));
+        let msg = format!("{}", result.unwrap_err());
+        assert!(msg.contains("percentage"));
+        assert!(msg.contains("150"));
+        assert!(msg.contains("0"));
+        assert!(msg.contains("100"));
     }
 }

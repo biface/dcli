@@ -481,6 +481,70 @@ mod tests {
         assert!(arg.required);
         assert_eq!(arg.description, "Input file");
         assert_eq!(arg.validation.len(), 2);
+        // secure defaults to false when absent from YAML
+        assert!(!arg.secure);
+    }
+
+    #[test]
+    fn test_deserialize_argument_definition_secure_default_false() {
+        // When `secure` is absent from the YAML, serde must default to false.
+        let yaml = r#"
+            name: username
+            arg_type: string
+            required: true
+            description: "User name"
+        "#;
+
+        let arg: ArgumentDefinition = serde_yaml::from_str(yaml).unwrap();
+        assert!(!arg.secure, "secure must default to false when absent");
+    }
+
+    #[test]
+    fn test_deserialize_argument_definition_secure_true() {
+        // When `secure: true` is present, it must be deserialised correctly.
+        let yaml = r#"
+            name: password
+            arg_type: string
+            required: true
+            description: "User password"
+            secure: true
+        "#;
+
+        let arg: ArgumentDefinition = serde_yaml::from_str(yaml).unwrap();
+        assert!(arg.secure, "secure must be true when set in YAML");
+    }
+
+    #[test]
+    fn test_deserialize_argument_definition_secure_false_explicit() {
+        // Explicit `secure: false` must round-trip correctly.
+        let yaml = r#"
+            name: output
+            arg_type: path
+            required: false
+            description: "Output path"
+            secure: false
+        "#;
+
+        let arg: ArgumentDefinition = serde_yaml::from_str(yaml).unwrap();
+        assert!(!arg.secure);
+    }
+
+    #[test]
+    fn test_serialize_argument_definition_secure_roundtrip() {
+        let original = ArgumentDefinition {
+            name: "secret".to_string(),
+            arg_type: ArgumentType::String,
+            required: true,
+            description: "A secret value".to_string(),
+            validation: vec![],
+            secure: true,
+        };
+
+        let yaml = serde_yaml::to_string(&original).unwrap();
+        let deserialized: ArgumentDefinition = serde_yaml::from_str(&yaml).unwrap();
+
+        assert_eq!(original, deserialized);
+        assert!(deserialized.secure);
     }
 
     #[test]

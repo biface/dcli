@@ -620,6 +620,7 @@ mod tests {
     use crate::config::schema::{
         ArgumentDefinition, ArgumentType, CommandDefinition, OptionDefinition,
     };
+    use rustyline::history::History;
     use std::collections::HashMap;
 
     #[derive(Default)]
@@ -1076,5 +1077,188 @@ mod tests {
         // "unknown " → empty (command not in registry)
         let (_, candidates) = completer.complete("unknown ", 8, &ctx).unwrap();
         assert!(candidates.is_empty());
+    }
+
+    // ── has_secure_arg ────────────────────────────────────────────────────────
+
+    /// Build a registry + config with one command that has a `secure` argument.
+    fn make_secure_registry_and_config() -> (CommandRegistry, CommandsConfig) {
+        use crate::config::schema::{CommandsConfig, Metadata};
+
+        let cmd_def = CommandDefinition {
+            name: "login".to_string(),
+            aliases: vec![],
+            description: "Login command".to_string(),
+            required: false,
+            arguments: vec![
+                ArgumentDefinition {
+                    name: "username".to_string(),
+                    arg_type: ArgumentType::String,
+                    required: true,
+                    description: "Username".to_string(),
+                    validation: vec![],
+                    secure: false,
+                },
+                ArgumentDefinition {
+                    name: "password".to_string(),
+                    arg_type: ArgumentType::String,
+                    required: true,
+                    description: "Password".to_string(),
+                    validation: vec![],
+                    secure: true,
+                },
+            ],
+            options: vec![],
+            implementation: "login_handler".to_string(),
+        };
+
+        struct LoginHandler;
+        impl crate::executor::CommandHandler for LoginHandler {
+            fn execute(
+                &self,
+                _ctx: &mut dyn ExecutionContext,
+                _args: &HashMap<String, String>,
+            ) -> Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut registry = CommandRegistry::new();
+        registry
+            .register(cmd_def.clone(), Box::new(LoginHandler))
+            .unwrap();
+
+        let config = CommandsConfig {
+            metadata: Metadata {
+                version: "1.0.0".to_string(),
+                prompt: "testapp".to_string(),
+                prompt_suffix: " > ".to_string(),
+            },
+            commands: vec![cmd_def],
+            global_options: vec![],
+        };
+
+        (registry, config)
+    }
+
+    #[test]
+    fn test_has_secure_arg_returns_false_without_config() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let repl = ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let mut args = HashMap::new();
+        args.insert("password".to_string(), "secret".to_string());
+
+        assert!(!repl.has_secure_arg("login", &args));
+    }
+
+    #[test]
+    fn test_has_secure_arg_returns_false_when_no_secure_field() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+        let repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        let mut args = HashMap::new();
+        args.insert("loud".to_string(), "true".to_string());
+
+        assert!(!repl.has_secure_arg("hello", &args));
+    }
+
+    #[test]
+    fn test_has_secure_arg_returns_true_when_secure_argument_present() {
+        let (registry, config) = make_secure_registry_and_config();
+        let context = Box::new(TestContext::default());
+        let repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        let mut args = HashMap::new();
+        args.insert("username".to_string(), "alice".to_string());
+        args.insert("password".to_string(), "secret".to_string());
+
+        assert!(repl.has_secure_arg("login", &args));
+    }
+
+    #[test]
+    fn test_has_secure_arg_returns_false_when_only_non_secure_present() {
+        let (registry, config) = make_secure_registry_and_config();
+        let context = Box::new(TestContext::default());
+        let repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        // Only username provided — password (secure) absent from parsed args.
+        let mut args = HashMap::new();
+        args.insert("username".to_string(), "alice".to_string());
+
+        assert!(!repl.has_secure_arg("login", &args));
+    }
+
+    #[test]
+    fn test_has_secure_arg_returns_false_for_unknown_command() {
+        let (registry, config) = make_secure_registry_and_config();
+        let context = Box::new(TestContext::default());
+        let repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        let mut args = HashMap::new();
+        args.insert("password".to_string(), "secret".to_string());
+
+        assert!(!repl.has_secure_arg("nonexistent", &args));
+    }
+
+    // ── Secure argument history filtering ─────────────────────────────────────
+
+    #[test]
+    fn test_execute_line_with_secure_arg_does_not_add_to_history() {
+        let (registry, config) = make_secure_registry_and_config();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        let result = repl.execute_line("login alice secret");
+        assert!(result.is_ok());
+
+        // The line must NOT appear in the in-memory history.
+        let history = repl.editor.history();
+        let in_history = (0..history.len()).any(|i| {
+            history
+                .get(i, rustyline::history::SearchDirection::Forward)
+                .ok()
+                .flatten()
+                .map(|e| e.entry.as_ref() == "login alice secret")
+                .unwrap_or(false)
+        });
+        assert!(
+            !in_history,
+            "secure command line must not be written to history"
+        );
+    }
+
+    #[test]
+    fn test_execute_line_without_secure_arg_adds_to_history() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let result = repl.execute_line("test");
+        assert!(result.is_ok());
+
+        // The line must appear in the in-memory history.
+        let history = repl.editor.history();
+        let in_history = (0..history.len()).any(|i| {
+            history
+                .get(i, rustyline::history::SearchDirection::Forward)
+                .ok()
+                .flatten()
+                .map(|e| e.entry.as_ref() == "test")
+                .unwrap_or(false)
+        });
+        assert!(
+            in_history,
+            "non-secure command line must be written to history"
+        );
     }
 }
