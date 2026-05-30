@@ -149,52 +149,78 @@ async = ["tokio", "async-trait"]
 
 ---
 
-## [0.3.0] - Planned (Q2 2026)
+## [0.3.0] - 2026-05-30
 
-**Theme**: Shell Integration & UX  
-**Estimated Effort**: 3-4 weeks  
+**Theme**: Shell Completions & Advanced History  
 **Dependencies**: v0.2.0
 
-### Planned
+### Added
 
-#### Shell Completion
-- **Bash completion**: Generate completion script for bash
-  ```bash
-  myapp completion bash > /etc/bash_completion.d/myapp
-  ```
-- **Zsh completion**: Generate completion script for zsh
-  ```bash
-  myapp completion zsh > ~/.zsh/completion/_myapp
-  ```
-- **Fish completion**: Generate completion script for fish
-  ```bash
-  myapp completion fish > ~/.config/fish/completions/myapp.fish
-  ```
-- **PowerShell completion**: Generate completion script for PowerShell
+#### REPL Tab Completion (issue #18)
+- New `DcliCompleter` and `DcliHelper` types (private) implementing the
+  `rustyline::completion::Completer` trait. Completion operates at three depth levels
+  driven by the YAML configuration:
+  - Level 1: command names and aliases (`p<Tab>` → `peek`, `pop`, `push`)
+  - Level 2: long and short option flags after a command (`push --<Tab>` → `--count`, `-c`)
+  - Positional argument values are not completed (open-ended strings)
+- `ReplInterface` now uses `Editor<DcliHelper, DefaultHistory>` instead of `DefaultEditor`,
+  activating tab completion as soon as the REPL starts.
+- `ReplInterface::new()` signature updated to accept all configuration upfront:
+  `registry`, `context`, `prompt`, `config: Option<CommandsConfig>`,
+  `help_formatter: Option<Box<dyn HelpFormatter>>`. Eliminates the two-phase
+  construction pattern.
+- `registry` and `config` are shared via `Arc<T>` between `ReplInterface` and
+  `DcliCompleter` — single source of truth, no data duplication.
+- `ReplInterface::with_help()` removed; `CliBuilder::run_repl()` adapted to pass
+  the full configuration to `new()` in a single call.
 
-#### Completion Features
-- Command name completion
-- Argument completion (if defined in config)
-- Option completion (short and long forms)
-- File path completion for path arguments
-- Dynamic completion from command handlers
+#### Per-Application History & Secure Argument Filtering (issue #19)
+- History is now stored per application under the XDG data directory:
+  `~/.local/share/<app_name>/history` (Linux/macOS) via `dirs::data_local_dir()`.
+  Each application built on `dynamic-cli` gets an isolated history file.
+- New `secure: bool` field on `ArgumentDefinition` (YAML schema, `serde` default: `false`).
+  Fully backward-compatible — existing configs without this field are unaffected.
+- History write moved from `run()` to `execute_line()`: only successfully parsed
+  commands are persisted; parse failures are silently discarded.
+- When a parsed command contains at least one argument marked `secure: true`,
+  the entire line is silently omitted from history. The command name itself is
+  not filtered.
 
-#### REPL History Improvements
-- **History filtering**: Filter history by command name
-- **History statistics**: Most used commands, usage patterns
-- **History export**: Export history to file
-- **Shared history**: Share history across multiple REPL sessions
+#### Example YAML for secure arguments
+```yaml
+arguments:
+  - name: password
+    arg_type: string
+    required: true
+    description: "User password"
+    secure: true
+```
 
-#### Command Suggestions
-- **Did-you-mean**: Suggest similar commands on typos (enhanced)
-- **Context-aware suggestions**: Suggest based on command history
-- **Tip of the day**: Random tips on startup
+### Changed
 
-**Breaking Changes**: None
+- `ReplInterface::new()` now takes 5 arguments (was 3). All call sites in
+  `CliBuilder`, examples, and tests updated. `chrom-rs` is unaffected (uses
+  `CliBuilder` exclusively).
+- History path migrated from `~/.config/<app_name>/history.txt`
+  (v0.2.0, `dirs::config_dir()`) to `~/.local/share/<app_name>/history`
+  (v0.3.0, `dirs::data_local_dir()`). Existing history files are not migrated
+  automatically.
+
+### Fixed
+
+- `test_validate_file_exists_relative_path`: removed `std::env::set_current_dir()`
+  which mutated the process-wide working directory and caused data races under
+  parallel test execution. Now uses `Cargo.toml` as a stable relative path.
+- All `TempDir` + `File::create` patterns in validator tests replaced with
+  `NamedTempFile` to eliminate a `Permission denied` race condition under
+  parallel test execution.
+
+**Breaking Changes**: None for `CliBuilder` users. `ReplInterface::new()` signature
+changed — direct callers must update to the 5-argument form.
 
 ---
 
-## [0.2.0] - In progress (target Q2 2026)
+## [0.2.0] - 2026-04-05
 
 **Theme**: Built-in Help & Error Improvements  
 **Dependencies**: v0.1.1
@@ -252,58 +278,34 @@ async = ["tokio", "async-trait"]
     - Added `#[allow(unused_imports)]` for `Result` in `parser/mod.rs` (import is necessary)
     - Added `#[allow(unused_imports)]` for `ArgumentDefinition` in `parser/cli_parser.rs` (import is necessary)
     - Removed unnecessary `.enumerate()` calls in `config/validator.rs`
-    - Added `#[allow(clippy::needless_range_loop)]` in `error/suggestions.rs` (algorithm clarity)
+    - Added `#[allow(clippy::needless_range_loop)]` in `config/validator.rs` (readability)
 
-### Documentation
-- Added Issues and Discussions links to README.md and CONTRIBUTING.md
-- Updated French versions (README.fr.md, CONTRIBUTING.fr.md)
+---
 
-### Notes
-- All imports marked as "unused" by clippy are actually necessary for compilation
-- Using `#[allow]` attributes instead of removing imports prevents compilation errors
+## [0.1.0] - 2026-01-10
 
-## [0.1.0] - 2025-01-08
+**Theme**: Foundation  
+**Initial Release**
 
 ### Added
 
 #### Core Framework
-- Complete CLI/REPL framework with declarative YAML/JSON configuration
-- Builder API (`CliBuilder`) for fluent application construction
-- Automatic CLI/REPL mode detection based on arguments
-- Thread-safe command execution with shared context
+- Complete CLI/REPL framework driven by YAML/JSON configuration files
+- 11 production-ready modules with >85% test coverage
 
 #### Configuration System (`config` module)
-- YAML and JSON configuration file support with automatic format detection
-- Complete schema definition with `serde` integration
-- Comprehensive configuration validation
-- Support for 5 argument types: `string`, `integer`, `float`, `bool`, `path`
-- Metadata support (version, prompt, prompt_suffix)
-- Global options applicable to all commands
+- YAML primary format, JSON alternative via single `serde` pipeline
+- `CommandsConfig` root structure with metadata, commands, and global options
+- `CommandDefinition` with arguments, options, aliases, and validation rules
+- `ArgumentDefinition` with type system (String, Integer, Float, Bool, Path)
+- `OptionDefinition` with short/long forms, defaults, and restricted choices
+- `ValidationRule` enum: `MustExist`, `Extensions`, `Range`
+- Internal schema validator at startup
 
-#### Command Management
-- Command registry with O(1) alias resolution (`registry` module)
-- Command handler trait (`CommandHandler`) for type-safe implementations
-- Command executor with context management (`executor` module)
-- Support for command aliases
-- Required and optional commands
-
-#### Argument Parsing (`parser` module)
-- CLI argument parser for one-shot commands
-- REPL parser for interactive mode
-- Type-aware parsing with automatic conversion
-- Support for positional arguments and named options (short/long forms)
-- Flexible argument validation
-
-#### Validation System (`validator` module)
-- File existence validation
-- File extension validation
-- Numeric range validation (min/max)
-- Custom validation support in command handlers
-- Contextual error messages with field names
-
-#### Error Handling (`error` module)
-- Rich error types with `thiserror` integration
-- Levenshtein distance-based suggestions for typos
+#### Error System (`error` module)
+- Typed error hierarchy via `thiserror`: `DynamicCliError` with variants
+  `Config`, `Parse`, `Validation`, `Execution`, `Registry`
+- `suggestion: Option<String>` on key variants for actionable error messages
 - Position-aware errors for configuration files
 - Colored error output for better readability
 - Context-preserving error propagation
@@ -476,18 +478,15 @@ dynamic-cli/
 
 ## Version Roadmap Summary
 
-| Version   | Theme             | Key Features                 | Effort    | Status                |
-|-----------|-------------------|------------------------------|-----------|-----------------------|
-| **0.1.0** | Initial Release   | Complete framework           | -         | ✅ Released            |
-| **0.2.0** | Help & Errors     | Built-in help, better errors | 3-4 weeks | 🔵 In progress Q2 2026 |
-| **0.3.0** | Shell Integration | Completions, history         | 3-4 weeks | 🔵 Planned Q2 2026    |
-| **0.4.0** | Extensibility     | Plugin system                | 4-6 weeks | 🔵 Planned Q3 2026    |
-| **0.5.0** | Async Support     | Async handlers (optional)    | 4-6 weeks | 🔵 Planned Q4 2026    |
-| **0.6.0** | Polish            | Hot-reload, themes           | 4-6 weeks | 🔵 Planned Q1 2027    |
-| **1.0.0** | Stable            | Production-ready             | -         | 🔵 Planned Q2 2027    |
-
-**Total Development Time**: ~18-26 weeks spread over 30 months  
-**Flexibility**: Each version can be delayed or expedited independently
+| Version   | Theme                    | Key Features                        | Effort    | Status               |
+|-----------|--------------------------|-------------------------------------|-----------|----------------------|
+| **0.1.0** | Initial Release          | Complete framework                  | -         | ✅ Released           |
+| **0.2.0** | Help & Errors            | Built-in help, better errors        | 3-4 weeks | ✅ Released           |
+| **0.3.0** | Shell Completions        | REPL completion, secure history     | 3-4 weeks | ✅ Released           |
+| **0.4.0** | Plugin System            | Extensible handlers                 | 4-6 weeks | 🔵 Planned Q3 2026   |
+| **0.5.0** | Async Support            | Async handlers (optional)           | 4-6 weeks | 🔵 Planned Q4 2026   |
+| **0.6.0** | Advanced Options         | Repeatable options, typed sub-params| 4-6 weeks | 🔵 Planned Q1 2027   |
+| **1.0.0** | Stable                   | Production-ready, locked API        | -         | 🔵 Planned Q1 2028   |
 
 ---
 
@@ -554,6 +553,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-04-05  
-**Current Version**: 0.2.0 (pending publish)  
-**Next Release**: 0.3.0 (planned Q4 2026)
+**Last Updated**: 2026-05-30  
+**Current Version**: 0.3.0  
+**Next Release**: 0.4.0 (planned Q3 2026)
