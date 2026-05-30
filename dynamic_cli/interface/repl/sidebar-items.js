@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["ReplInterface"]};
+window.SIDEBAR_ITEMS = {"struct":["DcliCompleter","DcliHelper","ReplInterface"]};
