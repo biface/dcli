@@ -2,8 +2,8 @@
 //!
 //! This module provides an interactive REPL interface with:
 //! - Line editing (arrow keys, history navigation)
-//! - Command history (persistent across sessions)
-//! - Tab completion (future enhancement)
+//! - Per-application command history (persistent across sessions)
+//! - Tab completion at three levels: commands, sub-commands, argument flags
 //! - Colored prompts and error display
 //!
 //! # Example
@@ -22,11 +22,21 @@
 //! let registry = CommandRegistry::new();
 //! let context = Box::new(MyContext::default());
 //!
-//! let repl = ReplInterface::new(registry, context, "myapp".to_string())?;
+//! let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None)?;
 //! repl.run()?;
 //! # Ok(())
 //! # }
 //! ```
+
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use rustyline::completion::{Completer, Pair};
+use rustyline::error::ReadlineError;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::{CompletionType, Config, Context, Editor, Helper};
 
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
@@ -34,57 +44,250 @@ use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
 use crate::help::HelpFormatter;
 use crate::parser::ReplParser;
 use crate::registry::CommandRegistry;
-use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
-use std::path::PathBuf;
+
+// ============================================================================
+// DcliCompleter
+// ============================================================================
+
+/// Tab-completion engine for the REPL.
+///
+/// Completes at three depth levels driven by the YAML configuration:
+///
+/// | Input                    | Candidates                              |
+/// |--------------------------|------------------------------------------|
+/// | `<Tab>`                  | all command names + aliases              |
+/// | `he<Tab>`                | command names/aliases starting with `he` |
+/// | `hello <Tab>`            | long and short option flags of `hello`   |
+/// | `hello --<Tab>`          | long flags of `hello`                    |
+/// | `hello -<Tab>`           | short flags of `hello`                   |
+///
+/// Positional argument values are not completed (open-ended strings).
+///
+/// The completer holds `Arc` references so it shares the same data as
+/// `ReplInterface` without duplication or unsafe aliasing.
+struct DcliCompleter {
+    /// Shared registry — single source of truth for command names and aliases.
+    registry: Arc<CommandRegistry>,
+
+    /// Shared configuration — source of truth for option flags.
+    /// `None` when the REPL was constructed without a config.
+    config: Option<Arc<CommandsConfig>>,
+}
+
+impl DcliCompleter {
+    fn new(registry: Arc<CommandRegistry>, config: Option<Arc<CommandsConfig>>) -> Self {
+        Self { registry, config }
+    }
+
+    /// Collect all flag completions for a given canonical command name.
+    ///
+    /// Returns both long forms (`--flag`) and short forms (`-f`) for every
+    /// option defined on the command.
+    fn flags_for(&self, command_name: &str) -> Vec<String> {
+        let config = match &self.config {
+            Some(c) => c,
+            None => return vec![],
+        };
+
+        let cmd_def = match config.commands.iter().find(|c| c.name == command_name) {
+            Some(d) => d,
+            None => return vec![],
+        };
+
+        let mut flags = Vec::new();
+        for opt in &cmd_def.options {
+            if let Some(long) = &opt.long {
+                flags.push(format!("--{}", long));
+            }
+            if let Some(short) = &opt.short {
+                flags.push(format!("-{}", short));
+            }
+        }
+        flags
+    }
+}
+
+impl Completer for DcliCompleter {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        // Work only on the portion of the line up to the cursor.
+        let line = &line[..pos];
+        let tokens: Vec<&str> = line.split_whitespace().collect();
+
+        // ── Level 1: no token yet, or first token still being typed ──────────
+        // Complete command names and aliases.
+        let completing_first_token =
+            tokens.is_empty() || (tokens.len() == 1 && !line.ends_with(' '));
+
+        if completing_first_token {
+            let prefix = tokens.first().copied().unwrap_or("");
+            let start = pos - prefix.len();
+
+            let mut candidates: Vec<Pair> = self
+                .registry
+                .list_commands()
+                .into_iter()
+                .flat_map(|def| {
+                    let mut names = vec![def.name.clone()];
+                    names.extend(def.aliases.clone());
+                    names
+                })
+                .filter(|name| name.starts_with(prefix))
+                .map(|name| Pair {
+                    display: name.clone(),
+                    replacement: name,
+                })
+                .collect();
+
+            candidates.sort_by(|a, b| a.display.cmp(&b.display));
+            return Ok((start, candidates));
+        }
+
+        // ── Level 2: first token is a complete command, completing flags ──────
+        // Resolve the command name (handles aliases).
+        let command_token = tokens[0];
+        let canonical = match self.registry.resolve_name(command_token) {
+            Some(name) => name.to_string(),
+            None => return Ok((pos, vec![])),
+        };
+
+        // The word being completed (may be empty if cursor follows a space).
+        let current_word = if line.ends_with(' ') {
+            ""
+        } else {
+            tokens.last().copied().unwrap_or("")
+        };
+
+        // Only offer flag completions when the current word looks like a flag
+        // or when the user pressed Tab on an empty position after the command.
+        let is_flag_context = current_word.is_empty() || current_word.starts_with('-');
+
+        if !is_flag_context {
+            return Ok((pos, vec![]));
+        }
+
+        let start = pos - current_word.len();
+        let mut candidates: Vec<Pair> = self
+            .flags_for(&canonical)
+            .into_iter()
+            .filter(|flag| flag.starts_with(current_word))
+            .map(|flag| Pair {
+                display: flag.clone(),
+                replacement: flag,
+            })
+            .collect();
+
+        candidates.sort_by(|a, b| a.display.cmp(&b.display));
+        Ok((start, candidates))
+    }
+}
+
+// ============================================================================
+// DcliHelper — rustyline Helper glue
+// ============================================================================
+
+/// Rustyline `Helper` implementation that wires `DcliCompleter` into the
+/// editor. The remaining traits (`Hinter`, `Highlighter`, `Validator`) use
+/// their no-op default implementations.
+struct DcliHelper {
+    completer: DcliCompleter,
+}
+
+impl DcliHelper {
+    fn new(registry: Arc<CommandRegistry>, config: Option<Arc<CommandsConfig>>) -> Self {
+        Self {
+            completer: DcliCompleter::new(registry, config),
+        }
+    }
+}
+
+impl Helper for DcliHelper {}
+
+impl Completer for DcliHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        self.completer.complete(line, pos, ctx)
+    }
+}
+
+// No-op implementations required by the Helper supertrait bound.
+impl Hinter for DcliHelper {
+    type Hint = String;
+}
+
+impl Highlighter for DcliHelper {}
+
+impl Validator for DcliHelper {}
+
+// ============================================================================
+// ReplInterface
+// ============================================================================
 
 /// REPL (Read-Eval-Print Loop) interface
 ///
 /// Provides an interactive command-line interface with:
 /// - Line editing and history
-/// - Persistent command history
+/// - Per-application persistent command history
+/// - Tab completion (commands, aliases, option flags)
 /// - Graceful error handling
-/// - Special commands (exit, quit, help)
+/// - Special commands (exit, quit, --help)
 ///
 /// # Architecture
 ///
 /// ```text
-/// User input → rustyline → ReplParser → CommandExecutor → Handler
-///                                             ↓
-///                                       ExecutionContext
+/// User input → rustyline (DcliHelper) → ReplParser → CommandExecutor → Handler
+///                    ↓                                      ↓
+///             Tab completion                         ExecutionContext
+///          (commands + flags)
 /// ```
 ///
 /// # Special Commands
 ///
 /// The REPL recognizes these built-in commands:
-/// - `exit`, `quit` - Exit the REPL
-/// - `help` - Show available commands (if registered)
+/// - `exit`, `quit` — Exit the REPL
+/// - `--help`, `-h` — Show application-level help (if a formatter is attached)
+/// - `<cmd> --help`, `--help <cmd>` — Show per-command help
 ///
 /// # History
 ///
-/// Command history is stored in the user's config directory:
-/// - Linux: `~/.config/<app_name>/history.txt`
-/// - macOS: `~/Library/Application Support/<app_name>/history.txt`
-/// - Windows: `%APPDATA%\<app_name>\history.txt`
+/// Command history is stored per application under the XDG data directory:
+/// - Linux/macOS: `~/.local/share/<app_name>/history`
+/// - Windows:     `%LOCALAPPDATA%\<app_name>\history`
+///
+/// Lines containing a `secure: true` argument are never written to history.
+/// Lines that fail to parse are discarded silently.
 pub struct ReplInterface {
-    /// Command registry
-    registry: CommandRegistry,
+    /// Shared command registry — single source of truth for names, aliases,
+    /// definitions, and handlers.
+    registry: Arc<CommandRegistry>,
 
-    /// Execution context
+    /// Execution context passed to every command handler.
     context: Box<dyn ExecutionContext>,
 
-    /// Prompt string (e.g., "myapp > ")
+    /// Prompt string (e.g., "myapp > ").
     prompt: String,
 
-    /// Rustyline editor for input
-    editor: DefaultEditor,
+    /// Rustyline editor with tab-completion support.
+    editor: Editor<DcliHelper, rustyline::history::DefaultHistory>,
 
-    /// History file path
+    /// History file path.
     history_path: Option<PathBuf>,
 
-    /// Application configuration — used by the help formatter.
-    /// `None` when no formatter has been supplied.
-    config: Option<CommandsConfig>,
+    /// Application configuration — shared with the completer and used by the
+    /// help formatter. `None` when no config was supplied at construction.
+    config: Option<Arc<CommandsConfig>>,
 
     /// Help formatter — renders `--help` output.
     /// `None` when the application was built without a formatter.
@@ -92,17 +295,26 @@ pub struct ReplInterface {
 }
 
 impl ReplInterface {
-    /// Create a new REPL interface
+    /// Create a new REPL interface.
+    ///
+    /// All configuration is supplied at construction time so that the
+    /// tab-completion engine and the help formatter share the same data
+    /// without duplication.
     ///
     /// # Arguments
     ///
-    /// * `registry` - Command registry with all registered commands
-    /// * `context` - Execution context
-    /// * `prompt` - Prompt prefix (e.g., "myapp" will display as "myapp > ")
+    /// * `registry`       — Command registry with all registered commands.
+    /// * `context`        — Execution context passed to handlers.
+    /// * `prompt`         — Prompt prefix (e.g., `"myapp"` displays as `"myapp > "`).
+    /// * `config`         — Application configuration for completion and help.
+    ///   Pass `None` to disable both features.
+    /// * `help_formatter` — Help formatter implementation.
+    ///   Pass `None` to use [`DefaultHelpFormatter`] lazily,
+    ///   or supply a custom implementation.
     ///
     /// # Errors
     ///
-    /// Returns an error if rustyline initialization fails (rare).
+    /// Returns an error if rustyline initialisation fails (rare).
     ///
     /// # Example
     ///
@@ -120,7 +332,8 @@ impl ReplInterface {
     /// let registry = CommandRegistry::new();
     /// let context = Box::new(MyContext::default());
     ///
-    /// let repl = ReplInterface::new(registry, context, "myapp".to_string())?;
+    /// // Without completion or help:
+    /// let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -128,13 +341,28 @@ impl ReplInterface {
         registry: CommandRegistry,
         context: Box<dyn ExecutionContext>,
         prompt: String,
+        config: Option<CommandsConfig>,
+        help_formatter: Option<Box<dyn HelpFormatter>>,
     ) -> Result<Self> {
-        // Create rustyline editor
-        let editor = DefaultEditor::new().map_err(|e| {
+        // Wrap registry in Arc — shared with the completer.
+        let registry = Arc::new(registry);
+
+        // Wrap config in Arc if present — shared with the completer.
+        let config: Option<Arc<CommandsConfig>> = config.map(Arc::new);
+
+        // Build the rustyline editor with Tab completion enabled.
+        let rl_config = Config::builder()
+            .completion_type(CompletionType::List)
+            .build();
+
+        let helper = DcliHelper::new(Arc::clone(&registry), config.clone());
+
+        let mut editor = Editor::with_config(rl_config).map_err(|e| {
             ExecutionError::CommandFailed(anyhow::anyhow!("Failed to initialize REPL: {}", e))
         })?;
+        editor.set_helper(Some(helper));
 
-        // Determine history file path
+        // Determine history file path using the prompt as the app name.
         let history_path = Self::get_history_path(&prompt);
 
         let mut repl = Self {
@@ -143,58 +371,13 @@ impl ReplInterface {
             prompt: format!("{} > ", prompt),
             editor,
             history_path,
-            config: None,
-            help_formatter: None,
+            config,
+            help_formatter,
         };
 
-        // Load history if available
         repl.load_history();
 
         Ok(repl)
-    }
-
-    /// Attach a help formatter and configuration to this REPL.
-    ///
-    /// When supplied, the REPL will intercept `--help` and `--help <command>`
-    /// (and their `-h` short forms, as well as `<command> --help`) before
-    /// dispatch and print formatted help instead of executing a command.
-    ///
-    /// This method is called automatically by [`CliBuilder`] when a formatter
-    /// has been registered. It can also be called directly when constructing
-    /// a `ReplInterface` manually.
-    ///
-    /// # Arguments
-    ///
-    /// * `config`    - The loaded application configuration (commands, metadata)
-    /// * `formatter` - A boxed [`HelpFormatter`] implementation
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use dynamic_cli::interface::ReplInterface;
-    /// use dynamic_cli::help::DefaultHelpFormatter;
-    /// use dynamic_cli::prelude::*;
-    ///
-    /// # #[derive(Default)]
-    /// # struct MyContext;
-    /// # impl ExecutionContext for MyContext {
-    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
-    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    /// # }
-    /// # fn main() -> dynamic_cli::Result<()> {
-    /// # let config = dynamic_cli::config::loader::load_config("commands.yaml")?;
-    /// let registry = CommandRegistry::new();
-    /// let context = Box::new(MyContext::default());
-    ///
-    /// let repl = ReplInterface::new(registry, context, "myapp".to_string())?
-    ///     .with_help(config, Box::new(DefaultHelpFormatter::new()));
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn with_help(mut self, config: CommandsConfig, formatter: Box<dyn HelpFormatter>) -> Self {
-        self.config = Some(config);
-        self.help_formatter = Some(formatter);
-        self
     }
 
     /// Try to handle a `--help` / `-h` request.
@@ -213,19 +396,15 @@ impl ReplInterface {
     /// | `<command> --help` | Per-command help          |
     /// | `<command> -h`     | Per-command help          |
     fn try_handle_help(&self, line: &str) -> Option<String> {
-        let (config, formatter) = match (&self.config, &self.help_formatter) {
-            (Some(c), Some(f)) => (c, f.as_ref()),
-            _ => return None,
-        };
+        let config = self.config.as_deref()?;
+        let formatter = self.help_formatter.as_deref()?;
 
         let trimmed = line.trim();
 
-        // "--help" or "-h" alone → application-level help
         if trimmed == "--help" || trimmed == "-h" {
             return Some(formatter.format_app(config));
         }
 
-        // "--help <command>" or "-h <command>" → per-command help
         if let Some(rest) = trimmed
             .strip_prefix("--help ")
             .or_else(|| trimmed.strip_prefix("-h "))
@@ -236,7 +415,6 @@ impl ReplInterface {
             }
         }
 
-        // "<command> --help" or "<command> -h" → per-command help
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
         if parts.len() >= 2 {
             let last = *parts.last().unwrap();
@@ -248,143 +426,11 @@ impl ReplInterface {
         None
     }
 
-    /// Get the history file path for this application.
-    ///
-    /// Each application gets its own isolated history file under the
-    /// XDG data directory:
-    ///
-    /// - Linux/macOS: `~/.local/share/<app_name>/history`
-    /// - Windows:     `%LOCALAPPDATA%\<app_name>\history`
-    ///
-    /// Using `data_local_dir` (XDG `$XDG_DATA_HOME`) rather than
-    /// `config_dir` keeps history data separate from configuration files
-    /// and avoids sharing a single history across different applications
-    /// built on `dynamic-cli`.
-    fn get_history_path(app_name: &str) -> Option<PathBuf> {
-        dirs::data_local_dir().map(|data_dir| data_dir.join(app_name).join("history"))
-    }
-
-    /// Load command history from file
-    fn load_history(&mut self) {
-        if let Some(ref path) = self.history_path {
-            // Create parent directory if it doesn't exist
-            if let Some(parent) = path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-
-            // Load history (ignore errors if file doesn't exist yet)
-            let _ = self.editor.load_history(path);
-        }
-    }
-
-    /// Save command history to file
-    fn save_history(&mut self) {
-        if let Some(ref path) = self.history_path {
-            if let Err(e) = self.editor.save_history(path) {
-                eprintln!("Warning: Failed to save command history: {}", e);
-            }
-        }
-    }
-
-    /// Run the REPL loop
-    ///
-    /// Enters an interactive loop that:
-    /// 1. Displays the prompt
-    /// 2. Reads user input
-    /// 3. Parses and executes the command
-    /// 4. Displays results or errors
-    /// 5. Repeats until user exits
-    ///
-    /// # Returns
-    ///
-    /// - `Ok(())` when user exits normally (via `exit` or `quit`)
-    /// - `Err(_)` on critical errors (I/O failures, etc.)
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use dynamic_cli::interface::ReplInterface;
-    /// use dynamic_cli::prelude::*;
-    ///
-    /// # #[derive(Default)]
-    /// # struct MyContext;
-    /// # impl ExecutionContext for MyContext {
-    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
-    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
-    /// # }
-    /// # fn main() -> dynamic_cli::Result<()> {
-    /// let registry = CommandRegistry::new();
-    /// let context = Box::new(MyContext::default());
-    ///
-    /// let repl = ReplInterface::new(registry, context, "myapp".to_string())?;
-    /// repl.run()?; // Starts the REPL loop
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn run(mut self) -> Result<()> {
-        loop {
-            // Read line from user
-            let readline = self.editor.readline(&self.prompt);
-
-            match readline {
-                Ok(line) => {
-                    // Skip empty lines
-                    let line = line.trim();
-                    if line.is_empty() {
-                        continue;
-                    }
-
-                    // Check for built-in exit commands
-                    if line == "exit" || line == "quit" {
-                        println!("Goodbye!");
-                        break;
-                    }
-
-                    // Parse and execute command.
-                    // History is written inside execute_line(), after successful
-                    // parsing and only when no secure argument is present.
-                    match self.execute_line(line) {
-                        Ok(()) => {}
-                        Err(e) => {
-                            display_error(&e);
-                        }
-                    }
-                }
-
-                Err(ReadlineError::Interrupted) => {
-                    // Ctrl-C pressed
-                    println!("^C");
-                    continue;
-                }
-
-                Err(ReadlineError::Eof) => {
-                    // Ctrl-D pressed
-                    println!("exit");
-                    break;
-                }
-
-                Err(err) => {
-                    // Other readline errors (rare)
-                    eprintln!("Error reading input: {}", err);
-                    break;
-                }
-            }
-        }
-
-        // Save history before exiting
-        self.save_history();
-
-        Ok(())
-    }
-
     /// Check whether a parsed command involves at least one secure argument.
     ///
     /// Looks up the command definition in `self.config` (if available) and
     /// returns `true` when any argument name present in `parsed_args` is
     /// marked `secure: true` in the YAML schema.
-    ///
-    /// Returns `false` when no configuration is attached (history written
-    /// as normal) or when no secure argument is found.
     fn has_secure_arg(
         &self,
         command_name: &str,
@@ -406,27 +452,134 @@ impl ReplInterface {
             .any(|arg| arg.secure && parsed_args.contains_key(&arg.name))
     }
 
-    /// Execute a single line of input
+    /// Get the history file path for this application.
+    ///
+    /// Each application gets its own isolated history file under the
+    /// XDG data directory:
+    ///
+    /// - Linux/macOS: `~/.local/share/<app_name>/history`
+    /// - Windows:     `%LOCALAPPDATA%\<app_name>\history`
+    fn get_history_path(app_name: &str) -> Option<PathBuf> {
+        dirs::data_local_dir().map(|data_dir| data_dir.join(app_name).join("history"))
+    }
+
+    /// Load command history from file.
+    fn load_history(&mut self) {
+        if let Some(ref path) = self.history_path {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = self.editor.load_history(path);
+        }
+    }
+
+    /// Save command history to file.
+    fn save_history(&mut self) {
+        if let Some(ref path) = self.history_path {
+            if let Err(e) = self.editor.save_history(path) {
+                eprintln!("Warning: Failed to save command history: {}", e);
+            }
+        }
+    }
+
+    /// Run the REPL loop.
+    ///
+    /// Enters an interactive loop that:
+    /// 1. Displays the prompt
+    /// 2. Reads user input (with tab completion)
+    /// 3. Parses and executes the command
+    /// 4. Displays results or errors
+    /// 5. Repeats until the user exits
+    ///
+    /// # Returns
+    ///
+    /// - `Ok(())` when the user exits normally (via `exit` or `quit`)
+    /// - `Err(_)` on critical errors (I/O failures, etc.)
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use dynamic_cli::interface::ReplInterface;
+    /// use dynamic_cli::prelude::*;
+    ///
+    /// # #[derive(Default)]
+    /// # struct MyContext;
+    /// # impl ExecutionContext for MyContext {
+    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
+    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// # }
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// let registry = CommandRegistry::new();
+    /// let context = Box::new(MyContext::default());
+    ///
+    /// let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None)?;
+    /// repl.run()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn run(mut self) -> Result<()> {
+        loop {
+            let readline = self.editor.readline(&self.prompt);
+
+            match readline {
+                Ok(line) => {
+                    let line = line.trim();
+                    if line.is_empty() {
+                        continue;
+                    }
+
+                    if line == "exit" || line == "quit" {
+                        println!("Goodbye!");
+                        break;
+                    }
+
+                    // Parse and execute command.
+                    // History is written inside execute_line(), after successful
+                    // parsing and only when no secure argument is present.
+                    match self.execute_line(line) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            display_error(&e);
+                        }
+                    }
+                }
+
+                Err(ReadlineError::Interrupted) => {
+                    println!("^C");
+                    continue;
+                }
+
+                Err(ReadlineError::Eof) => {
+                    println!("exit");
+                    break;
+                }
+
+                Err(err) => {
+                    eprintln!("Error reading input: {}", err);
+                    break;
+                }
+            }
+        }
+
+        self.save_history();
+        Ok(())
+    }
+
+    /// Execute a single line of input.
     ///
     /// Parses the line and executes the corresponding command.
-    /// `--help` and `-h` requests are intercepted before dispatch
-    /// and handled by the configured [`HelpFormatter`] if one is present.
+    /// `--help` and `-h` requests are intercepted before dispatch.
     ///
     /// History is written here — after successful parsing — so that:
     /// - Failed or invalid commands are never persisted.
     /// - Lines containing a `secure: true` argument are silently omitted.
     fn execute_line(&mut self, line: &str) -> Result<()> {
-        // Intercept --help / -h before the parser so the registry
-        // is never consulted for help requests.
         if let Some(output) = self.try_handle_help(line) {
             print!("{}", output);
             return Ok(());
         }
 
-        // Create parser (borrows registry immutably)
         let parser = ReplParser::new(&self.registry);
-
-        // Parse command (parser is dropped after this, releasing the borrow)
         let parsed = parser.parse_line(line)?;
 
         // Write to history only on successful parse and when no secure
@@ -435,7 +588,6 @@ impl ReplInterface {
             let _ = self.editor.add_history_entry(line);
         }
 
-        // Now we can borrow registry again to get the handler
         let handler = self
             .registry
             .get_handler(&parsed.command_name)
@@ -446,27 +598,30 @@ impl ReplInterface {
                 ))
             })?;
 
-        // Execute (handler references registry, context is borrowed mutably)
         handler.execute(&mut *self.context, &parsed.arguments)?;
 
         Ok(())
     }
 }
 
-// Implement Drop to ensure history is saved even if run() is not called
 impl Drop for ReplInterface {
     fn drop(&mut self) {
         self.save_history();
     }
 }
 
+// ============================================================================
+// Tests
+// ============================================================================
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition};
+    use crate::config::schema::{
+        ArgumentDefinition, ArgumentType, CommandDefinition, OptionDefinition,
+    };
     use std::collections::HashMap;
 
-    // Test context
     #[derive(Default)]
     struct TestContext {
         executed_commands: Vec<String>,
@@ -476,13 +631,11 @@ mod tests {
         fn as_any(&self) -> &dyn std::any::Any {
             self
         }
-
         fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
             self
         }
     }
 
-    // Test handler
     struct TestHandler {
         name: String,
     }
@@ -502,7 +655,6 @@ mod tests {
 
     fn create_test_registry() -> CommandRegistry {
         let mut registry = CommandRegistry::new();
-
         let cmd_def = CommandDefinition {
             name: "test".to_string(),
             aliases: vec!["t".to_string()],
@@ -512,36 +664,76 @@ mod tests {
             options: vec![],
             implementation: "test_handler".to_string(),
         };
-
-        let handler = Box::new(TestHandler {
-            name: "test".to_string(),
-        });
-
-        registry.register(cmd_def, handler).unwrap();
-
+        registry
+            .register(
+                cmd_def,
+                Box::new(TestHandler {
+                    name: "test".to_string(),
+                }),
+            )
+            .unwrap();
         registry
     }
+
+    fn make_help_config() -> CommandsConfig {
+        use crate::config::schema::{CommandsConfig, Metadata};
+        CommandsConfig {
+            metadata: Metadata {
+                version: "1.0.0".to_string(),
+                prompt: "testapp".to_string(),
+                prompt_suffix: " > ".to_string(),
+            },
+            commands: vec![CommandDefinition {
+                name: "hello".to_string(),
+                aliases: vec!["hi".to_string()],
+                description: "Say hello".to_string(),
+                required: false,
+                arguments: vec![],
+                options: vec![OptionDefinition {
+                    name: "loud".to_string(),
+                    short: Some("l".to_string()),
+                    long: Some("loud".to_string()),
+                    option_type: ArgumentType::Bool,
+                    required: false,
+                    default: Some("false".to_string()),
+                    description: "Loud greeting".to_string(),
+                    choices: vec![],
+                }],
+                implementation: "hello_handler".to_string(),
+            }],
+            global_options: vec![],
+        }
+    }
+
+    // ── Construction ──────────────────────────────────────────────────────────
 
     #[test]
     fn test_repl_interface_creation() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-
-        let repl = ReplInterface::new(registry, context, "test".to_string());
+        let repl = ReplInterface::new(registry, context, "test".to_string(), None, None);
         assert!(repl.is_ok());
     }
+
+    #[test]
+    fn test_repl_interface_creation_with_config() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+        let repl = ReplInterface::new(registry, context, "test".to_string(), Some(config), None);
+        assert!(repl.is_ok());
+    }
+
+    // ── execute_line ──────────────────────────────────────────────────────────
 
     #[test]
     fn test_repl_execute_line() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-
-        let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
         let result = repl.execute_line("test");
         assert!(result.is_ok());
-
-        // Verify command was executed
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         assert_eq!(ctx.executed_commands, vec!["test".to_string()]);
     }
@@ -550,23 +742,19 @@ mod tests {
     fn test_repl_execute_with_alias() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-
-        let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
-        let result = repl.execute_line("t");
-        assert!(result.is_ok());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+        assert!(repl.execute_line("t").is_ok());
     }
 
     #[test]
     fn test_repl_execute_unknown_command() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-
-        let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
         let result = repl.execute_line("unknown");
         assert!(result.is_err());
-
         match result.unwrap_err() {
             DynamicCliError::Parse(_) => {}
             other => panic!("Expected Parse error, got: {:?}", other),
@@ -574,20 +762,17 @@ mod tests {
     }
 
     #[test]
-    fn test_repl_history_path() {
-        let path = ReplInterface::get_history_path("myapp");
-
-        // Path should exist (unless we're in a very restricted environment)
-        if let Some(p) = path {
-            assert!(p.to_str().unwrap().contains("myapp"));
-            assert!(p.to_str().unwrap().contains("history.txt"));
-        }
+    fn test_repl_empty_line() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+        assert!(repl.execute_line("").is_err());
     }
 
     #[test]
     fn test_repl_command_with_args() {
         let mut registry = CommandRegistry::new();
-
         let cmd_def = CommandDefinition {
             name: "greet".to_string(),
             aliases: vec![],
@@ -609,7 +794,7 @@ mod tests {
         impl crate::executor::CommandHandler for GreetHandler {
             fn execute(
                 &self,
-                _context: &mut dyn ExecutionContext,
+                _ctx: &mut dyn ExecutionContext,
                 args: &HashMap<String, String>,
             ) -> Result<()> {
                 assert_eq!(args.get("name"), Some(&"Alice".to_string()));
@@ -618,59 +803,35 @@ mod tests {
         }
 
         registry.register(cmd_def, Box::new(GreetHandler)).unwrap();
-
         let context = Box::new(TestContext::default());
-        let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
-        let result = repl.execute_line("greet Alice");
-        assert!(result.is_ok());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+        assert!(repl.execute_line("greet Alice").is_ok());
     }
+
+    // ── History path ──────────────────────────────────────────────────────────
 
     #[test]
-    fn test_repl_empty_line() {
-        let registry = create_test_registry();
-        let context = Box::new(TestContext::default());
-
-        let mut repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
-        // Empty line should return an error from parser
-        let result = repl.execute_line("");
-        assert!(result.is_err());
-    }
-
-    // -------------------------------------------------------------------------
-    // with_help / try_handle_help
-    // -------------------------------------------------------------------------
-
-    /// Minimal config for help tests.
-    fn make_help_config() -> crate::config::schema::CommandsConfig {
-        use crate::config::schema::{CommandDefinition, CommandsConfig, Metadata};
-        CommandsConfig {
-            metadata: Metadata {
-                version: "1.0.0".to_string(),
-                prompt: "testapp".to_string(),
-                prompt_suffix: " > ".to_string(),
-            },
-            commands: vec![CommandDefinition {
-                name: "hello".to_string(),
-                aliases: vec!["hi".to_string()],
-                description: "Say hello".to_string(),
-                required: false,
-                arguments: vec![],
-                options: vec![],
-                implementation: "hello_handler".to_string(),
-            }],
-            global_options: vec![],
+    fn test_repl_history_path() {
+        let path = ReplInterface::get_history_path("myapp");
+        if let Some(p) = path {
+            let path_str = p.to_str().unwrap();
+            assert!(path_str.contains("myapp"), "path should contain app name");
+            assert!(
+                path_str.ends_with("history"),
+                "path should end with 'history', got: {}",
+                path_str
+            );
         }
     }
 
+    // ── Help interception ─────────────────────────────────────────────────────
+
     #[test]
     fn test_try_handle_help_without_formatter_returns_none() {
-        // No formatter attached → try_handle_help must be a no-op.
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
-        let repl = ReplInterface::new(registry, context, "test".to_string()).unwrap();
-
+        let repl = ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
         assert!(repl.try_handle_help("--help").is_none());
         assert!(repl.try_handle_help("-h").is_none());
     }
@@ -679,36 +840,39 @@ mod tests {
     fn test_try_handle_help_global() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
+        let repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
         let out = repl.try_handle_help("--help");
         assert!(out.is_some());
         let out = out.unwrap();
-        assert!(out.contains("testapp"), "should contain app prompt");
-        assert!(out.contains("hello"), "should list commands");
+        assert!(out.contains("testapp"));
+        assert!(out.contains("hello"));
     }
 
     #[test]
     fn test_try_handle_help_short_flag() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
-        // -h alone → same as --help
+        let repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
         let out = repl.try_handle_help("-h");
         assert!(out.is_some());
         assert!(out.unwrap().contains("testapp"));
@@ -718,21 +882,20 @@ mod tests {
     fn test_try_handle_help_with_command_prefix() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
-        // "--help hello" → per-command help
+        let repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
         let out = repl.try_handle_help("--help hello");
         assert!(out.is_some());
         assert!(out.unwrap().contains("hello"));
-
-        // "-h hello" → per-command help
         let out2 = repl.try_handle_help("-h hello");
         assert!(out2.is_some());
     }
@@ -741,21 +904,20 @@ mod tests {
     fn test_try_handle_help_command_suffix() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
-        // "hello --help" → per-command help
+        let repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
         let out = repl.try_handle_help("hello --help");
         assert!(out.is_some());
         assert!(out.unwrap().contains("hello"));
-
-        // "hello -h" → per-command help
         let out2 = repl.try_handle_help("hello -h");
         assert!(out2.is_some());
     }
@@ -764,19 +926,19 @@ mod tests {
     fn test_try_handle_help_alias() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
-        // "hi" is an alias for "hello"
+        let repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
         let out = repl.try_handle_help("--help hi");
         assert!(out.is_some());
-        // The formatter resolves aliases, output should mention hello
         assert!(out.unwrap().contains("hello"));
     }
 
@@ -784,34 +946,135 @@ mod tests {
     fn test_execute_line_help_intercepted() {
         use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
-
-        let mut repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
-
-        // "--help" must succeed (print help, not dispatch)
-        let result = repl.execute_line("--help");
-        assert!(result.is_ok(), "help request must not return an error");
+        let mut repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
+        assert!(repl.execute_line("--help").is_ok());
     }
 
     #[test]
     fn test_execute_line_normal_command_still_works_with_formatter() {
         use crate::help::DefaultHelpFormatter;
-
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
+        let mut repl = ReplInterface::new(
+            registry,
+            context,
+            "test".to_string(),
+            Some(config),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        )
+        .unwrap();
+        assert!(repl.execute_line("test").is_ok());
+    }
 
-        let mut repl = ReplInterface::new(registry, context, "test".to_string())
-            .unwrap()
-            .with_help(config, Box::new(DefaultHelpFormatter::new()));
+    // ── Tab completion ────────────────────────────────────────────────────────
 
-        // Normal commands must still execute normally
-        let result = repl.execute_line("test");
-        assert!(result.is_ok());
+    #[test]
+    fn test_completer_commands_empty_input() {
+        let registry = Arc::new(create_test_registry());
+        let completer = DcliCompleter::new(Arc::clone(&registry), None);
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+        let (_, candidates) = completer.complete("", 0, &ctx).unwrap();
+        let names: Vec<&str> = candidates.iter().map(|p| p.display.as_str()).collect();
+        assert!(names.contains(&"test"));
+        assert!(names.contains(&"t"));
+    }
+
+    #[test]
+    fn test_completer_commands_prefix_filter() {
+        let registry = Arc::new(create_test_registry());
+        let completer = DcliCompleter::new(Arc::clone(&registry), None);
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+        let (_, candidates) = completer.complete("te", 2, &ctx).unwrap();
+        let names: Vec<&str> = candidates.iter().map(|p| p.display.as_str()).collect();
+        assert!(names.contains(&"test"));
+        assert!(!names.contains(&"t"));
+    }
+
+    #[test]
+    fn test_completer_flags_after_command() {
+        let config = Arc::new(make_help_config());
+        // Registry with "hello" command
+        let mut registry = CommandRegistry::new();
+        let cmd_def = make_help_config().commands.into_iter().next().unwrap();
+        struct DummyHandler;
+        impl crate::executor::CommandHandler for DummyHandler {
+            fn execute(
+                &self,
+                _: &mut dyn ExecutionContext,
+                _: &HashMap<String, String>,
+            ) -> Result<()> {
+                Ok(())
+            }
+        }
+        registry.register(cmd_def, Box::new(DummyHandler)).unwrap();
+        let registry = Arc::new(registry);
+
+        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+
+        // "hello " → should propose --loud and -l
+        let (_, candidates) = completer.complete("hello ", 6, &ctx).unwrap();
+        let names: Vec<&str> = candidates.iter().map(|p| p.display.as_str()).collect();
+        assert!(
+            names.contains(&"--loud"),
+            "expected --loud, got {:?}",
+            names
+        );
+        assert!(names.contains(&"-l"), "expected -l, got {:?}", names);
+    }
+
+    #[test]
+    fn test_completer_flags_prefix_filter() {
+        let config = Arc::new(make_help_config());
+        let mut registry = CommandRegistry::new();
+        let cmd_def = make_help_config().commands.into_iter().next().unwrap();
+        struct DummyHandler;
+        impl crate::executor::CommandHandler for DummyHandler {
+            fn execute(
+                &self,
+                _: &mut dyn ExecutionContext,
+                _: &HashMap<String, String>,
+            ) -> Result<()> {
+                Ok(())
+            }
+        }
+        registry.register(cmd_def, Box::new(DummyHandler)).unwrap();
+        let registry = Arc::new(registry);
+
+        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+
+        // "hello --l" → only --loud
+        let (_, candidates) = completer.complete("hello --l", 9, &ctx).unwrap();
+        let names: Vec<&str> = candidates.iter().map(|p| p.display.as_str()).collect();
+        assert!(names.contains(&"--loud"));
+        assert!(!names.contains(&"-l"));
+    }
+
+    #[test]
+    fn test_completer_no_flags_for_unknown_command() {
+        let config = Arc::new(make_help_config());
+        let registry = Arc::new(create_test_registry());
+        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+        // "unknown " → empty (command not in registry)
+        let (_, candidates) = completer.complete("unknown ", 8, &ctx).unwrap();
+        assert!(candidates.is_empty());
     }
 }

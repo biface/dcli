@@ -591,11 +591,14 @@ impl CliApp {
     /// # }
     /// ```
     pub fn run_repl(self) -> Result<()> {
-        let mut repl = ReplInterface::new(self.registry, self.context, self.prompt)?;
-        if let Some(formatter) = self.help_formatter {
-            repl = repl.with_help(self.config, formatter);
-        }
-        repl.run()
+        ReplInterface::new(
+            self.registry,
+            self.context,
+            self.prompt,
+            Some(self.config),
+            self.help_formatter,
+        )?
+        .run()
     }
 
     /// Run with automatic mode detection

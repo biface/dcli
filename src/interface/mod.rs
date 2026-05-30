@@ -65,7 +65,7 @@
 //! let registry = CommandRegistry::new();
 //! let context = Box::new(MyContext::default());
 //!
-//! let repl = ReplInterface::new(registry, context, "myapp".to_string())?;
+//! let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None)?;
 //! repl.run()?; // Enters interactive loop
 //! # Ok(())
 //! # }
@@ -204,7 +204,7 @@
 //!     
 //!     // Create and run REPL
 //!     let context = Box::new(AppContext::default());
-//!     let repl = ReplInterface::new(registry, context, "myapp".to_string())?;
+//!     let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None)?;
 //!     repl.run() // Interactive loop
 //! }
 //! ```
@@ -302,6 +302,6 @@ mod tests {
         registry.register(cmd_def, Box::new(TestHandler)).unwrap();
 
         let context = Box::new(TestContext::default());
-        let _repl = ReplInterface::new(registry, context, "test".to_string());
+        let _repl = ReplInterface::new(registry, context, "test".to_string(), None, None);
     }
 }

@@ -116,6 +116,7 @@
 //!             extensions: vec!["csv".to_string(), "tsv".to_string()],
 //!         },
 //!     ],
+//!     secure: false,
 //! };
 //!
 //! // Parse arguments
