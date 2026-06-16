@@ -50,6 +50,7 @@ use crate::error::{ConfigError, DynamicCliError, Result};
 use crate::executor::CommandHandler;
 use crate::help::{DefaultHelpFormatter, HelpFormatter};
 use crate::interface::{CliInterface, ReplInterface};
+use crate::plugin::Plugin;
 use crate::registry::CommandRegistry;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -109,6 +110,9 @@ pub struct CliBuilder {
 
     /// Custom help formatter. None = DefaultHelpFormatter used lazily.
     help_formatter: Option<Box<dyn HelpFormatter>>,
+
+    /// Registered plugins
+    plugins: Vec<Box<dyn Plugin>>,
 }
 
 impl CliBuilder {
@@ -129,6 +133,7 @@ impl CliBuilder {
             handlers: HashMap::new(),
             prompt: None,
             help_formatter: None,
+            plugins: Vec::new(),
         }
     }
 
@@ -251,6 +256,31 @@ impl CliBuilder {
         handler: Box<dyn CommandHandler>,
     ) -> Self {
         self.handlers.insert(name.into(), handler);
+        self
+    }
+
+    /// Register a plugin
+    ///
+    /// A plugin groups related handlers under a single unit. During `build()`,
+    /// each handler declared by the plugin is merged into the handler map.
+    /// Conflicts with already-registered handler names produce an error at
+    /// build time.
+    ///
+    /// The YAML config remains the sole source of truth for command definitions.
+    /// Plugin handlers are matched by their `implementation` name, exactly as
+    /// with [`register_handler`][Self::register_handler].
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::CliBuilder;
+    /// use dynamic_cli::plugin::SystemPlugin;
+    ///
+    /// let builder = CliBuilder::new()
+    ///     .register_plugin(Box::new(SystemPlugin::new()));
+    /// ```
+    pub fn register_plugin(mut self, plugin: Box<dyn Plugin>) -> Self {
+        self.plugins.push(plugin);
         self
     }
 
@@ -386,6 +416,28 @@ impl CliBuilder {
 
         // Create registry and register commands
         let mut registry = CommandRegistry::new();
+
+        for plugin in self.plugins.drain(..) {
+            let plugin_name = plugin.name().to_string();
+            for (impl_name, handler) in plugin.handlers() {
+                if self.handlers.contains_key(&impl_name) {
+                    return Err(DynamicCliError::Config(ConfigError::InvalidSchema {
+                        reason: format!(
+                            "Plugin '{}' tried to register handler '{}' \
+                     which is already registered.",
+                            plugin_name, impl_name
+                        ),
+                        path: None,
+                        suggestion: Some(format!(
+                            "Remove the duplicate call to register_handler(\"{}\") \
+                     or rename the implementation in your YAML config.",
+                            impl_name
+                        )),
+                    }));
+                }
+                self.handlers.insert(impl_name, handler);
+            }
+        }
 
         for command_def in &config.commands {
             // Find handler for this command

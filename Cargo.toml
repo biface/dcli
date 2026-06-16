@@ -20,6 +20,9 @@ exclude = [
     "tests/integration/",
 ]
 
+[features]
+wasm-plugins = ["dep:wasmtime"]
+
 [dependencies]
 # Serialization and configuration parsing
 serde = { version = "1.0", features = ["derive"] }
@@ -38,6 +41,9 @@ rustyline = "14.0"
 
 # System utilities
 dirs = "5.0"
+
+# WASM plugin runtime (optional — enabled via features = ["wasm-plugins"])
+wasmtime = { version = "45.0.0", optional = true }
 
 [dev-dependencies]
 # Testing utilities

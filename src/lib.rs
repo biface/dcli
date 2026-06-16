@@ -96,6 +96,7 @@ pub mod executor;
 pub mod help;
 pub mod interface;
 pub mod parser;
+pub mod plugin;
 pub mod registry;
 pub mod utils;
 pub mod validator;
