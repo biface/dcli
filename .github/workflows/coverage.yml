@@ -67,14 +67,15 @@ jobs:
           cargo llvm-cov --all-targets --workspace \
             --lcov --output-path lcov-default.info
 
-      # ── Run 2 : all features ──────────────────────────────────────────────
-      # Activate at v0.5.0 when Cargo.toml declares optional features.
-      # Replace lcov-default.info with lcov-all.info in the upload step below.
-      #
-      # - name: Generate code coverage — all features
-      #   run: |
-      #     cargo llvm-cov --all-targets --all-features --workspace \
-      #       --lcov --output-path lcov-all.info
+      # ── Run 2 : wasm-plugins feature ───────────────────────────────────────
+      # Activated at v0.4.0 — covers src/plugin/wasm.rs (Option C, DD-021).
+      # Uses --features wasm-plugins rather than --all-features so that the
+      # umbrella report stays scoped to currently declared features; revisit
+      # this comment when a second feature flag is introduced.
+      - name: Generate code coverage — feature wasm-plugins
+        run: |
+          cargo llvm-cov --all-targets --features wasm-plugins --workspace \
+            --lcov --output-path lcov-wasm-plugins.info
 
       # ── Run 3 : async feature ─────────────────────────────────────────────
       # Activate at v0.5.0 when Cargo.toml declares: [features] async = [...]
@@ -87,7 +88,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: lcov-default.info
+          files: lcov-default.info,lcov-wasm-plugins.info
           fail_ci_if_error: false
           flags: unittests
           name: codecov-umbrella
@@ -98,7 +99,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: code-coverage-report
-          path: lcov-default.info
+          path: |
+            lcov-default.info
+            lcov-wasm-plugins.info
           retention-days: 30
 
       - name: Display coverage summary
