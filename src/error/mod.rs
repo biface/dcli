@@ -11,6 +11,7 @@
 //! - [`ValidationError`] : Validation errors
 //! - [`ExecutionError`] : Execution errors
 //! - [`RegistryError`] : Registry errors
+//! - [`WasmError`] : WASM plugin errors (feature = "wasm-plugins")
 //!
 //! ## Example
 //!
