@@ -36,6 +36,11 @@ pub enum DynamicCliError {
     #[error(transparent)]
     Registry(#[from] RegistryError),
 
+    /// WASM plugin errors (only available with the `wasm-plugins` feature)
+    #[cfg(feature = "wasm-plugins")]
+    #[error(transparent)]
+    Wasm(#[from] WasmError),
+
     /// I/O errors
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -672,6 +677,128 @@ pub enum RegistryError {
 }
 
 // ═══════════════════════════════════════════════════════════
+// WASM PLUGIN ERRORS (feature = "wasm-plugins")
+// ═══════════════════════════════════════════════════════════
+
+/// Errors related to loading and executing WASM plugins
+///
+/// Only available when the `wasm-plugins` feature is enabled.
+/// These errors occur when loading a `.wasm` module, validating its
+/// mandatory exports, or invoking a guest function across the host/guest
+/// boundary. See `WASM_PLUGIN_INTERFACE.md` for the full ABI contract.
+#[cfg(feature = "wasm-plugins")]
+#[derive(Debug, Error)]
+pub enum WasmError {
+    /// The `.wasm` module could not be loaded or instantiated
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    /// use std::path::PathBuf;
+    ///
+    /// let error = WasmError::LoadFailed {
+    ///     path: PathBuf::from("plugin.wasm"),
+    ///     source: anyhow::anyhow!("invalid magic number"),
+    ///     suggestion: Some("Verify the file is a valid WASM binary.".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("plugin.wasm"));
+    /// ```
+    #[error("Failed to load WASM module: {path:?}: {source}")]
+    LoadFailed {
+        path: PathBuf,
+        #[source]
+        source: anyhow::Error,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
+
+    /// A mandatory or mapped export is missing from the module
+    ///
+    /// Mandatory exports are `memory`, `dcli_alloc`, `dcli_dealloc`, and the
+    /// mapped business function. See `WASM_PLUGIN_INTERFACE.md`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::FunctionNotFound {
+    ///     function: "dcli_dealloc".to_string(),
+    ///     module: "plugin.wasm".to_string(),
+    ///     suggestion: Some(
+    ///         "Export `dcli_dealloc(ptr: i32, size: i32)` from the WASM module.".to_string()
+    ///     ),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("dcli_dealloc"));
+    /// ```
+    #[error("WASM function '{function}' not found in module '{module}'")]
+    FunctionNotFound {
+        function: String,
+        module: String,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
+
+    /// The guest function returned a non-zero error code
+    ///
+    /// `message` is populated from `dcli_last_error_message()` when the
+    /// module exports it; otherwise `None`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::GuestError {
+    ///     code: 1,
+    ///     message: Some("invalid argument".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains('1'));
+    /// ```
+    #[error("WASM guest returned error code {code}{}",
+        .message.as_ref().map(|m| format!(": {m}")).unwrap_or_default())]
+    GuestError {
+        code: i32,
+        /// Detailed message from `dcli_last_error_message()`, if exported
+        message: Option<String>,
+    },
+
+    /// Failed to serialize handler arguments before crossing the WASM boundary
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::SerializationFailed("unsupported map key type".to_string());
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("unsupported map key type"));
+    /// ```
+    #[error("Failed to serialize arguments for WASM call: {0}")]
+    SerializationFailed(String),
+
+    /// Failed to read from or write to the guest's linear memory
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::MemoryAccessFailed {
+    ///     reason: "write out of bounds".to_string(),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("out of bounds"));
+    /// ```
+    #[error("Failed to access WASM guest memory: {reason}")]
+    MemoryAccessFailed { reason: String },
+}
+
+// ═══════════════════════════════════════════════════════════
 // HELPERS FOR CREATING CONTEXTUAL ERRORS
 // ═══════════════════════════════════════════════════════════
 
@@ -932,6 +1059,69 @@ impl RegistryError {
             suggestion: Some(format!(
                 "Call .register_handler(\"{command}\", ...) before running."
             )),
+        }
+    }
+}
+
+#[cfg(feature = "wasm-plugins")]
+impl WasmError {
+    /// Create a `FunctionNotFound` error for a missing mandatory export
+    ///
+    /// The suggestion names the exact signature expected for the missing
+    /// export, taken from `WASM_PLUGIN_INTERFACE.md`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::missing_mandatory_export("dcli_alloc", "plugin.wasm");
+    /// match error {
+    ///     WasmError::FunctionNotFound { suggestion, .. } => {
+    ///         assert!(suggestion.is_some());
+    ///     }
+    ///     _ => panic!("wrong variant"),
+    /// }
+    /// ```
+    pub fn missing_mandatory_export(function: &str, module: &str) -> Self {
+        let signature = match function {
+            "dcli_alloc" => "fn dcli_alloc(size: i32) -> i32",
+            "dcli_dealloc" => "fn dcli_dealloc(ptr: i32, size: i32)",
+            "memory" => "(memory (export \"memory\") ...)",
+            other => other,
+        };
+        Self::FunctionNotFound {
+            function: function.to_string(),
+            module: module.to_string(),
+            suggestion: Some(format!(
+                "Export `{signature}` from the WASM module. \
+                 See WASM_PLUGIN_INTERFACE.md for the full contract."
+            )),
+        }
+    }
+
+    /// Create a `GuestError` from a raw error code, without a detailed message
+    ///
+    /// Used when the module does not export `dcli_last_error_message`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::WasmError;
+    ///
+    /// let error = WasmError::guest_error_without_message(2);
+    /// match error {
+    ///     WasmError::GuestError { code, message } => {
+    ///         assert_eq!(code, 2);
+    ///         assert!(message.is_none());
+    ///     }
+    ///     _ => panic!("wrong variant"),
+    /// }
+    /// ```
+    pub fn guest_error_without_message(code: i32) -> Self {
+        Self::GuestError {
+            code,
+            message: None,
         }
     }
 }
@@ -1257,5 +1447,105 @@ mod tests {
         let msg = format!("{}", error);
         assert!(msg.contains("run"));
         assert!(!msg.contains("Choose")); // suggestion separate from Display
+    }
+
+    // ── WasmError ────────────────────────────────────────────
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_load_failed_display() {
+        let error = WasmError::LoadFailed {
+            path: PathBuf::from("plugin.wasm"),
+            source: anyhow::anyhow!("invalid magic number"),
+            suggestion: None,
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("plugin.wasm"));
+        assert!(msg.contains("invalid magic number"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_function_not_found_display() {
+        let error = WasmError::FunctionNotFound {
+            function: "dcli_alloc".to_string(),
+            module: "plugin.wasm".to_string(),
+            suggestion: None,
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("dcli_alloc"));
+        assert!(msg.contains("plugin.wasm"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_missing_mandatory_export_helper_has_suggestion() {
+        let error = WasmError::missing_mandatory_export("dcli_dealloc", "plugin.wasm");
+        match error {
+            WasmError::FunctionNotFound {
+                suggestion,
+                function,
+                ..
+            } => {
+                assert_eq!(function, "dcli_dealloc");
+                let s = suggestion.unwrap();
+                assert!(s.contains("dcli_dealloc"));
+                assert!(s.contains("WASM_PLUGIN_INTERFACE.md"));
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_guest_error_with_message_display() {
+        let error = WasmError::GuestError {
+            code: 1,
+            message: Some("invalid argument".to_string()),
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains('1'));
+        assert!(msg.contains("invalid argument"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_guest_error_without_message_display() {
+        let error = WasmError::guest_error_without_message(2);
+        let msg = format!("{}", error);
+        assert!(msg.contains('2'));
+        match error {
+            WasmError::GuestError { message, .. } => assert!(message.is_none()),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_serialization_failed_display() {
+        let error = WasmError::SerializationFailed("unsupported map key type".to_string());
+        let msg = format!("{}", error);
+        assert!(msg.contains("unsupported map key type"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_memory_access_failed_display() {
+        let error = WasmError::MemoryAccessFailed {
+            reason: "write out of bounds".to_string(),
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("out of bounds"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_wasm_error_converts_into_dynamic_cli_error() {
+        let wasm_err = WasmError::guest_error_without_message(1);
+        let err: DynamicCliError = wasm_err.into();
+        match err {
+            DynamicCliError::Wasm(WasmError::GuestError { code, .. }) => assert_eq!(code, 1),
+            _ => panic!("wrong variant"),
+        }
     }
 }
