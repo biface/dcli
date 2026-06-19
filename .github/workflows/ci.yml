@@ -51,7 +51,10 @@ jobs:
       - name: cargo clippy — default features
         run: cargo clippy -- -D warnings
 
-      # v0.3.0+ — activate when optional features are declared in Cargo.toml
+      - name: cargo clippy — feature wasm-plugins
+        run: cargo clippy --features wasm-plugins -- -D warnings
+
+      # v0.5.0+ — activate when async feature flag is declared in Cargo.toml
       # - name: cargo clippy — feature async
       #   run: cargo clippy --features async -- -D warnings
 
@@ -78,8 +81,14 @@ jobs:
       - name: cargo test — default features
         run: cargo test
 
+      - name: cargo test — feature wasm-plugins
+        run: cargo test --features wasm-plugins
+
       - name: cargo test — doc examples
         run: cargo test --doc
+
+      - name: cargo test — doc examples (feature wasm-plugins)
+        run: cargo test --doc --features wasm-plugins
 
       # v0.5.0+ — activate when async feature flag is declared in Cargo.toml
       # - name: cargo test — feature async

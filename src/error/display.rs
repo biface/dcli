@@ -26,6 +26,8 @@
 
 use colored::Colorize;
 
+#[cfg(feature = "wasm-plugins")]
+use crate::error::WasmError;
 use crate::error::{
     ConfigError, DynamicCliError, ExecutionError, ParseError, RegistryError, ValidationError,
 };
@@ -145,6 +147,8 @@ pub fn format_error(error: &DynamicCliError) -> String {
         DynamicCliError::Validation(e) => format_validation_error(&mut output, e),
         DynamicCliError::Execution(e) => format_execution_error(&mut output, e),
         DynamicCliError::Registry(e) => format_registry_error(&mut output, e),
+        #[cfg(feature = "wasm-plugins")]
+        DynamicCliError::Wasm(e) => format_wasm_error(&mut output, e),
         DynamicCliError::Io(e) => output.push_str(&format!("{}\n", e)),
     }
 
@@ -307,6 +311,27 @@ fn format_registry_error(output: &mut String, error: &RegistryError) {
         RegistryError::DuplicateRegistration { suggestion, .. } => suggestion.as_deref(),
         RegistryError::DuplicateAlias { suggestion, .. } => suggestion.as_deref(),
         RegistryError::MissingHandler { suggestion, .. } => suggestion.as_deref(),
+    };
+
+    append_suggestion(output, suggestion);
+}
+
+/// Format a WASM plugin error with its actionable suggestion
+///
+/// Only available when the `wasm-plugins` feature is enabled.
+///
+/// `GuestError` and `SerializationFailed` and `MemoryAccessFailed` carry no
+/// structured `suggestion` field — they surface only their `Display` message.
+#[cfg(feature = "wasm-plugins")]
+fn format_wasm_error(output: &mut String, error: &WasmError) {
+    output.push_str(&format!("{}\n", error));
+
+    let suggestion = match error {
+        WasmError::LoadFailed { suggestion, .. } => suggestion.as_deref(),
+        WasmError::FunctionNotFound { suggestion, .. } => suggestion.as_deref(),
+        WasmError::GuestError { .. } => None,
+        WasmError::SerializationFailed(_) => None,
+        WasmError::MemoryAccessFailed { .. } => None,
     };
 
     append_suggestion(output, suggestion);
@@ -663,6 +688,38 @@ mod tests {
         let formatted = format_error(&error);
         assert!(formatted.contains("run"));
         assert!(formatted.contains("Choose a different alias."));
+    }
+
+    // ── WasmError ────────────────────────────────────────────
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_format_wasm_function_not_found_with_suggestion() {
+        let error: DynamicCliError = WasmError::FunctionNotFound {
+            function: "dcli_dealloc".to_string(),
+            module: "plugin.wasm".to_string(),
+            suggestion: Some("Export `dcli_dealloc(ptr: i32, size: i32)`.".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("dcli_dealloc"));
+        assert!(formatted.contains("Export `dcli_dealloc"));
+    }
+
+    #[cfg(feature = "wasm-plugins")]
+    #[test]
+    fn test_format_wasm_guest_error_without_suggestion_line() {
+        let error: DynamicCliError = WasmError::GuestError {
+            code: 1,
+            message: Some("invalid argument".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("invalid argument"));
+        // GuestError carries no structured suggestion — no "ℹ" line expected
+        assert!(!formatted.contains('ℹ'));
     }
 
     // ── display_error ────────────────────────────────────────

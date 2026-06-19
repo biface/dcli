@@ -20,6 +20,9 @@ exclude = [
     "tests/integration/",
 ]
 
+[features]
+wasm-plugins = ["dep:wasmtime"]
+
 [dependencies]
 # Serialization and configuration parsing
 serde = { version = "1.0", features = ["derive"] }
@@ -39,6 +42,9 @@ rustyline = "14.0"
 # System utilities
 dirs = "5.0"
 
+# WASM plugin runtime (optional — enabled via features = ["wasm-plugins"])
+wasmtime = { version = "45.0.0", optional = true }
+
 [dev-dependencies]
 # Testing utilities
 tempfile = "3.13"
@@ -56,6 +62,17 @@ tempfile = "3.13"
 name = "dynamic_cli"
 path = "src/lib.rs"
 doctest = true
+
+# Integration tests under tests/integration/ — not auto-discovered by Cargo
+# since they live in a subdirectory rather than directly under tests/.
+[[test]]
+name = "system_plugin_test"
+path = "tests/integration/system_plugin_test.rs"
+
+[[test]]
+name = "wasm_plugin_test"
+path = "tests/integration/wasm_plugin_test.rs"
+required-features = ["wasm-plugins"]
 
 # Benchmark configuration (uncomment when benchmarks are implemented)
 # [[bench]]
