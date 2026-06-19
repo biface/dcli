@@ -21,7 +21,7 @@ A powerful Rust framework for creating configurable CLI and REPL applications vi
 - **🔄 CLI & REPL Modes** : Support for both command-line and interactive modes
 - **✅ Automatic Validation** : Built-in type checking and constraint validation
 - **🎨 Rich Error Messages** : Colorful and informative messages with suggestions
-- **🔌 Extensible** : Easy addition of custom command handlers
+- **🔌 Plugin System** : Static plugins (compiled in) and sandboxed WASM plugins (loaded at runtime)
 - **📚 Well Documented** : Complete API documentation and examples
 - **🧪 Thoroughly Tested** : >80% test coverage with 345+ tests
 - **⚡ Performance** : Zero-cost abstractions with efficient parsing
@@ -36,7 +36,10 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.1.1"
+dynamic-cli = "0.4.0"
+
+# Optional — sandboxed WASM plugins (see Plugin System below)
+# dynamic-cli = { version = "0.4.0", features = ["wasm-plugins"] }
 ```
 
 ### Basic Example
@@ -144,6 +147,57 @@ myapp > exit
 
 ---
 
+## 🔌 Plugin System
+
+Extend an application with handlers that do not live in your own crate,
+without modifying `dynamic-cli` itself. Two mechanisms are available:
+
+| Mechanism | When to use it | Cost |
+|---|---|---|
+| **Static plugins** (`Plugin` trait) | Compiled into your binary | No `unsafe`, no extra dependency |
+| **WASM plugins** (`WasmPlugin`) | Distributed and loaded independently, sandboxed | `wasmtime` dependency, opt-in via `features = ["wasm-plugins"]` |
+
+`dynamic-cli` ships `SystemPlugin` out of the box — `help`, `version`, and
+`exit` in one call:
+
+```rust
+use dynamic_cli::plugin::SystemPlugin;
+
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MyContext::default()))
+    .register_plugin(Box::new(SystemPlugin::new()))
+    .register_handler("greet_handler", Box::new(GreetCommand))
+    .build()?
+    .run()
+```
+
+WASM plugins run in a `wasmtime` sandbox, with no `unsafe` code on the host
+side:
+
+```rust
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MyContext::default()))
+    .register_wasm_plugin(
+        Path::new("plugins/greet.wasm"),
+        &[("greet_hello", "say_hello")],
+    )?
+    .build()?
+    .run()
+```
+
+Static and WASM plugins, and directly-registered handlers, all coexist in
+the same application — the YAML configuration remains the single source of
+truth for command definitions either way.
+
+**[Full Plugin Guide →](PLUGIN_GUIDE.md)** ([Français](PLUGIN_GUIDE.fr.md)) —
+the complete WASM ABI contract for third-party plugin authors, a worked
+example, and the architecture decision behind it
+([DD-021](https://github.com/biface/dcli/issues/10)).
+
+---
+
 ## 📖 Documentation
 
 - **[API Reference](https://docs.rs/dynamic-cli)** - Complete API documentation
@@ -180,27 +234,33 @@ dynamic-cli is organized into focused modules:
 - **interface** - CLI and REPL interfaces
 - **error** - Error types and display
 - **builder** - Fluent API for building applications
+- **help** - Dynamic `--help` generation
+- **plugin** - Static (`Plugin` trait) and sandboxed WASM (`wasm-plugins` feature) extension mechanisms
 
 ---
 
 ## 🧪 Tests
 
 ```bash
-# Run all tests
-cargo test --all-features
+# Run all tests (default features)
+cargo test
+
+# Run all tests, including WASM plugins
+cargo test --features wasm-plugins
 
 # Run with coverage
-cargo tarpaulin --out Html
+cargo llvm-cov --all-targets --workspace
 
 # Check code quality
 cargo clippy --all-features -- -D warnings
 ```
 
 **Current test statistics:**
-- **345+ unit tests** ✅
-- **126+ documentation tests**
-- **80-90% code coverage**
-- **Zero clippy warnings**
+- **400+ unit tests** ✅
+- **130+ documentation tests**
+- **9 integration tests** (static + WASM plugins, full public API chain)
+- **80-90% code coverage**, including the `wasm-plugins` feature
+- **Zero clippy warnings** (default and `wasm-plugins`)
 
 ---
 
@@ -307,4 +367,4 @@ If you find dynamic-cli useful, please:
 - 📢 **Share** it with others who might find it useful
 - 📝 **Write** a blog post or tutorial!
 
-**Last updated**: 2026-01-12
+**Last updated**: 2026-06-19
