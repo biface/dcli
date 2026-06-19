@@ -105,14 +105,14 @@ pub struct CliBuilder {
     /// Registered command handlers (name -> handler)
     handlers: HashMap<String, Box<dyn CommandHandler>>,
 
+    /// Registered plugins, expanded into `handlers` during `build()`
+    plugins: Vec<Box<dyn Plugin>>,
+
     /// REPL prompt (if None, will use config default or "cli")
     prompt: Option<String>,
 
     /// Custom help formatter. None = DefaultHelpFormatter used lazily.
     help_formatter: Option<Box<dyn HelpFormatter>>,
-
-    /// Registered plugins
-    plugins: Vec<Box<dyn Plugin>>,
 }
 
 impl CliBuilder {
@@ -131,9 +131,9 @@ impl CliBuilder {
             config: None,
             context: None,
             handlers: HashMap::new(),
+            plugins: Vec::new(),
             prompt: None,
             help_formatter: None,
-            plugins: Vec::new(),
         }
     }
 
@@ -261,14 +261,16 @@ impl CliBuilder {
 
     /// Register a plugin
     ///
-    /// A plugin groups related handlers under a single unit. During `build()`,
-    /// each handler declared by the plugin is merged into the handler map.
-    /// Conflicts with already-registered handler names produce an error at
-    /// build time.
+    /// A plugin groups related handlers under a single unit. During
+    /// [`build()`][Self::build], each handler declared by the plugin is
+    /// merged into the handler map. Conflicts with already-registered
+    /// handler names (whether from another plugin or from
+    /// [`register_handler`][Self::register_handler]) produce a build-time
+    /// error.
     ///
-    /// The YAML config remains the sole source of truth for command definitions.
-    /// Plugin handlers are matched by their `implementation` name, exactly as
-    /// with [`register_handler`][Self::register_handler].
+    /// The YAML config remains the sole source of truth for command
+    /// definitions. Plugin handlers are matched by their `implementation`
+    /// name, exactly as with [`register_handler`][Self::register_handler].
     ///
     /// # Example
     ///
@@ -282,6 +284,57 @@ impl CliBuilder {
     pub fn register_plugin(mut self, plugin: Box<dyn Plugin>) -> Self {
         self.plugins.push(plugin);
         self
+    }
+
+    /// Load a WASM plugin from disk, map its business functions, and
+    /// register it
+    ///
+    /// Convenience wrapper around [`WasmPlugin::load`][crate::plugin::wasm::WasmPlugin::load],
+    /// [`WasmPlugin::with_function_map`][crate::plugin::wasm::WasmPlugin::with_function_map],
+    /// and [`register_plugin`][Self::register_plugin]. Only available with
+    /// the `wasm-plugins` feature.
+    ///
+    /// `function_map` is mandatory here, unlike the other `WasmPlugin`
+    /// builder methods (`with_format`, `with_metadata`), which have
+    /// reasonable defaults (YAML, file-name-derived metadata). A
+    /// `WasmPlugin` with an empty function map registers zero handlers —
+    /// silently inert — so this wrapper does not offer a path that skips
+    /// mapping. Applications that also need a non-default format or
+    /// explicit metadata should build the `WasmPlugin` directly and pass it
+    /// to [`register_plugin`][Self::register_plugin] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the module cannot be loaded or fails mandatory
+    /// export validation. See `WASM_PLUGIN_INTERFACE.md` for the ABI
+    /// contract.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use dynamic_cli::CliBuilder;
+    /// use std::path::Path;
+    ///
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// let builder = CliBuilder::new()
+    ///     .register_wasm_plugin(
+    ///         Path::new("plugins/greet.wasm"),
+    ///         &[("greet_hello", "say_hello")],
+    ///     )?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg(feature = "wasm-plugins")]
+    pub fn register_wasm_plugin(
+        self,
+        path: &std::path::Path,
+        function_map: &[(&str, &str)],
+    ) -> Result<Self> {
+        let mut plugin = crate::plugin::wasm::WasmPlugin::load(path)?;
+        for &(impl_name, wasm_fn_name) in function_map {
+            plugin = plugin.with_function_map(impl_name, wasm_fn_name);
+        }
+        Ok(self.register_plugin(Box::new(plugin)))
     }
 
     /// Set the REPL prompt
@@ -417,6 +470,10 @@ impl CliBuilder {
         // Create registry and register commands
         let mut registry = CommandRegistry::new();
 
+        // Expand plugins into the handler map before processing commands.
+        // Conflicts between plugins (or between a plugin and a directly
+        // registered handler) are detected here and produce a clear error,
+        // before any command resolution begins.
         for plugin in self.plugins.drain(..) {
             let plugin_name = plugin.name().to_string();
             for (impl_name, handler) in plugin.handlers() {
@@ -424,13 +481,13 @@ impl CliBuilder {
                     return Err(DynamicCliError::Config(ConfigError::InvalidSchema {
                         reason: format!(
                             "Plugin '{}' tried to register handler '{}' \
-                     which is already registered.",
+                             which is already registered.",
                             plugin_name, impl_name
                         ),
                         path: None,
                         suggestion: Some(format!(
                             "Remove the duplicate call to register_handler(\"{}\") \
-                     or rename the implementation in your YAML config.",
+                             or rename the implementation in your YAML config.",
                             impl_name
                         )),
                     }));
