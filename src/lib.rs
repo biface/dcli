@@ -135,6 +135,11 @@ pub use builder::{CliApp, CliBuilder};
 // Helper system
 pub use help::{DefaultHelpFormatter, HelpFormatter};
 
+// Plugin system
+#[cfg(feature = "wasm-plugins")]
+pub use plugin::wasm::{WasmPlugin, WasmSerializationFormat};
+pub use plugin::{Plugin, SystemPlugin};
+
 // Utility functions
 pub use utils::{
     detect_type, format_bytes, format_duration, get_extension, has_extension, is_blank, normalize,
@@ -196,6 +201,11 @@ pub mod prelude {
 
     // Help system — re-exported so framework users need only `use dynamic_cli::prelude::*`
     pub use crate::help::{DefaultHelpFormatter, HelpFormatter};
+
+    // Plugin system
+    #[cfg(feature = "wasm-plugins")]
+    pub use crate::plugin::wasm::{WasmPlugin, WasmSerializationFormat};
+    pub use crate::plugin::{Plugin, SystemPlugin};
 
     // Utilities (most commonly used)
     pub use crate::utils::{detect_type, is_blank, normalize, parse_bool, parse_float, parse_int};
