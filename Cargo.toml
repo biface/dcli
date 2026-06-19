@@ -63,6 +63,17 @@ name = "dynamic_cli"
 path = "src/lib.rs"
 doctest = true
 
+# Integration tests under tests/integration/ — not auto-discovered by Cargo
+# since they live in a subdirectory rather than directly under tests/.
+[[test]]
+name = "system_plugin_test"
+path = "tests/integration/system_plugin_test.rs"
+
+[[test]]
+name = "wasm_plugin_test"
+path = "tests/integration/wasm_plugin_test.rs"
+required-features = ["wasm-plugins"]
+
 # Benchmark configuration (uncomment when benchmarks are implemented)
 # [[bench]]
 # name = "parser_benchmarks"
