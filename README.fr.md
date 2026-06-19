@@ -20,7 +20,7 @@ Un framework Rust puissant pour créer des applications CLI et REPL configurable
 - **🔄 Modes CLI & REPL** : Support des modes ligne de commande et interactif
 - **✅ Validation Automatique** : Vérification de type et validation de contraintes intégrées
 - **🎨 Messages d'Erreur Riches** : Messages colorés et informatifs avec suggestions
-- **🔌 Extensible** : Ajout facile de gestionnaires de commandes personnalisés
+- **🔌 Système de Plugins** : Plugins statiques (compilés) et plugins WASM sandboxés (chargés à l'exécution)
 - **📚 Bien Documenté** : Documentation API complète et exemples
 - **🧪 Testé Exhaustivement** : Couverture de tests >80% avec 345+ tests
 - **⚡ Performance** : Abstractions sans coût avec parsing efficace
@@ -35,7 +35,10 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.1.1"
+dynamic-cli = "0.4.0"
+
+# Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
+# dynamic-cli = { version = "0.4.0", features = ["wasm-plugins"] }
 ```
 
 ### Exemple Basique
@@ -144,6 +147,59 @@ monapp > exit
 
 ---
 
+## 🔌 Système de Plugins
+
+Étendez une application avec des handlers qui ne vivent pas dans votre
+propre crate, sans modifier `dynamic-cli` lui-même. Deux mécanismes sont
+disponibles :
+
+| Mécanisme | Quand l'utiliser | Coût |
+|---|---|---|
+| **Plugins statiques** (trait `Plugin`) | Compilés dans votre binaire | Aucun `unsafe`, aucune dépendance supplémentaire |
+| **Plugins WASM** (`WasmPlugin`) | Distribués et chargés indépendamment, sandboxés | Dépendance `wasmtime`, opt-in via `features = ["wasm-plugins"]` |
+
+`dynamic-cli` fournit `SystemPlugin` prêt à l'emploi — `help`, `version`
+et `exit` en un seul appel :
+
+```rust
+use dynamic_cli::plugin::SystemPlugin;
+
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MonContexte::default()))
+    .register_plugin(Box::new(SystemPlugin::new()))
+    .register_handler("saluer_handler", Box::new(CommandeSaluer))
+    .build()?
+    .run()
+```
+
+Les plugins WASM s'exécutent dans une sandbox `wasmtime`, sans aucun code
+`unsafe` côté hôte :
+
+```rust
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MonContexte::default()))
+    .register_wasm_plugin(
+        Path::new("plugins/greet.wasm"),
+        &[("greet_hello", "say_hello")],
+    )?
+    .build()?
+    .run()
+```
+
+Plugins statiques, plugins WASM et handlers enregistrés directement
+coexistent tous dans la même application — la configuration YAML reste
+la seule source de vérité des définitions de commandes, quel que soit le
+mécanisme.
+
+**[Guide complet des plugins →](PLUGIN_GUIDE.fr.md)** ([English](PLUGIN_GUIDE.md)) —
+le contrat ABI WASM complet pour les auteurs de plugins tiers, un exemple
+concret, et la décision d'architecture associée
+([DD-021](https://github.com/biface/dcli/issues/10)).
+
+---
+
 ## 📖 Documentation
 
 - **[Référence API](https://docs.rs/dynamic-cli)** - Documentation API complète
@@ -180,27 +236,33 @@ dynamic-cli est organisé en modules ciblés :
 - **interface** - Interfaces CLI et REPL
 - **error** - Types d'erreurs et affichage
 - **builder** - API fluide pour construire des applications
+- **help** - Génération dynamique de `--help`
+- **plugin** - Mécanismes d'extension statiques (trait `Plugin`) et WASM sandboxés (feature `wasm-plugins`)
 
 ---
 
 ## 🧪 Tests
 
 ```bash
-# Exécuter tous les tests
-cargo test --all-features
+# Exécuter tous les tests (features par défaut)
+cargo test
+
+# Exécuter tous les tests, incluant les plugins WASM
+cargo test --features wasm-plugins
 
 # Exécuter avec couverture
-cargo tarpaulin --out Html
+cargo llvm-cov --all-targets --workspace
 
 # Vérifier la qualité du code
 cargo clippy --all-features -- -D warnings
 ```
 
 **Statistiques de tests actuelles :**
-- **345+ tests unitaires** ✅
-- **126+ tests de documentation**
-- **Couverture de code 80-90%**
-- **Zéro avertissement clippy**
+- **400+ tests unitaires** ✅
+- **130+ tests de documentation**
+- **9 tests d'intégration** (plugins statiques + WASM, chaîne complète de l'API publique)
+- **Couverture de code 80-90%**, incluant la feature `wasm-plugins`
+- **Zéro avertissement clippy** (par défaut et avec `wasm-plugins`)
 
 ---
 
@@ -307,4 +369,4 @@ Si vous trouvez dynamic-cli utile, veuillez :
 - 📢 **Partager** avec d'autres qui pourraient le trouver utile
 - 📝 **Écrire** un article de blog ou un tutoriel !
 
-**Dernière mise à jour** : 2026-01-12
+**Dernière mise à jour** : 2026-06-19

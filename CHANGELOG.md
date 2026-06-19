@@ -101,51 +101,87 @@ async = ["tokio", "async-trait"]
 
 ---
 
-## [0.4.0] - Planned (Q3 2026)
+## [0.4.0] - 2026-06-19
 
-**Theme**: Extensibility  
-**Estimated Effort**: 4-6 weeks  
-**Dependencies**: None
+**Theme**: Plugin System
+**Decision**: [DD-021](https://github.com/biface/dcli/issues/10)
 
-### Planned
+### Added
 
-#### Plugin System
-- **Dynamic plugin loading**: Load plugins from shared libraries (.so, .dylib, .dll)
-  ```yaml
-  plugins:
-    - path: ./plugins/custom_validator.so
-      config:
-        enabled: true
-    - path: ./plugins/extra_commands.so
-  ```
-- **Plugin API**: Stable ABI for external plugins
-  - Add custom command handlers
-  - Add custom validators
-  - Register hooks (pre-execution, post-execution)
-  - Access to context and registry
+#### Static plugins (Option A)
+- **`Plugin` trait** (`src/plugin/mod.rs`): declarative extension point.
+  A plugin declares `name`/`version`/`description` and returns its handlers
+  via `handlers() -> Vec<(String, Box<dyn CommandHandler>)>`. The framework
+  controls registration — a plugin never receives a `&mut CommandRegistry`.
+- **`SystemPlugin`** (`src/plugin/system.rs`): reference implementation
+  supplying `system_help`, `system_version`, `system_exit`.
+  - `system_exit` accepts an optional shutdown callback via
+    `with_exit_fn()`, defaulting to `std::process::exit(0)`, for
+    applications that need a clean shutdown sequence (flush logs, close
+    connections) before exiting.
+- **`CliBuilder::register_plugin(Box<dyn Plugin>)`**: additive, freely
+  combinable with `register_handler()`.
+- **Conflict detection**: `build()` fails with an actionable error if two
+  sources (plugins or direct handlers) claim the same `implementation`
+  name, rather than silently overwriting one with the other.
 
-#### Custom Validators API
-- **`ValidatorPlugin` trait**: Define custom validation logic
-- **Registration system**: Register validators at runtime
-- **Composition**: Chain multiple validators
-
-#### Plugin Discovery
-- **Plugin directory**: Auto-discover plugins in `~/.config/myapp/plugins/`
-- **Plugin metadata**: Version, author, description
-- **Dependency management**: Plugin dependencies and compatibility
-
-#### Safety
-- **Sandboxing**: Isolate plugin execution
-- **Signature verification**: Verify plugin authenticity (optional)
-- **Error isolation**: Plugin errors don't crash main application
+#### WASM plugins (Option C, opt-in)
+- **`WasmPlugin`** (`src/plugin/wasm.rs`, feature `wasm-plugins`): loads a
+  sandboxed `.wasm` (or `.wat`) module via `wasmtime`. Validates three
+  mandatory exports at load time: `memory`, `dcli_alloc`, `dcli_dealloc`.
+  Business functions are mapped via `with_function_map(impl_name, wasm_fn_name)`.
+- **`WasmSerializationFormat`**: YAML by default (config-first principle),
+  JSON available via `with_format()`.
+- **`CliBuilder::register_wasm_plugin(path, function_map)`**: convenience
+  wrapper; `function_map` is mandatory (no safe default — an empty map
+  would register zero handlers).
+- **`dcli_dealloc` always called**: on every exit path of a handler call,
+  including guest error returns, preventing unfreed-buffer accumulation
+  across a long-running REPL session.
+- **Optional `dcli_last_error_message` export**: detailed error messages
+  from the guest when a business function returns a non-zero code;
+  degrades gracefully (`message: None`) when absent.
+- **`WasmError`** (`src/error/types.rs`, feature `wasm-plugins`): typed
+  error category — `LoadFailed`, `FunctionNotFound`, `GuestError`,
+  `SerializationFailed`, `MemoryAccessFailed`.
+- New optional dependency: `wasmtime = "45.0.0"` (only pulled in under
+  `--features wasm-plugins`; zero cost otherwise).
 
 #### Documentation
-- Plugin development guide
-- Plugin API reference
-- Security considerations
-- Example plugins repository
+- **`PLUGIN_GUIDE.md`** / **`PLUGIN_GUIDE.fr.md`**: end-to-end plugin guide
+  — common YAML contract, static plugins with a worked `chrom-rs` example,
+  full WASM ABI contract (mandatory/optional exports, call sequence,
+  host/guest terminology), and a distinction between WASM **restrictions**
+  (no `ExecutionContext` access — permanent, security-motivated) and
+  **limitations** (no host functions, no WASI — absent today, not excluded
+  tomorrow).
 
-**Breaking Changes**: None (plugins are opt-in)
+### Excluded
+- **Dynamic loading via `libloading`** (Option B): permanently excluded.
+  Rust's ABI is not stable across compiler versions, making this approach
+  structurally unsafe regardless of implementation quality. Will not be
+  reconsidered in a future version.
+
+### Testing
+- `tests/integration/system_plugin_test.rs`: `SystemPlugin` through the
+  full `CliBuilder` → `build()` → `CliApp` → `run_cli()` chain — dispatch,
+  alias resolution, coexistence with native handlers, conflict detection.
+- `tests/integration/wasm_plugin_test.rs` (feature `wasm-plugins`):
+  `WasmPlugin` through `register_wasm_plugin()` and the full chain, using
+  real `.wasm` files written via `NamedTempFile` — success path, guest
+  error with and without the optional message export, coexistence with a
+  native handler.
+- CI (`ci.yml`, `coverage.yml`) extended to run `clippy`/`test`/coverage
+  under `--features wasm-plugins` explicitly, alongside default features.
+
+**Breaking Changes**: None (plugins are opt-in; `wasm-plugins` is an
+optional feature flag)
+
+**Roadmap follow-up**: granular static plugins
+(`HelpPlugin`/`VersionPlugin`/`ExitPlugin` alongside the existing
+`SystemPlugin`) and new official static plugins (`SysInfoPlugin`,
+`EnvPlugin`, `ConfigPlugin`) deferred to
+[v0.7.0 · Static Plugin Library](https://github.com/biface/dcli/milestone/?title=v0.7.0).
 
 ---
 
