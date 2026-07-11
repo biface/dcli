@@ -55,16 +55,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.5.0] - Planned (Q4 2026)
+## [0.5.0] - 2026-07-11
 
-**Theme**: Async Support  
-**Estimated Effort**: 4-6 weeks  
-**Dependencies**: None (optional feature)
+**Theme**: Async Command Handlers
+**Decision**: [DD-022](https://github.com/biface/dcli/issues/8)
 
-### Planned
+### Added
 
-#### Async Command Handlers (Optional Feature)
-- **`AsyncCommandHandler` trait**: Async version of `CommandHandler`
+#### `AsyncCommandHandler` trait (Option C — `async-trait`)
+- **`AsyncCommandHandler` trait** (`src/executor/traits.rs`, alongside
+  `CommandHandler`): additive async counterpart, object-safe via
+  `#[async_trait]`, same contract as `CommandHandler` (`execute`/`validate`)
+  aside from the `async` keyword.
   ```rust
   #[async_trait]
   pub trait AsyncCommandHandler: Send + Sync {
@@ -75,29 +77,80 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       ) -> Result<()>;
   }
   ```
-- **Tokio runtime integration**: Optional tokio runtime
-- **Non-blocking I/O**: Async file operations, network requests
-- **Concurrent command execution**: Run multiple commands in parallel
-- **Progress indicators**: Real-time progress for long operations
+- **Unified registry storage**: `CommandRegistry` stores sync and async
+  handlers behind a single private `StoredHandler` enum instead of two
+  parallel maps — one conflict check, one lookup path.
+- **`CommandRegistry::register_async()` / `get_handler_async()`**:
+  symmetric with the renamed `register_sync()` / `get_handler_sync()` (see
+  Deprecated below). A command name resolves to exactly one handler kind;
+  registering the same name as both sync and async fails at registration
+  time.
+- **`CliBuilder::register_async_handler()`**: symmetric with the renamed
+  `register_sync_handler()`. `build()` now drains both handler maps,
+  rejects a command registered both sync and async for the same
+  `implementation` name, and accepts a required command satisfied by an
+  async handler alone.
+- **Dispatch** (`CliInterface::run()`, `ReplInterface::execute_line()`):
+  sync handler tried first (unchanged behaviour); if none matches, the
+  async handler is driven via `futures::executor::block_on(...)` — safe
+  because both dispatch loops are already strictly sequential.
+- New dependencies: `async-trait = "0.1"`, `futures = "0.3"` — normal
+  (non-feature-gated) dependencies. Unlike `wasmtime` (v0.4.0),
+  `async-trait` is a lightweight proc-macro with no runtime footprint, so
+  gating it behind a feature flag would add complexity without a
+  corresponding benefit.
 
-#### Feature Flag
-```toml
-[features]
-default = ["sync"]
-async = ["tokio", "async-trait"]
-```
+### Deprecated
 
-#### Examples
-- **async_http_client**: Fetch data from APIs
-- **async_file_processor**: Process large files asynchronously
-- **concurrent_tasks**: Run multiple operations in parallel
+- **`CommandRegistry::register()`** → renamed `register_sync()`, for
+  symmetry with `register_async()`. Old name kept as a `#[deprecated]`
+  alias, scheduled for removal in **v1.0.0**.
+- **`CommandRegistry::get_handler()`** → renamed `get_handler_sync()`, for
+  symmetry with `get_handler_async()`. Same deprecation schedule.
+- **`CliBuilder::register_handler()`** → renamed `register_sync_handler()`,
+  for symmetry with `register_async_handler()`. Same deprecation schedule.
+- Downstream consumers (including `chrom-rs`) should migrate to the `_sync`
+  names now: `cargo clippy -- -D warnings` turns the deprecation into a
+  build error, so the old names cannot be used silently going forward.
+- Tracked for removal alongside DD-024's planned `CommandHandler::execute`
+  signature change in the **v1.0.0 API cleanup** tracking issue.
 
-#### Documentation
-- Async/await guide for command handlers
-- Migration guide from sync to async
-- Performance comparison benchmarks
+### Documentation
+- **`CONFIG_SYNTAX_REFERENCE.md`** / **`.fr.md`**: clarified that sync vs.
+  async is not a config-file concern — the `implementation` field is
+  agnostic to handler kind; the choice is made entirely on the Rust side
+  via `register_sync_handler()` / `register_async_handler()`.
+- `AsyncCommandHandler` re-exported from `prelude`, with the same rustdoc
+  depth (contract, object-safety/Send+Sync notes, worked example) as
+  `CommandHandler`.
 
-**Breaking Changes**: None (feature is optional)
+### Testing
+- `tests/integration/async_token_test.rs`: end-to-end proof that an
+  `AsyncCommandHandler` reaches execution through the real dispatch path
+  (not just a direct `.execute()` call) — alias resolution, a required
+  command satisfied by an async handler alone, and elapsed-time assertions
+  confirming `block_on` genuinely awaits the handler rather than returning
+  early.
+- `examples/async_token_demo.rs`: runnable demo of the same handler with a
+  literal 10-second non-blocking delay (`futures_timer::Delay`, not
+  `std::thread::sleep` — a thread sleep here would block the executor
+  exactly like a sync call, defeating the purpose of the demo).
+- Deprecated-alias coverage: dedicated tests (`#[allow(deprecated)]`) in
+  `command_registry.rs` and `builder.rs` confirm `register()` /
+  `get_handler()` / `register_handler()` behave identically to their
+  renamed counterparts.
+- Existing test suites, examples, and doc examples across the crate
+  migrated to the new names to satisfy `cargo clippy -- -D warnings`.
+
+**Breaking Changes**: None (fully additive; the three renames above are
+deprecations, not removals — both names work until v1.0.0)
+
+**Roadmap follow-up**: `CommandHandler::execute`'s signature is expected to
+change under DD-024 (v0.6.0, repeatable options), batched with the removal
+of the deprecated names above at v1.0.0. Concurrent/cancellable async
+execution — explicitly out of scope here, since `ExecutionContext` is
+borrowed non-`'static` — would require its own future design decision if
+ever confirmed as a need.
 
 ---
 

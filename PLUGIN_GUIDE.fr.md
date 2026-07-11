@@ -496,7 +496,7 @@ Ils nécessitent le feature flag `wasm-plugins` :
 
 ```toml
 [dependencies]
-dynamic-cli = { version = "0.4.0", features = ["wasm-plugins"] }
+dynamic-cli = { version = "0.5.0", features = ["wasm-plugins"] }
 ```
 
 ### Enregistrer un plugin WASM

@@ -35,10 +35,10 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.4.0"
+dynamic-cli = "0.5.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.4.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.5.0", features = ["wasm-plugins"] }
 ```
 
 ### Exemple Basique
