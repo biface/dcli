@@ -119,7 +119,7 @@ fn main() -> dynamic_cli::Result<()> {
     CliBuilder::new()
         .config_file("commands.yaml")
         .context(Box::new(MyContext::default()))
-        .register_handler("greet_handler", Box::new(GreetCommand))
+        .register_sync_handler("greet_handler", Box::new(GreetCommand))
         .build()?
         .run()
 }
@@ -152,22 +152,22 @@ myapp > exit
 Extend an application with handlers that do not live in your own crate,
 without modifying `dynamic-cli` itself. Two mechanisms are available:
 
-| Mechanism | When to use it | Cost |
-|---|---|---|
-| **Static plugins** (`Plugin` trait) | Compiled into your binary | No `unsafe`, no extra dependency |
-| **WASM plugins** (`WasmPlugin`) | Distributed and loaded independently, sandboxed | `wasmtime` dependency, opt-in via `features = ["wasm-plugins"]` |
+| Mechanism                           | When to use it                                  | Cost                                                            |
+|-------------------------------------|-------------------------------------------------|-----------------------------------------------------------------|
+| **Static plugins** (`Plugin` trait) | Compiled into your binary                       | No `unsafe`, no extra dependency                                |
+| **WASM plugins** (`WasmPlugin`)     | Distributed and loaded independently, sandboxed | `wasmtime` dependency, opt-in via `features = ["wasm-plugins"]` |
 
 `dynamic-cli` ships `SystemPlugin` out of the box — `help`, `version`, and
 `exit` in one call:
 
-```rust
+```rust, ignore
 use dynamic_cli::plugin::SystemPlugin;
 
 CliBuilder::new()
     .config_file("commands.yaml")
     .context(Box::new(MyContext::default()))
     .register_plugin(Box::new(SystemPlugin::new()))
-    .register_handler("greet_handler", Box::new(GreetCommand))
+    .register_sync_handler("greet_handler", Box::new(GreetCommand))
     .build()?
     .run()
 ```
@@ -175,7 +175,7 @@ CliBuilder::new()
 WASM plugins run in a `wasmtime` sandbox, with no `unsafe` code on the host
 side:
 
-```rust
+```rust, ignore
 CliBuilder::new()
     .config_file("commands.yaml")
     .context(Box::new(MyContext::default()))

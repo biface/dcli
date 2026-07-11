@@ -343,10 +343,10 @@ fn main() -> Result<()> {
     CliBuilder::new()
         .config_file(config_path)
         .context(Box::new(FileManagerContext::default()))
-        .register_handler("list_handler", Box::new(ListCommand))
-        .register_handler("info_handler", Box::new(InfoCommand))
-        .register_handler("search_handler", Box::new(SearchCommand))
-        .register_handler("stats_handler", Box::new(StatsCommand))
+        .register_sync_handler("list_handler", Box::new(ListCommand))
+        .register_sync_handler("info_handler", Box::new(InfoCommand))
+        .register_sync_handler("search_handler", Box::new(SearchCommand))
+        .register_sync_handler("stats_handler", Box::new(StatsCommand))
         .build()?
         .run()
 }

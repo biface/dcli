@@ -81,15 +81,15 @@
 //! }
 //!
 //! // 4. Register the command
-//! registry.register(definition, Box::new(HelloCommand))?;
+//! registry.register_sync(definition, Box::new(HelloCommand))?;
 //!
 //! // 5. Use the registry
-//! if let Some(handler) = registry.get_handler("hello") {
+//! if let Some(handler) = registry.get_handler_sync("hello") {
 //!     // Execute the command
 //! }
 //!
 //! // Works with aliases too!
-//! if let Some(handler) = registry.get_handler("hi") {
+//! if let Some(handler) = registry.get_handler_sync("hi") {
 //!     // Same handler
 //! }
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
@@ -120,7 +120,7 @@
 //! # impl CommandHandler for TestCmd {
 //! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
-//! registry.register(definition, Box::new(TestCmd))?;
+//! registry.register_sync(definition, Box::new(TestCmd))?;
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
 //! ```
 //!
@@ -150,7 +150,7 @@
 //! # impl CommandHandler for SimCmd {
 //! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
-//! registry.register(definition, Box::new(SimCmd))?;
+//! registry.register_sync(definition, Box::new(SimCmd))?;
 //!
 //! // All these work:
 //! assert!(registry.contains("simulate"));
@@ -190,8 +190,8 @@
 //! # impl CommandHandler for TestCmd {
 //! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
-//! # registry.register(def1, Box::new(TestCmd)).unwrap();
-//! # registry.register(def2, Box::new(TestCmd)).unwrap();
+//! # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
+//! # registry.register_sync(def2, Box::new(TestCmd)).unwrap();
 //! // Get all commands for help text
 //! for cmd in registry.list_commands() {
 //!     println!("{}: {}", cmd.name, cmd.description);
@@ -229,9 +229,9 @@
 //! # impl CommandHandler for TestCmd {
 //! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
-//! # registry.register(def1, Box::new(TestCmd)).unwrap();
+//! # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
 //! // Try to register duplicate
-//! let result = registry.register(def2, Box::new(TestCmd));
+//! let result = registry.register_sync(def2, Box::new(TestCmd));
 //!
 //! match result {
 //!     Err(DynamicCliError::Registry(RegistryError::DuplicateRegistration { name, .. })) => {
@@ -256,7 +256,7 @@
 //!
 //! for cmd_def in config.commands {
 //!     let handler = create_handler(&cmd_def.implementation);
-//!     registry.register(cmd_def, handler)?;
+//!     registry.register_sync(cmd_def, handler)?;
 //! }
 //! ```
 //!
@@ -273,7 +273,7 @@
 //!     context: &mut dyn ExecutionContext,
 //!     args: &HashMap<String, String>,
 //! ) -> Result<()> {
-//!     let handler = registry.get_handler(command_name)
+//!     let handler = registry.get_handler_sync(command_name)
 //!         .ok_or_else(|| anyhow::anyhow!("Unknown command"))?;
 //!     
 //!     handler.execute(context, args)
@@ -297,7 +297,7 @@
 //!
 //! std::thread::spawn(move || {
 //!     // Safe to use in multiple threads
-//!     if let Some(handler) = registry_clone.get_handler("test") {
+//!     if let Some(handler) = registry_clone.get_handler_sync("test") {
 //!         // ...
 //!     }
 //! });
@@ -377,10 +377,10 @@ mod tests {
 
         // Register commands
         registry
-            .register(simulate_def, Box::new(TestHandler))
+            .register_sync(simulate_def, Box::new(TestHandler))
             .unwrap();
         registry
-            .register(validate_def, Box::new(TestHandler))
+            .register_sync(validate_def, Box::new(TestHandler))
             .unwrap();
 
         // Verify complete workflow
@@ -395,9 +395,9 @@ mod tests {
         assert_eq!(registry.resolve_name("val"), Some("validate"));
 
         // Get handlers
-        assert!(registry.get_handler("simulate").is_some());
-        assert!(registry.get_handler("sim").is_some());
-        assert!(registry.get_handler("val").is_some());
+        assert!(registry.get_handler_sync("simulate").is_some());
+        assert!(registry.get_handler_sync("sim").is_some());
+        assert!(registry.get_handler_sync("val").is_some());
 
         // Get definitions
         let sim_def = registry.get_definition("sim");
@@ -425,13 +425,13 @@ mod tests {
             implementation: "test_handler".to_string(),
         };
 
-        registry.register(def, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def, Box::new(TestHandler)).unwrap();
 
         // Executor pattern: resolve name, then get handler
         let user_input = "t"; // User types alias
 
         if let Some(canonical_name) = registry.resolve_name(user_input) {
-            if let Some(handler) = registry.get_handler(canonical_name) {
+            if let Some(handler) = registry.get_handler_sync(canonical_name) {
                 let mut context = TestContext;
                 let args = HashMap::new();
 
@@ -467,8 +467,8 @@ mod tests {
             implementation: "exit_handler".to_string(),
         };
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        registry.register(def2, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def2, Box::new(TestHandler)).unwrap();
 
         // Generate help text
         let mut help_text = String::from("Available commands:\n");
@@ -493,7 +493,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
 
         registry
-            .register(
+            .register_sync(
                 CommandDefinition {
                     name: "simulate".to_string(),
                     aliases: vec![],
@@ -508,7 +508,7 @@ mod tests {
             .unwrap();
 
         registry
-            .register(
+            .register_sync(
                 CommandDefinition {
                     name: "simulation".to_string(),
                     aliases: vec![],
@@ -552,11 +552,11 @@ mod tests {
 
         // First registration succeeds
         assert!(registry
-            .register(def.clone(), Box::new(TestHandler))
+            .register_sync(def.clone(), Box::new(TestHandler))
             .is_ok());
 
         // Second registration fails
-        let result = registry.register(def, Box::new(TestHandler));
+        let result = registry.register_sync(def, Box::new(TestHandler));
         assert!(result.is_err());
 
         // Error type is correct

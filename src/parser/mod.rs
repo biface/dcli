@@ -357,7 +357,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);
@@ -372,7 +372,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);
@@ -389,7 +389,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);
@@ -413,7 +413,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);
@@ -495,7 +495,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);
@@ -518,7 +518,7 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_comprehensive_command();
         registry
-            .register(definition, Box::new(IntegrationTestHandler))
+            .register_sync(definition, Box::new(IntegrationTestHandler))
             .unwrap();
 
         let parser = ReplParser::new(&registry);

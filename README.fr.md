@@ -119,7 +119,7 @@ fn main() -> dynamic_cli::Result<()> {
     CliBuilder::new()
         .config_file("commands.yaml")
         .context(Box::new(MonContexte::default()))
-        .register_handler("saluer_handler", Box::new(CommandeSaluer))
+        .register_sync_handler("saluer_handler", Box::new(CommandeSaluer))
         .build()?
         .run()
 }
@@ -153,22 +153,22 @@ monapp > exit
 propre crate, sans modifier `dynamic-cli` lui-même. Deux mécanismes sont
 disponibles :
 
-| Mécanisme | Quand l'utiliser | Coût |
-|---|---|---|
-| **Plugins statiques** (trait `Plugin`) | Compilés dans votre binaire | Aucun `unsafe`, aucune dépendance supplémentaire |
-| **Plugins WASM** (`WasmPlugin`) | Distribués et chargés indépendamment, sandboxés | Dépendance `wasmtime`, opt-in via `features = ["wasm-plugins"]` |
+| Mécanisme                              | Quand l'utiliser                                | Coût                                                            |
+|----------------------------------------|-------------------------------------------------|-----------------------------------------------------------------|
+| **Plugins statiques** (trait `Plugin`) | Compilés dans votre binaire                     | Aucun `unsafe`, aucune dépendance supplémentaire                |
+| **Plugins WASM** (`WasmPlugin`)        | Distribués et chargés indépendamment, sandboxés | Dépendance `wasmtime`, opt-in via `features = ["wasm-plugins"]` |
 
 `dynamic-cli` fournit `SystemPlugin` prêt à l'emploi — `help`, `version`
 et `exit` en un seul appel :
 
-```rust
+```rust, ignore
 use dynamic_cli::plugin::SystemPlugin;
 
 CliBuilder::new()
     .config_file("commands.yaml")
     .context(Box::new(MonContexte::default()))
     .register_plugin(Box::new(SystemPlugin::new()))
-    .register_handler("saluer_handler", Box::new(CommandeSaluer))
+    .register_sync_handler("saluer_handler", Box::new(CommandeSaluer))
     .build()?
     .run()
 ```
@@ -176,7 +176,7 @@ CliBuilder::new()
 Les plugins WASM s'exécutent dans une sandbox `wasmtime`, sans aucun code
 `unsafe` côté hôte :
 
-```rust
+```rust, ignore
 CliBuilder::new()
     .config_file("commands.yaml")
     .context(Box::new(MonContexte::default()))
