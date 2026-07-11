@@ -588,17 +588,20 @@ impl ReplInterface {
             let _ = self.editor.add_history_entry(line);
         }
 
-        let handler = self
-            .registry
-            .get_handler(&parsed.command_name)
-            .ok_or_else(|| {
-                DynamicCliError::Execution(ExecutionError::handler_not_found(
-                    &parsed.command_name,
-                    "unknown",
-                ))
-            })?;
-
-        handler.execute(&mut *self.context, &parsed.arguments)?;
+        // Sync tried first (unchanged behaviour), then async via `block_on`
+        // (DD-022). Safe here because the REPL loop is strictly sequential
+        // — one command finishes (readline blocks regardless) before the
+        // next line is even read, so there is no other async task waiting
+        // that `block_on` could starve.
+        if let Some(handler) = self.registry.get_handler_sync(&parsed.command_name) {
+            handler.execute(&mut *self.context, &parsed.arguments)?;
+        } else if let Some(handler) = self.registry.get_handler_async(&parsed.command_name) {
+            futures::executor::block_on(handler.execute(&mut *self.context, &parsed.arguments))?;
+        } else {
+            return Err(DynamicCliError::Execution(
+                ExecutionError::handler_not_found(&parsed.command_name, "unknown"),
+            ));
+        }
 
         Ok(())
     }
@@ -666,7 +669,7 @@ mod tests {
             implementation: "test_handler".to_string(),
         };
         registry
-            .register(
+            .register_sync(
                 cmd_def,
                 Box::new(TestHandler {
                     name: "test".to_string(),
@@ -803,7 +806,9 @@ mod tests {
             }
         }
 
-        registry.register(cmd_def, Box::new(GreetHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(GreetHandler))
+            .unwrap();
         let context = Box::new(TestContext::default());
         let mut repl =
             ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
@@ -1020,7 +1025,9 @@ mod tests {
                 Ok(())
             }
         }
-        registry.register(cmd_def, Box::new(DummyHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(DummyHandler))
+            .unwrap();
         let registry = Arc::new(registry);
 
         let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
@@ -1053,7 +1060,9 @@ mod tests {
                 Ok(())
             }
         }
-        registry.register(cmd_def, Box::new(DummyHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(DummyHandler))
+            .unwrap();
         let registry = Arc::new(registry);
 
         let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
@@ -1125,7 +1134,7 @@ mod tests {
 
         let mut registry = CommandRegistry::new();
         registry
-            .register(cmd_def.clone(), Box::new(LoginHandler))
+            .register_sync(cmd_def.clone(), Box::new(LoginHandler))
             .unwrap();
 
         let config = CommandsConfig {
