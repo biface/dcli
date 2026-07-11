@@ -57,6 +57,7 @@
 
 use crate::context::ExecutionContext;
 use crate::error::Result;
+use async_trait::async_trait;
 use std::collections::HashMap;
 
 /// Trait for command implementations
@@ -271,6 +272,90 @@ pub trait CommandHandler: Send + Sync {
     /// }
     /// ```
     fn validate(&self, _args: &HashMap<String, String>) -> Result<()> {
+        Ok(())
+    }
+}
+
+/// Async counterpart of [`CommandHandler`].
+///
+/// Additive to `CommandHandler` (see DD-022) — it does not replace it.
+/// Implementations use this trait when their command body needs to perform
+/// async I/O (network calls, streaming, etc.). The signatures deliberately
+/// mirror `CommandHandler` exactly, `execute`/`validate` aside from the
+/// `async` keyword, so that migrating a handler from sync to async is a
+/// mechanical change.
+///
+/// # Object Safety
+///
+/// Made `dyn`-compatible via `#[async_trait]` (which desugars `async fn` to
+/// a boxed, pinned future under the hood). Stored as `Box<dyn
+/// AsyncCommandHandler>` in the registry, exactly like `CommandHandler` is
+/// stored as `Box<dyn CommandHandler>`.
+///
+/// # Thread Safety
+///
+/// Same constraint as `CommandHandler`: `Send + Sync` is required so the
+/// handler can be shared across the registry and, transitively, across
+/// threads if the application needs it.
+///
+/// # Why a separate trait instead of an async `CommandHandler`?
+///
+/// Existing sync `CommandHandler` implementations (including downstream
+/// consumers) must keep compiling unchanged. See DD-022 for the full
+/// rationale, including why `tokio` is not a dependency of `dynamic-cli`
+/// itself and why driving the returned future via
+/// `futures::executor::block_on` at the dispatch site is safe.
+///
+/// # Example
+///
+/// ```
+/// use std::collections::HashMap;
+/// use async_trait::async_trait;
+/// use dynamic_cli::executor::AsyncCommandHandler;
+/// use dynamic_cli::context::ExecutionContext;
+/// use dynamic_cli::error::ExecutionError;
+/// use dynamic_cli::Result;
+///
+/// struct FetchCommand;
+///
+/// #[async_trait]
+/// impl AsyncCommandHandler for FetchCommand {
+///     async fn execute(
+///         &self,
+///         _context: &mut dyn ExecutionContext,
+///         args: &HashMap<String, String>,
+///     ) -> Result<()> {
+///         let url = args.get("url").ok_or_else(|| {
+///             ExecutionError::CommandFailed(anyhow::anyhow!("Missing 'url' argument"))
+///         })?;
+///         // Real implementations would `.await` an async HTTP call here.
+///         println!("Fetching {url}...");
+///         Ok(())
+///     }
+///
+///     async fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
+///         if !args.contains_key("url") {
+///             return Err(ExecutionError::CommandFailed(anyhow::anyhow!("url is required")).into());
+///         }
+///         Ok(())
+///     }
+/// }
+/// ```
+#[async_trait]
+pub trait AsyncCommandHandler: Send + Sync {
+    /// Async equivalent of [`CommandHandler::execute`]. Same contract:
+    /// receives the mutable execution context and the parsed arguments,
+    /// returns `Ok(())` on success or a `DynamicCliError` on failure.
+    async fn execute(
+        &self,
+        context: &mut dyn ExecutionContext,
+        args: &HashMap<String, String>,
+    ) -> Result<()>;
+
+    /// Async equivalent of [`CommandHandler::validate`]. Same contract and
+    /// same default (accepts all arguments) — override only for custom
+    /// validation logic.
+    async fn validate(&self, _args: &HashMap<String, String>) -> Result<()> {
         Ok(())
     }
 }
@@ -747,4 +832,158 @@ mod tests {
     /// ```
     #[allow(dead_code)]
     fn test_no_generic_methods_documentation() {}
+
+    // ============================================================================
+    // AsyncCommandHandler TESTS (DD-022)
+    // ============================================================================
+
+    /// Async command that writes to the test context, mirroring `HelloCommand`.
+    struct AsyncHelloCommand;
+
+    #[async_trait]
+    impl AsyncCommandHandler for AsyncHelloCommand {
+        async fn execute(
+            &self,
+            context: &mut dyn ExecutionContext,
+            args: &HashMap<String, String>,
+        ) -> Result<()> {
+            let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
+                ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
+            })?;
+            let name = args.get("name").map(|s| s.as_str()).unwrap_or("World");
+            ctx.state = format!("Hello, {}!", name);
+            Ok(())
+        }
+    }
+
+    /// Async command with custom validation, mirroring `ValidatedCommand`.
+    struct AsyncValidatedCommand;
+
+    #[async_trait]
+    impl AsyncCommandHandler for AsyncValidatedCommand {
+        async fn execute(
+            &self,
+            _context: &mut dyn ExecutionContext,
+            _args: &HashMap<String, String>,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        async fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
+            if !args.contains_key("count") {
+                return Err(
+                    ExecutionError::CommandFailed(anyhow::anyhow!("count is required")).into(),
+                );
+            }
+            Ok(())
+        }
+    }
+
+    /// Async command that fails during execution, mirroring `FailingCommand`.
+    struct AsyncFailingCommand;
+
+    #[async_trait]
+    impl AsyncCommandHandler for AsyncFailingCommand {
+        async fn execute(
+            &self,
+            _context: &mut dyn ExecutionContext,
+            _args: &HashMap<String, String>,
+        ) -> Result<()> {
+            Err(ExecutionError::CommandFailed(anyhow::anyhow!("Simulated async failure")).into())
+        }
+    }
+
+    #[test]
+    fn test_async_basic_execution() {
+        let handler = AsyncHelloCommand;
+        let mut context = TestContext::default();
+        let mut args = HashMap::new();
+        args.insert("name".to_string(), "Rust".to_string());
+
+        let result = futures::executor::block_on(handler.execute(&mut context, &args));
+
+        assert!(result.is_ok());
+        assert_eq!(context.state, "Hello, Rust!");
+    }
+
+    #[test]
+    fn test_async_default_validation_accepts_all() {
+        let handler = AsyncHelloCommand;
+        let mut args = HashMap::new();
+        args.insert("random".to_string(), "value".to_string());
+
+        let result = futures::executor::block_on(handler.validate(&args));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_async_custom_validation_missing_arg() {
+        let handler = AsyncValidatedCommand;
+        let args = HashMap::new();
+
+        let result = futures::executor::block_on(handler.validate(&args));
+
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("required"));
+    }
+
+    #[test]
+    fn test_async_custom_validation_success() {
+        let handler = AsyncValidatedCommand;
+        let mut args = HashMap::new();
+        args.insert("count".to_string(), "5".to_string());
+
+        let result = futures::executor::block_on(handler.validate(&args));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_async_execution_failure() {
+        let handler = AsyncFailingCommand;
+        let mut context = TestContext::default();
+        let args = HashMap::new();
+
+        let result = futures::executor::block_on(handler.execute(&mut context, &args));
+
+        assert!(result.is_err());
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(err_msg.contains("Simulated async failure"));
+    }
+
+    #[test]
+    fn test_async_trait_object_usage() {
+        // Verify that AsyncCommandHandler can be used as a trait object —
+        // the core object-safety guarantee DD-022 depends on.
+        let handler: Box<dyn AsyncCommandHandler> = Box::new(AsyncHelloCommand);
+        let mut context = TestContext::default();
+        let mut args = HashMap::new();
+        args.insert("name".to_string(), "TraitObject".to_string());
+
+        let result = futures::executor::block_on(handler.execute(&mut context, &args));
+
+        assert!(result.is_ok());
+        assert_eq!(context.state, "Hello, TraitObject!");
+    }
+
+    #[test]
+    fn test_async_send_sync_requirement() {
+        // Verifies AsyncCommandHandler is Send + Sync by sharing it across
+        // threads via Arc — same pattern as test_send_sync_requirement above.
+        let handler: Arc<dyn AsyncCommandHandler> = Arc::new(AsyncHelloCommand);
+        let handler_clone = handler.clone();
+
+        let _ = std::thread::spawn(move || {
+            let _h = handler_clone;
+        });
+    }
+
+    #[test]
+    fn test_async_object_safety_compile_time() {
+        // If this compiles, AsyncCommandHandler is dyn-compatible.
+        fn _accepts_trait_object(_: &dyn AsyncCommandHandler) {}
+        _accepts_trait_object(&AsyncHelloCommand);
+    }
 }

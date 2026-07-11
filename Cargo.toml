@@ -24,6 +24,9 @@ exclude = [
 wasm-plugins = ["dep:wasmtime"]
 
 [dependencies]
+# Asynchronus and I/O commands
+async-trait = "0.1"
+futures = "0.3"
 # Serialization and configuration parsing
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
