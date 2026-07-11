@@ -37,7 +37,7 @@
 //! CliBuilder::new()
 //!     .config_file("commands.yaml")
 //!     .context(Box::new(MyContext::default()))
-//!     .register_handler("hello_handler", Box::new(HelloCommand))
+//!     .register_sync_handler("hello_handler", Box::new(HelloCommand))
 //!     .build()?
 //!     .run()
 //! # }
@@ -47,7 +47,7 @@ use crate::config::loader::load_config;
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{ConfigError, DynamicCliError, Result};
-use crate::executor::CommandHandler;
+use crate::executor::{AsyncCommandHandler, CommandHandler};
 use crate::help::{DefaultHelpFormatter, HelpFormatter};
 use crate::interface::{CliInterface, ReplInterface};
 use crate::plugin::Plugin;
@@ -86,7 +86,7 @@ use std::path::PathBuf;
 /// let app = CliBuilder::new()
 ///     .config_file("commands.yaml")
 ///     .context(Box::new(MyContext::default()))
-///     .register_handler("my_handler", Box::new(MyHandler))
+///     .register_sync_handler("my_handler", Box::new(MyHandler))
 ///     .prompt("myapp")
 ///     .build()?;
 /// # Ok(())
@@ -104,6 +104,9 @@ pub struct CliBuilder {
 
     /// Registered command handlers (name -> handler)
     handlers: HashMap<String, Box<dyn CommandHandler>>,
+
+    /// Registered asynchronous command handler (name -> async_handler)
+    async_handlers: HashMap<String, Box<dyn AsyncCommandHandler>>,
 
     /// Registered plugins, expanded into `handlers` during `build()`
     plugins: Vec<Box<dyn Plugin>>,
@@ -131,6 +134,7 @@ impl CliBuilder {
             config: None,
             context: None,
             handlers: HashMap::new(),
+            async_handlers: HashMap::new(),
             plugins: Vec::new(),
             prompt: None,
             help_formatter: None,
@@ -218,10 +222,15 @@ impl CliBuilder {
         self
     }
 
-    /// Register a command handler
+    /// Register a (sync) command handler
     ///
     /// Associates a handler with the command's implementation name from the config.
     /// The name must match the `implementation` field in the command definition.
+    ///
+    /// Renamed from `register_handler()` in v0.5.0 for symmetry with
+    /// [`register_async_handler`][Self::register_async_handler].
+    /// `register_handler()` remains available as a deprecated alias until
+    /// v1.0.0 (DD-022).
     ///
     /// # Arguments
     ///
@@ -248,14 +257,78 @@ impl CliBuilder {
     /// }
     ///
     /// let builder = CliBuilder::new()
-    ///     .register_handler("my_command", Box::new(MyCommand));
+    ///     .register_sync_handler("my_command", Box::new(MyCommand));
     /// ```
-    pub fn register_handler(
+    pub fn register_sync_handler(
         mut self,
         name: impl Into<String>,
         handler: Box<dyn CommandHandler>,
     ) -> Self {
         self.handlers.insert(name.into(), handler);
+        self
+    }
+
+    /// Deprecated alias for [`register_sync_handler`][Self::register_sync_handler].
+    /// Scheduled for removal in v1.0.0 alongside `CommandRegistry::register`.
+    #[deprecated(
+        since = "0.5.0",
+        note = "renamed to `register_sync_handler` for symmetry with \
+                `register_async_handler`; will be removed in 1.0.0"
+    )]
+    pub fn register_handler(
+        self,
+        name: impl Into<String>,
+        handler: Box<dyn CommandHandler>,
+    ) -> Self {
+        self.register_sync_handler(name.into(), handler)
+    }
+
+    /// Register an async command handler (DD-022)
+    ///
+    /// Additive counterpart of [`register_sync_handler`][Self::register_sync_handler].
+    /// Associates an async handler with the command's implementation name
+    /// from the config, exactly like its sync counterpart. Registering both
+    /// a sync and an async handler for the *same* implementation name is
+    /// detected as an error at [`build()`][Self::build] time, not here —
+    /// this method, like `register_sync_handler`, always succeeds (it just
+    /// stores the handler for `build()` to consume).
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Implementation name from the configuration
+    /// * `handler` - Boxed async command handler implementing `AsyncCommandHandler`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::prelude::*;
+    /// use dynamic_cli::executor::AsyncCommandHandler;
+    /// use std::collections::HashMap;
+    /// use async_trait::async_trait;
+    ///
+    /// struct FetchCommand;
+    ///
+    /// #[async_trait]
+    /// impl AsyncCommandHandler for FetchCommand {
+    ///     async fn execute(
+    ///         &self,
+    ///         _ctx: &mut dyn ExecutionContext,
+    ///         _args: &HashMap<String, String>,
+    ///     ) -> dynamic_cli::Result<()> {
+    ///         println!("Fetched!");
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// let builder = CliBuilder::new()
+    ///     .register_async_handler("fetch_command", Box::new(FetchCommand));
+    /// ```
+    pub fn register_async_handler(
+        mut self,
+        name: impl Into<String>,
+        handler: Box<dyn AsyncCommandHandler>,
+    ) -> Self {
+        self.async_handlers.insert(name.into(), handler);
         self
     }
 
@@ -265,12 +338,13 @@ impl CliBuilder {
     /// [`build()`][Self::build], each handler declared by the plugin is
     /// merged into the handler map. Conflicts with already-registered
     /// handler names (whether from another plugin or from
-    /// [`register_handler`][Self::register_handler]) produce a build-time
-    /// error.
+    /// [`register_sync_handler`][Self::register_sync_handler]) produce a
+    /// build-time error.
     ///
     /// The YAML config remains the sole source of truth for command
     /// definitions. Plugin handlers are matched by their `implementation`
-    /// name, exactly as with [`register_handler`][Self::register_handler].
+    /// name, exactly as with [`register_sync_handler`][Self::register_sync_handler].
+    /// Plugins remain sync-only for now — out of scope for DD-022.
     ///
     /// # Example
     ///
@@ -437,7 +511,7 @@ impl CliBuilder {
     /// let app = CliBuilder::new()
     ///     .config_file("commands.yaml")
     ///     .context(Box::new(MyContext::default()))
-    ///     .register_handler("handler", Box::new(MyHandler))
+    ///     .register_sync_handler("handler", Box::new(MyHandler))
     ///     .build()?;
     ///
     /// // Now app is ready to run
@@ -486,7 +560,7 @@ impl CliBuilder {
                         ),
                         path: None,
                         suggestion: Some(format!(
-                            "Remove the duplicate call to register_handler(\"{}\") \
+                            "Remove the duplicate call to register_sync_handler(\"{}\") \
                              or rename the implementation in your YAML config.",
                             impl_name
                         )),
@@ -497,15 +571,39 @@ impl CliBuilder {
         }
 
         for command_def in &config.commands {
-            // Find handler for this command
-            let handler = self.handlers.remove(&command_def.implementation);
+            // Find handlers for this command — sync and async are looked up
+            // independently; at most one should be present (see conflict
+            // check below).
+            let sync_handler = self.handlers.remove(&command_def.implementation);
+            let async_handler = self.async_handlers.remove(&command_def.implementation);
+
+            // A command's implementation name must resolve to exactly one
+            // handler kind. Registering both is a configuration mistake,
+            // not something to resolve silently (e.g. "sync wins") — that
+            // would hide a bug where the same name was registered twice
+            // with different handler types.
+            if sync_handler.is_some() && async_handler.is_some() {
+                return Err(DynamicCliError::Config(ConfigError::InvalidSchema {
+                    reason: format!(
+                        "Command '{}' has both a sync and an async handler \
+                         registered for implementation '{}'.",
+                        command_def.name, command_def.implementation
+                    ),
+                    path: None,
+                    suggestion: Some(
+                        "Use either register_sync_handler() or \
+                         register_async_handler() for this implementation, not both."
+                            .to_string(),
+                    ),
+                }));
+            }
 
             // Check if handler is required
-            if command_def.required && handler.is_none() {
+            if command_def.required && sync_handler.is_none() && async_handler.is_none() {
                 return Err(DynamicCliError::Config(ConfigError::InvalidSchema {
                     reason: format!(
                         "Required command '{}' has no registered handler (implementation: '{}'). \
-                        Use register_handler() to register it.",
+                        Use register_sync_handler() or register_async_handler() to register it.",
                         command_def.name, command_def.implementation
                     ),
                     path: None,
@@ -513,9 +611,11 @@ impl CliBuilder {
                 }));
             }
 
-            // Register command if handler exists
-            if let Some(handler) = handler {
-                registry.register(command_def.clone(), handler)?;
+            // Register command with whichever handler kind was found.
+            if let Some(handler) = sync_handler {
+                registry.register_sync(command_def.clone(), handler)?;
+            } else if let Some(handler) = async_handler {
+                registry.register_async(command_def.clone(), handler)?;
             }
         }
 
@@ -568,7 +668,7 @@ impl Default for CliBuilder {
 /// let app = CliBuilder::new()
 ///     .config_file("commands.yaml")
 ///     .context(Box::new(MyContext::default()))
-///     .register_handler("handler", Box::new(MyHandler))
+///     .register_sync_handler("handler", Box::new(MyHandler))
 ///     .build()?;
 ///
 /// // Auto-detect mode (CLI if args provided, REPL otherwise)
@@ -635,7 +735,7 @@ impl CliApp {
     /// # let app = CliBuilder::new()
     /// #     .config_file("commands.yaml")
     /// #     .context(Box::new(MyContext::default()))
-    /// #     .register_handler("handler", Box::new(MyHandler))
+    /// #     .register_sync_handler("handler", Box::new(MyHandler))
     /// #     .build()?;
     /// // Run with specific arguments
     /// app.run_cli(vec!["command".to_string(), "arg1".to_string()])
@@ -693,7 +793,7 @@ impl CliApp {
     /// # let app = CliBuilder::new()
     /// #     .config_file("commands.yaml")
     /// #     .context(Box::new(MyContext::default()))
-    /// #     .register_handler("handler", Box::new(MyHandler))
+    /// #     .register_sync_handler("handler", Box::new(MyHandler))
     /// #     .build()?;
     /// // Start interactive REPL
     /// app.run_repl()
@@ -741,7 +841,7 @@ impl CliApp {
     /// # let app = CliBuilder::new()
     /// #     .config_file("commands.yaml")
     /// #     .context(Box::new(MyContext::default()))
-    /// #     .register_handler("handler", Box::new(MyHandler))
+    /// #     .register_sync_handler("handler", Box::new(MyHandler))
     /// #     .build()?;
     /// // Auto-detect: CLI if args, REPL if no args
     /// app.run()
@@ -788,6 +888,24 @@ mod tests {
 
     impl CommandHandler for TestHandler {
         fn execute(
+            &self,
+            context: &mut dyn ExecutionContext,
+            _args: &HashMap<String, String>,
+        ) -> Result<()> {
+            let ctx =
+                crate::context::downcast_mut::<TestContext>(context).expect("Failed to downcast");
+            ctx.executed.push(self.name.clone());
+            Ok(())
+        }
+    }
+
+    struct TestAsyncHandler {
+        name: String,
+    }
+
+    #[async_trait::async_trait]
+    impl AsyncCommandHandler for TestAsyncHandler {
+        async fn execute(
             &self,
             context: &mut dyn ExecutionContext,
             _args: &HashMap<String, String>,
@@ -848,9 +966,26 @@ mod tests {
             name: "test".to_string(),
         });
 
+        let builder = CliBuilder::new().register_sync_handler("test_handler", handler);
+
+        assert_eq!(builder.handlers.len(), 1);
+    }
+
+    /// Deprecated-alias coverage (DD-022 companion issue): `register_handler()`
+    /// must keep behaving exactly like `register_sync_handler()` until it's
+    /// removed in v1.0.0. This is the only place in the crate allowed to
+    /// call it directly.
+    #[test]
+    #[allow(deprecated)]
+    fn test_deprecated_register_handler_alias_still_works() {
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
+
         let builder = CliBuilder::new().register_handler("test_handler", handler);
 
         assert_eq!(builder.handlers.len(), 1);
+        assert!(builder.async_handlers.is_empty());
     }
 
     #[test]
@@ -871,7 +1006,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build();
 
         assert!(app.is_ok());
@@ -936,7 +1071,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .prompt("test")
             .build();
 
@@ -954,7 +1089,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build()
             .unwrap();
 
@@ -974,7 +1109,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build()
             .unwrap();
 
@@ -993,13 +1128,118 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .prompt("custom")
             .build()
             .unwrap();
 
         // Prompt should be overridden
         assert_eq!(app.prompt, "custom");
+    }
+
+    // ============================================================================
+    // async_handlers / register_async_handler / build() TESTS (DD-022)
+    // ============================================================================
+
+    #[test]
+    fn test_builder_with_async_handler() {
+        let handler = Box::new(TestAsyncHandler {
+            name: "test".to_string(),
+        });
+
+        let builder = CliBuilder::new().register_async_handler("test_handler", handler);
+
+        assert_eq!(builder.async_handlers.len(), 1);
+        assert!(builder.handlers.is_empty());
+    }
+
+    /// The core gap this session closes: an async handler registered via
+    /// `register_async_handler()` must actually reach the built registry —
+    /// previously `build()` only ever drained `self.handlers`.
+    #[test]
+    fn test_builder_build_with_async_handler_only() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestAsyncHandler {
+            name: "test".to_string(),
+        });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_async_handler("test_handler", handler)
+            .build();
+
+        assert!(app.is_ok());
+    }
+
+    /// Registering both a sync and an async handler for the same
+    /// implementation name must fail at build() time — this is the
+    /// conflict check `build()` didn't have before this session.
+    #[test]
+    fn test_builder_build_sync_and_async_conflict() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let sync_handler = Box::new(TestHandler {
+            name: "sync".to_string(),
+        });
+        let async_handler = Box::new(TestAsyncHandler {
+            name: "async".to_string(),
+        });
+
+        let result = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_sync_handler("test_handler", sync_handler)
+            .register_async_handler("test_handler", async_handler)
+            .build();
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DynamicCliError::Config(ConfigError::InvalidSchema { reason, .. }) => {
+                assert!(reason.contains("both a sync and an async handler"));
+            }
+            other => panic!("Expected InvalidSchema error, got: {:?}", other),
+        }
+    }
+
+    /// A required command satisfied only by an async handler must not be
+    /// reported as "missing" — the required-handler check must look at
+    /// both maps, not just `self.handlers`.
+    #[test]
+    fn test_builder_build_required_command_satisfied_by_async_handler() {
+        let config = create_test_config(); // "test" command is `required: true`
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestAsyncHandler {
+            name: "test".to_string(),
+        });
+
+        let result = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_async_handler("test_handler", handler)
+            .build();
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_cli_app_run_cli_with_async_handler() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestAsyncHandler {
+            name: "test".to_string(),
+        });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_async_handler("test_handler", handler)
+            .build()
+            .unwrap();
+
+        let result = app.run_cli(vec!["test".to_string()]);
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -1023,7 +1263,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build()
             .unwrap();
 
@@ -1043,7 +1283,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build()
             .unwrap();
 
@@ -1063,7 +1303,7 @@ mod tests {
         let app = CliBuilder::new()
             .config(config)
             .context(context)
-            .register_handler("test_handler", handler)
+            .register_sync_handler("test_handler", handler)
             .build()
             .unwrap();
 
