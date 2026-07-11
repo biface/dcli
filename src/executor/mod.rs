@@ -275,7 +275,7 @@
 pub mod traits;
 
 // Public re-exports for convenience
-pub use traits::CommandHandler;
+pub use traits::{AsyncCommandHandler, CommandHandler};
 
 #[cfg(test)]
 mod tests {

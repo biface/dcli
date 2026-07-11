@@ -47,10 +47,10 @@
 //! }
 //!
 //! // Register the command
-//! registry.register(definition, Box::new(HelloCommand))?;
+//! registry.register_sync(definition, Box::new(HelloCommand))?;
 //!
 //! // Retrieve by name
-//! assert!(registry.get_handler("hello").is_some());
+//! assert!(registry.get_handler_sync("hello").is_some());
 //!
 //! // Retrieve by alias
 //! assert_eq!(registry.resolve_name("hi"), Some("hello"));
@@ -59,9 +59,20 @@
 
 use crate::config::schema::CommandDefinition;
 use crate::error::{RegistryError, Result};
-use crate::executor::CommandHandler;
+use crate::executor::{AsyncCommandHandler, CommandHandler};
 use std::collections::HashMap;
 
+/// Internal storage for a single registered command's handler.
+///
+/// Private — never leaks into the public API. `get_handler_sync()` /
+/// `get_handler_async()` return `None` when queried against the wrong
+/// variant, so callers never need to know this enum exists. See DD-022 for
+/// the rationale behind unifying sync and async storage in one map instead
+/// of two parallel `HashMap`s.
+enum StoredHandler {
+    Sync(Box<dyn CommandHandler>),
+    Async(Box<dyn AsyncCommandHandler>),
+}
 /// Central registry for commands and their handlers
 ///
 /// The registry stores all registered commands along with their definitions
@@ -97,10 +108,10 @@ use std::collections::HashMap;
 /// # impl CommandHandler for TestCommand {
 /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
 /// # }
-/// registry.register(definition, Box::new(TestCommand))?;
+/// registry.register_sync(definition, Box::new(TestCommand))?;
 ///
 /// // Use throughout the application
-/// if let Some(handler) = registry.get_handler("test") {
+/// if let Some(handler) = registry.get_handler_sync("test") {
 ///     // Execute the command
 /// }
 /// # Ok::<(), dynamic_cli::error::DynamicCliError>(())
@@ -109,7 +120,7 @@ pub struct CommandRegistry {
     /// Map of command names to their data
     /// Key: canonical command name
     /// Value: (CommandDefinition, Box<dyn CommandHandler>)
-    commands: HashMap<String, (CommandDefinition, Box<dyn CommandHandler>)>,
+    commands: HashMap<String, (CommandDefinition, StoredHandler)>,
 
     /// Map of aliases to canonical command names
     /// Key: alias
@@ -137,10 +148,59 @@ impl CommandRegistry {
         }
     }
 
-    /// Register a command with its handler
+    /// Checks that `name` is free to use as a command name or alias.
+    ///
+    /// Shared by [`register_sync`][Self::register_sync] and
+    /// [`register_async`][Self::register_async] — a name can never belong
+    /// to both a sync and an async handler, nor be duplicated as a command
+    /// or an alias. Checked against the single unified `commands` map, so
+    /// this one call covers both storage kinds.
+    ///
+    /// # Errors
+    ///
+    /// - [`RegistryError::DuplicateRegistration`] if `name` is already a
+    ///   registered command (sync or async).
+    /// - [`RegistryError::DuplicateAlias`] if `name` is already registered
+    ///   as an alias of another command.
+    fn check_name_available(&self, name: &str) -> Result<()> {
+        if self.commands.contains_key(name) {
+            return Err(RegistryError::DuplicateRegistration {
+                name: name.to_string(),
+                suggestion: None,
+            }
+            .into());
+        }
+
+        if let Some(existing_cmd) = self.aliases.get(name) {
+            return Err(RegistryError::DuplicateAlias {
+                alias: name.to_string(),
+                existing_command: existing_cmd.clone(),
+                suggestion: None,
+            }
+            .into());
+        }
+
+        Ok(())
+    }
+
+    /// Registers every alias declared in `definition` as pointing to
+    /// `definition.name`. Called by both `register_sync` and
+    /// `register_async` after `check_name_available` has confirmed there is
+    /// no conflict.
+    fn insert_aliases(&mut self, definition: CommandDefinition) {
+        for alias in &definition.aliases {
+            self.aliases.insert(alias.clone(), definition.name.clone());
+        }
+    }
+
+    /// Register a command with its (sync) handler
     ///
     /// This method registers a command definition along with its handler.
     /// It also registers all aliases for the command.
+    ///
+    /// Renamed from `register()` in v0.5.0 for symmetry with
+    /// [`register_async`][Self::register_async]. `register()` remains
+    /// available as a deprecated alias until v1.0.0 (DD-022).
     ///
     /// # Arguments
     ///
@@ -151,7 +211,7 @@ impl CommandRegistry {
     ///
     /// - `Ok(())` if registration succeeds
     /// - `Err(RegistryError)` if:
-    ///   - A command with the same name is already registered
+    ///   - A command with the same name is already registered (sync or async)
     ///   - An alias conflicts with an existing command or alias
     ///
     /// # Errors
@@ -191,73 +251,111 @@ impl CommandRegistry {
     /// }
     ///
     /// // Register the command
-    /// registry.register(definition, Box::new(SimCommand))?;
+    /// registry.register_sync(definition, Box::new(SimCommand))?;
     ///
     /// // Can now access by name or alias
-    /// assert!(registry.get_handler("simulate").is_some());
+    /// assert!(registry.get_handler_sync("simulate").is_some());
     /// assert_eq!(registry.resolve_name("sim"), Some("simulate"));
     /// # Ok::<(), dynamic_cli::error::DynamicCliError>(())
     /// ```
+    pub fn register_sync(
+        &mut self,
+        definition: CommandDefinition,
+        handler: Box<dyn CommandHandler>,
+    ) -> Result<()> {
+        self.check_name_available(&definition.name)?;
+        for alias in &definition.aliases {
+            self.check_name_available(alias)?;
+        }
+        self.insert_aliases(definition.clone());
+        self.commands.insert(
+            definition.name.clone(),
+            (definition, StoredHandler::Sync(handler)),
+        );
+        Ok(())
+    }
+
+    /// Deprecated alias for [`register_sync`][Self::register_sync].
+    ///
+    /// Kept for backward compatibility with pre-0.5.0 consumers (e.g.
+    /// `chrom-rs`). Scheduled for removal in v1.0.0, batched with the other
+    /// breaking changes tracked in the v1.0.0 API cleanup issue.
+    #[deprecated(
+        since = "0.5.0",
+        note = "renamed to `register_sync` for symmetry with `register_async`; \
+                will be removed in 1.0.0"
+    )]
     pub fn register(
         &mut self,
         definition: CommandDefinition,
         handler: Box<dyn CommandHandler>,
     ) -> Result<()> {
-        let cmd_name = &definition.name;
+        self.register_sync(definition, handler)
+    }
 
-        // Check if command name is already registered
-        if self.commands.contains_key(cmd_name) {
-            return Err(RegistryError::DuplicateRegistration {
-                name: cmd_name.clone(),
-                suggestion: None,
-            }
-            .into());
-        }
-
-        // Check if command name conflicts with existing alias
-        if self.aliases.contains_key(cmd_name) {
-            let existing_cmd = self.aliases.get(cmd_name).unwrap();
-            return Err(RegistryError::DuplicateAlias {
-                alias: cmd_name.clone(),
-                existing_command: existing_cmd.clone(),
-                suggestion: None,
-            }
-            .into());
-        }
-
-        // Check all aliases for conflicts
+    /// Register a command with its async handler (DD-022)
+    ///
+    /// Additive counterpart of [`register_sync`][Self::register_sync] —
+    /// same conflict-detection rules (checked against both sync and async
+    /// registrations sharing the unified internal storage, plus aliases),
+    /// same alias handling.
+    ///
+    /// # Errors
+    ///
+    /// - [`RegistryError::DuplicateRegistration`] if the command name already exists
+    /// - [`RegistryError::DuplicateAlias`] if an alias is already in use
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::registry::CommandRegistry;
+    /// use dynamic_cli::config::schema::CommandDefinition;
+    /// use dynamic_cli::executor::AsyncCommandHandler;
+    /// use std::collections::HashMap;
+    /// use async_trait::async_trait;
+    ///
+    /// let mut registry = CommandRegistry::new();
+    ///
+    /// let definition = CommandDefinition {
+    ///     name: "fetch".to_string(),
+    ///     aliases: vec![],
+    ///     description: "Fetch remote data".to_string(),
+    ///     required: false,
+    ///     arguments: vec![],
+    ///     options: vec![],
+    ///     implementation: "fetch_handler".to_string(),
+    /// };
+    ///
+    /// struct FetchCommand;
+    /// #[async_trait]
+    /// impl AsyncCommandHandler for FetchCommand {
+    ///     async fn execute(
+    ///         &self,
+    ///         _: &mut dyn dynamic_cli::context::ExecutionContext,
+    ///         _: &HashMap<String, String>,
+    ///     ) -> dynamic_cli::Result<()> {
+    ///         Ok(())
+    ///     }
+    /// }
+    ///
+    /// registry.register_async(definition, Box::new(FetchCommand))?;
+    /// assert!(registry.get_handler_async("fetch").is_some());
+    /// # Ok::<(), dynamic_cli::error::DynamicCliError>(())
+    /// ```
+    pub fn register_async(
+        &mut self,
+        definition: CommandDefinition,
+        handler: Box<dyn AsyncCommandHandler>,
+    ) -> Result<()> {
+        self.check_name_available(&definition.name)?;
         for alias in &definition.aliases {
-            // Check if alias conflicts with existing command name
-            if self.commands.contains_key(alias) {
-                return Err(RegistryError::DuplicateAlias {
-                    alias: alias.clone(),
-                    existing_command: alias.clone(),
-                    suggestion: None,
-                }
-                .into());
-            }
-
-            // Check if alias conflicts with existing alias
-            if self.aliases.contains_key(alias) {
-                let existing_cmd = self.aliases.get(alias).unwrap();
-                return Err(RegistryError::DuplicateAlias {
-                    alias: alias.clone(),
-                    existing_command: existing_cmd.clone(),
-                    suggestion: None,
-                }
-                .into());
-            }
+            self.check_name_available(alias)?;
         }
-
-        // Register all aliases
-        for alias in &definition.aliases {
-            self.aliases.insert(alias.clone(), cmd_name.clone());
-        }
-
-        // Register the command
-        self.commands
-            .insert(cmd_name.clone(), (definition, handler));
-
+        self.insert_aliases(definition.clone());
+        self.commands.insert(
+            definition.name.clone(),
+            (definition, StoredHandler::Async(handler)),
+        );
         Ok(())
     }
 
@@ -299,7 +397,7 @@ impl CommandRegistry {
     /// # impl CommandHandler for TestCmd {
     /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
-    /// # registry.register(definition, Box::new(TestCmd)).unwrap();
+    /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// // Resolve command name
     /// assert_eq!(registry.resolve_name("hello"), Some("hello"));
     ///
@@ -352,7 +450,7 @@ impl CommandRegistry {
     /// # impl CommandHandler for TestCmd {
     /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
-    /// # registry.register(definition, Box::new(TestCmd)).unwrap();
+    /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// // Get by name
     /// if let Some(def) = registry.get_definition("test") {
     ///     assert_eq!(def.name, "test");
@@ -369,10 +467,17 @@ impl CommandRegistry {
         self.commands.get(canonical_name).map(|(def, _)| def)
     }
 
-    /// Get the handler of a command by name or alias
+    /// Get the (sync) handler of a command by name or alias
     ///
-    /// This is the primary method used during command execution to
-    /// retrieve the handler that will execute the command.
+    /// This is the primary method used during CLI/REPL dispatch to
+    /// retrieve the handler that will execute the command. Returns `None`
+    /// both when the name isn't registered at all, and when it resolves to
+    /// an *async* handler (query [`get_handler_async`][Self::get_handler_async]
+    /// instead in that case) — dispatch sites try both in sequence.
+    ///
+    /// Renamed from `get_handler()` in v0.5.0 for symmetry with
+    /// [`get_handler_async`][Self::get_handler_async]. `get_handler()`
+    /// remains available as a deprecated alias until v1.0.0 (DD-022).
     ///
     /// # Arguments
     ///
@@ -380,8 +485,8 @@ impl CommandRegistry {
     ///
     /// # Returns
     ///
-    /// - `Some(&Box<dyn CommandHandler>)` if the command exists
-    /// - `None` if the command is not registered
+    /// - `Some(&dyn CommandHandler)` if a sync handler is registered under this name
+    /// - `None` if unregistered, or if registered as an async handler
     ///
     /// # Example
     ///
@@ -404,26 +509,78 @@ impl CommandRegistry {
     /// # impl CommandHandler for ExecCmd {
     /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
-    /// # registry.register(definition, Box::new(ExecCmd)).unwrap();
+    /// # registry.register_sync(definition, Box::new(ExecCmd)).unwrap();
     /// // Get handler by name
-    /// if let Some(handler) = registry.get_handler("exec") {
+    /// if let Some(handler) = registry.get_handler_sync("exec") {
     ///     // Use handler for execution
     /// }
     ///
     /// // Get handler by alias
-    /// if let Some(handler) = registry.get_handler("x") {
+    /// if let Some(handler) = registry.get_handler_sync("x") {
     ///     // Same handler
     /// }
     /// ```
-    // The return type &Box<dyn CommandHandler> is intentional: callers receive a
-    // reference to the owned box, which preserves the indirection needed for
+    // The return type &dyn CommandHandler is intentional: callers receive a
+    // reference to the handler, which preserves the indirection needed for
     // dynamic dispatch without transferring ownership.
-    #[allow(clippy::borrowed_box)]
-    pub fn get_handler(&self, name: &str) -> Option<&Box<dyn CommandHandler>> {
-        let canonical_name = self.resolve_name(name)?;
-        self.commands
-            .get(canonical_name)
-            .map(|(_, handler)| handler)
+    pub fn get_handler_sync(&self, name: &str) -> Option<&dyn CommandHandler> {
+        let canonical = self.resolve_name(name)?;
+        match &self.commands.get(canonical)?.1 {
+            StoredHandler::Sync(h) => Some(h.as_ref()),
+            StoredHandler::Async(_) => None,
+        }
+    }
+
+    /// Deprecated alias for [`get_handler_sync`][Self::get_handler_sync].
+    /// Scheduled for removal in v1.0.0.
+    #[deprecated(
+        since = "0.5.0",
+        note = "renamed to `get_handler_sync` for symmetry with `get_handler_async`; \
+                will be removed in 1.0.0"
+    )]
+    pub fn get_handler(&self, name: &str) -> Option<&dyn CommandHandler> {
+        self.get_handler_sync(name)
+    }
+
+    /// Get the async handler of a command by name or alias (DD-022)
+    ///
+    /// Additive counterpart of [`get_handler_sync`][Self::get_handler_sync].
+    /// Returns `None` both when the name isn't registered at all, and when
+    /// it resolves to a *sync* handler.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use dynamic_cli::registry::CommandRegistry;
+    /// # use dynamic_cli::config::schema::CommandDefinition;
+    /// # use dynamic_cli::executor::AsyncCommandHandler;
+    /// # use std::collections::HashMap;
+    /// # use async_trait::async_trait;
+    /// # let mut registry = CommandRegistry::new();
+    /// # let definition = CommandDefinition {
+    /// #     name: "fetch".to_string(),
+    /// #     aliases: vec![],
+    /// #     description: "".to_string(),
+    /// #     required: false,
+    /// #     arguments: vec![],
+    /// #     options: vec![],
+    /// #     implementation: "".to_string(),
+    /// # };
+    /// # struct FetchCmd;
+    /// # #[async_trait]
+    /// # impl AsyncCommandHandler for FetchCmd {
+    /// #     async fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// # }
+    /// # registry.register_async(definition, Box::new(FetchCmd)).unwrap();
+    /// assert!(registry.get_handler_async("fetch").is_some());
+    /// assert!(registry.get_handler_sync("fetch").is_none()); // wrong accessor
+    /// ```
+    pub fn get_handler_async(&self, name: &str) -> Option<&dyn AsyncCommandHandler> {
+        let canonical = self.resolve_name(name)?;
+        match &self.commands.get(canonical)?.1 {
+            StoredHandler::Async(h) => Some(h.as_ref()),
+            StoredHandler::Sync(_) => None,
+        }
     }
 
     /// List all registered command definitions
@@ -465,8 +622,8 @@ impl CommandRegistry {
     /// # impl CommandHandler for TestCmd {
     /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
-    /// # registry.register(def1, Box::new(TestCmd)).unwrap();
-    /// # registry.register(def2, Box::new(TestCmd)).unwrap();
+    /// # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
+    /// # registry.register_sync(def2, Box::new(TestCmd)).unwrap();
     /// let commands = registry.list_commands();
     /// assert_eq!(commands.len(), 2);
     ///
@@ -530,7 +687,7 @@ impl CommandRegistry {
     /// # impl CommandHandler for TestCmd {
     /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
-    /// # registry.register(definition, Box::new(TestCmd)).unwrap();
+    /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// assert!(registry.contains("test"));
     /// assert!(registry.contains("t"));
     /// assert!(!registry.contains("unknown"));
@@ -577,6 +734,19 @@ mod tests {
         }
     }
 
+    struct TestAsyncHandler;
+
+    #[async_trait::async_trait]
+    impl AsyncCommandHandler for TestAsyncHandler {
+        async fn execute(
+            &self,
+            _context: &mut dyn crate::context::ExecutionContext,
+            _args: &HashMap<String, String>,
+        ) -> crate::error::Result<()> {
+            Ok(())
+        }
+    }
+
     fn create_test_definition(name: &str, aliases: Vec<&str>) -> CommandDefinition {
         CommandDefinition {
             name: name.to_string(),
@@ -603,11 +773,29 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec![]);
 
-        let result = registry.register(definition, Box::new(TestHandler));
+        let result = registry.register_sync(definition, Box::new(TestHandler));
 
         assert!(result.is_ok());
         assert_eq!(registry.len(), 1);
         assert!(!registry.is_empty());
+    }
+
+    /// Deprecated-alias coverage (DD-022 companion issue): `register()` and
+    /// `get_handler()` must keep behaving exactly like `register_sync()` /
+    /// `get_handler_sync()` until they're removed in v1.0.0. This is the
+    /// only place in the crate allowed to call them directly.
+    #[test]
+    #[allow(deprecated)]
+    fn test_deprecated_register_alias_still_works() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("legacy", vec!["old"]);
+
+        let result = registry.register(definition, Box::new(TestHandler));
+
+        assert!(result.is_ok());
+        assert!(registry.get_handler("legacy").is_some());
+        assert!(registry.get_handler("old").is_some());
+        assert_eq!(registry.resolve_name("old"), Some("legacy"));
     }
 
     #[test]
@@ -616,7 +804,7 @@ mod tests {
         let definition = create_test_definition("hello", vec!["hi", "greet"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         assert_eq!(registry.len(), 1);
@@ -631,8 +819,8 @@ mod tests {
         let def1 = create_test_definition("test", vec![]);
         let def2 = create_test_definition("test", vec![]);
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        let result = registry.register(def2, Box::new(TestHandler));
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        let result = registry.register_sync(def2, Box::new(TestHandler));
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -652,8 +840,8 @@ mod tests {
         let def1 = create_test_definition("cmd1", vec!["c"]);
         let def2 = create_test_definition("cmd2", vec!["c"]);
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        let result = registry.register(def2, Box::new(TestHandler));
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        let result = registry.register_sync(def2, Box::new(TestHandler));
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -675,8 +863,8 @@ mod tests {
         let def1 = create_test_definition("test", vec![]);
         let def2 = create_test_definition("other", vec!["test"]);
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        let result = registry.register(def2, Box::new(TestHandler));
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        let result = registry.register_sync(def2, Box::new(TestHandler));
 
         assert!(result.is_err());
     }
@@ -687,8 +875,8 @@ mod tests {
         let def1 = create_test_definition("cmd1", vec!["other"]);
         let def2 = create_test_definition("other", vec![]);
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        let result = registry.register(def2, Box::new(TestHandler));
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        let result = registry.register_sync(def2, Box::new(TestHandler));
 
         assert!(result.is_err());
     }
@@ -700,7 +888,7 @@ mod tests {
         let definition = create_test_definition("test", vec![]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         assert_eq!(registry.resolve_name("test"), Some("test"));
@@ -712,7 +900,7 @@ mod tests {
         let definition = create_test_definition("hello", vec!["hi", "greet"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         assert_eq!(registry.resolve_name("hi"), Some("hello"));
@@ -732,7 +920,7 @@ mod tests {
         let definition = create_test_definition("test", vec![]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         let retrieved = registry.get_definition("test");
@@ -746,7 +934,7 @@ mod tests {
         let definition = create_test_definition("hello", vec!["hi"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         let retrieved = registry.get_definition("hi");
@@ -767,10 +955,23 @@ mod tests {
         let definition = create_test_definition("test", vec![]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
-        let handler = registry.get_handler("test");
+        let handler = registry.get_handler_sync("test");
+        assert!(handler.is_some());
+    }
+
+    #[test]
+    fn test_get_handler_sync_by_name() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("test", vec![]);
+
+        registry
+            .register_sync(definition, Box::new(TestHandler))
+            .unwrap();
+
+        let handler = registry.get_handler_sync("test");
         assert!(handler.is_some());
     }
 
@@ -780,17 +981,17 @@ mod tests {
         let definition = create_test_definition("hello", vec!["hi"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
-        let handler = registry.get_handler("hi");
+        let handler = registry.get_handler_sync("hi");
         assert!(handler.is_some());
     }
 
     #[test]
     fn test_get_handler_unknown() {
         let registry = CommandRegistry::new();
-        assert!(registry.get_handler("unknown").is_none());
+        assert!(registry.get_handler_sync("unknown").is_none());
     }
 
     // List commands tests
@@ -806,19 +1007,19 @@ mod tests {
         let mut registry = CommandRegistry::new();
 
         registry
-            .register(
+            .register_sync(
                 create_test_definition("cmd1", vec![]),
                 Box::new(TestHandler),
             )
             .unwrap();
         registry
-            .register(
+            .register_sync(
                 create_test_definition("cmd2", vec![]),
                 Box::new(TestHandler),
             )
             .unwrap();
         registry
-            .register(
+            .register_sync(
                 create_test_definition("cmd3", vec![]),
                 Box::new(TestHandler),
             )
@@ -843,9 +1044,9 @@ mod tests {
         let def2 = create_test_definition("validate", vec!["val", "check"]);
         let def3 = create_test_definition("help", vec!["h", "?"]);
 
-        registry.register(def1, Box::new(TestHandler)).unwrap();
-        registry.register(def2, Box::new(TestHandler)).unwrap();
-        registry.register(def3, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def1, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def2, Box::new(TestHandler)).unwrap();
+        registry.register_sync(def3, Box::new(TestHandler)).unwrap();
 
         // Verify registry state
         assert_eq!(registry.len(), 3);
@@ -857,9 +1058,9 @@ mod tests {
         assert_eq!(registry.resolve_name("val"), Some("validate"));
 
         // Verify handlers are accessible
-        assert!(registry.get_handler("simulate").is_some());
-        assert!(registry.get_handler("sim").is_some());
-        assert!(registry.get_handler("h").is_some());
+        assert!(registry.get_handler_sync("simulate").is_some());
+        assert!(registry.get_handler_sync("sim").is_some());
+        assert!(registry.get_handler_sync("h").is_some());
 
         // Verify definitions are accessible
         let sim_def = registry.get_definition("sim");
@@ -879,7 +1080,7 @@ mod tests {
         let definition = create_test_definition("test", vec!["t"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         assert!(registry.contains("test"));
@@ -893,7 +1094,7 @@ mod tests {
         let definition = create_test_definition("command", vec!["c", "cmd", "com"]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         // All aliases should resolve to the same command
@@ -902,8 +1103,8 @@ mod tests {
         assert_eq!(registry.resolve_name("com"), Some("command"));
 
         // All should return the same handler
-        let handler1 = registry.get_handler("c");
-        let handler2 = registry.get_handler("cmd");
+        let handler1 = registry.get_handler_sync("c");
+        let handler2 = registry.get_handler_sync("cmd");
         assert!(handler1.is_some());
         assert!(handler2.is_some());
     }
@@ -914,7 +1115,7 @@ mod tests {
         let definition = create_test_definition("Test", vec![]);
 
         registry
-            .register(definition, Box::new(TestHandler))
+            .register_sync(definition, Box::new(TestHandler))
             .unwrap();
 
         // Case matters
@@ -928,9 +1129,210 @@ mod tests {
         let mut registry = CommandRegistry::new();
         let definition = create_test_definition("test", vec![]);
 
-        let result = registry.register(definition, Box::new(TestHandler));
+        let result = registry.register_sync(definition, Box::new(TestHandler));
 
         assert!(result.is_ok());
         assert!(registry.contains("test"));
+    }
+
+    // ============================================================================
+    // AsyncCommandHandler / register_async / get_handler_async TESTS (DD-022)
+    // ============================================================================
+
+    #[test]
+    fn test_register_async_command() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("fetch", vec![]);
+
+        let result = registry.register_async(definition, Box::new(TestAsyncHandler));
+
+        assert!(result.is_ok());
+        assert_eq!(registry.len(), 1);
+    }
+
+    #[test]
+    fn test_register_async_command_with_aliases() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("fetch", vec!["f", "get-remote"]);
+
+        registry
+            .register_async(definition, Box::new(TestAsyncHandler))
+            .unwrap();
+
+        assert!(registry.contains("fetch"));
+        assert!(registry.contains("f"));
+        assert!(registry.contains("get-remote"));
+        assert_eq!(registry.resolve_name("f"), Some("fetch"));
+    }
+
+    #[test]
+    fn test_get_handler_async_by_name_and_alias() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("fetch", vec!["f"]);
+
+        registry
+            .register_async(definition, Box::new(TestAsyncHandler))
+            .unwrap();
+
+        assert!(registry.get_handler_async("fetch").is_some());
+        assert!(registry.get_handler_async("f").is_some());
+        assert!(registry.get_handler_async("unknown").is_none());
+    }
+
+    /// The core cross-accessor guarantee DD-022 depends on: querying an
+    /// async-registered command through the *sync* accessor returns `None`
+    /// (not the wrong handler, not a panic) — dispatch sites rely on this
+    /// to fall through from `get_handler_sync` to `get_handler_async`.
+    #[test]
+    fn test_sync_accessor_returns_none_for_async_command() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("fetch", vec![]);
+
+        registry
+            .register_async(definition, Box::new(TestAsyncHandler))
+            .unwrap();
+
+        assert!(registry.get_handler_sync("fetch").is_none());
+        assert!(registry.get_handler_async("fetch").is_some());
+    }
+
+    /// Symmetric case: querying a sync-registered command through the
+    /// *async* accessor returns `None`.
+    #[test]
+    fn test_async_accessor_returns_none_for_sync_command() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("test", vec![]);
+
+        registry
+            .register_sync(definition, Box::new(TestHandler))
+            .unwrap();
+
+        assert!(registry.get_handler_async("test").is_none());
+        assert!(registry.get_handler_sync("test").is_some());
+    }
+
+    /// A command name already taken by a sync handler must be rejected for
+    /// async registration — the unified storage means one name, one kind.
+    #[test]
+    fn test_register_async_conflicts_with_existing_sync_name() {
+        let mut registry = CommandRegistry::new();
+        let sync_def = create_test_definition("dual", vec![]);
+        let async_def = create_test_definition("dual", vec![]);
+
+        registry
+            .register_sync(sync_def, Box::new(TestHandler))
+            .unwrap();
+        let result = registry.register_async(async_def, Box::new(TestAsyncHandler));
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Registry(RegistryError::DuplicateRegistration {
+                name,
+                ..
+            }) => {
+                assert_eq!(name, "dual");
+            }
+            other => panic!("Expected DuplicateRegistration, got: {:?}", other),
+        }
+    }
+
+    /// Symmetric case: a name already taken by an async handler must be
+    /// rejected for sync registration.
+    #[test]
+    fn test_register_sync_conflicts_with_existing_async_name() {
+        let mut registry = CommandRegistry::new();
+        let async_def = create_test_definition("dual", vec![]);
+        let sync_def = create_test_definition("dual", vec![]);
+
+        registry
+            .register_async(async_def, Box::new(TestAsyncHandler))
+            .unwrap();
+        let result = registry.register_sync(sync_def, Box::new(TestHandler));
+
+        assert!(result.is_err());
+    }
+
+    /// An async command's alias must not collide with an existing sync
+    /// command's alias, and vice versa — conflict detection is shared
+    /// across both kinds via `check_name_available`.
+    #[test]
+    fn test_async_alias_conflicts_with_sync_alias() {
+        let mut registry = CommandRegistry::new();
+        let sync_def = create_test_definition("cmd1", vec!["shared"]);
+        let async_def = create_test_definition("cmd2", vec!["shared"]);
+
+        registry
+            .register_sync(sync_def, Box::new(TestHandler))
+            .unwrap();
+        let result = registry.register_async(async_def, Box::new(TestAsyncHandler));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_definition_works_for_async_command() {
+        let mut registry = CommandRegistry::new();
+        let definition = create_test_definition("fetch", vec!["f"]);
+
+        registry
+            .register_async(definition, Box::new(TestAsyncHandler))
+            .unwrap();
+
+        let retrieved = registry.get_definition("f");
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().name, "fetch");
+    }
+
+    #[test]
+    fn test_list_commands_includes_both_sync_and_async() {
+        let mut registry = CommandRegistry::new();
+
+        registry
+            .register_sync(
+                create_test_definition("sync-cmd", vec![]),
+                Box::new(TestHandler),
+            )
+            .unwrap();
+        registry
+            .register_async(
+                create_test_definition("async-cmd", vec![]),
+                Box::new(TestAsyncHandler),
+            )
+            .unwrap();
+
+        let commands = registry.list_commands();
+        assert_eq!(commands.len(), 2);
+        let names: Vec<&str> = commands.iter().map(|c| c.name.as_str()).collect();
+        assert!(names.contains(&"sync-cmd"));
+        assert!(names.contains(&"async-cmd"));
+    }
+
+    #[test]
+    fn test_mixed_registry_workflow() {
+        // End-to-end: a registry with both sync and async commands behaves
+        // consistently across resolve_name / get_definition / len / contains.
+        let mut registry = CommandRegistry::new();
+
+        registry
+            .register_sync(
+                create_test_definition("simulate", vec!["sim"]),
+                Box::new(TestHandler),
+            )
+            .unwrap();
+        registry
+            .register_async(
+                create_test_definition("fetch", vec!["f"]),
+                Box::new(TestAsyncHandler),
+            )
+            .unwrap();
+
+        assert_eq!(registry.len(), 2);
+        assert!(registry.contains("sim"));
+        assert!(registry.contains("f"));
+
+        assert!(registry.get_handler_sync("simulate").is_some());
+        assert!(registry.get_handler_async("fetch").is_some());
+        assert!(registry.get_handler_sync("fetch").is_none());
+        assert!(registry.get_handler_async("simulate").is_none());
     }
 }
