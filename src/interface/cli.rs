@@ -170,15 +170,23 @@ impl CliInterface {
         let parser = CliParser::new(definition);
         let parsed_args = parser.parse(&args[1..])?;
 
-        // Get handler and execute command
-        let handler = self.registry.get_handler(resolved_name).ok_or_else(|| {
-            DynamicCliError::Execution(crate::error::ExecutionError::handler_not_found(
-                resolved_name,
-                &definition.implementation,
-            ))
-        })?;
-
-        handler.execute(&mut *self.context, &parsed_args)?;
+        // Get handler and execute command. Sync is tried first (unchanged
+        // behaviour); if no sync handler matches, fall through to the async
+        // path (DD-022) and drive it via `block_on`. Safe here because
+        // `run()` is a strictly sequential, one-shot dispatch — there is no
+        // other async task waiting behind it that `block_on` could starve.
+        if let Some(handler) = self.registry.get_handler_sync(resolved_name) {
+            handler.execute(&mut *self.context, &parsed_args)?;
+        } else if let Some(handler) = self.registry.get_handler_async(resolved_name) {
+            futures::executor::block_on(handler.execute(&mut *self.context, &parsed_args))?;
+        } else {
+            return Err(DynamicCliError::Execution(
+                crate::error::ExecutionError::handler_not_found(
+                    resolved_name,
+                    &definition.implementation,
+                ),
+            ));
+        }
 
         Ok(())
     }
@@ -296,7 +304,7 @@ mod tests {
         });
 
         registry
-            .register(cmd_def, handler)
+            .register_sync(cmd_def, handler)
             .expect("Failed to register command");
 
         registry
@@ -395,7 +403,9 @@ mod tests {
             }
         }
 
-        registry.register(cmd_def, Box::new(GreetHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(GreetHandler))
+            .unwrap();
 
         let context = Box::new(TestContext::default());
         let cli = CliInterface::new(registry, context);

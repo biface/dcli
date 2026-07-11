@@ -153,7 +153,7 @@
 //!     
 //!     // Build registry
 //!     let mut registry = CommandRegistry::new();
-//!     registry.register(
+//!     registry.register_sync(
 //!         config.commands[0].clone(),
 //!         Box::new(AddCommand),
 //!     )?;
@@ -197,7 +197,7 @@
 //!     
 //!     // Build registry
 //!     let mut registry = CommandRegistry::new();
-//!     registry.register(
+//!     registry.register_sync(
 //!         config.commands[0].clone(),
 //!         Box::new(AddCommand),
 //!     )?;
@@ -279,7 +279,9 @@ mod tests {
             implementation: "test".to_string(),
         };
 
-        registry.register(cmd_def, Box::new(TestHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(TestHandler))
+            .unwrap();
 
         let context = Box::new(TestContext::default());
         let _cli = CliInterface::new(registry, context);
@@ -299,7 +301,9 @@ mod tests {
             implementation: "test".to_string(),
         };
 
-        registry.register(cmd_def, Box::new(TestHandler)).unwrap();
+        registry
+            .register_sync(cmd_def, Box::new(TestHandler))
+            .unwrap();
 
         let context = Box::new(TestContext::default());
         let _repl = ReplInterface::new(registry, context, "test".to_string(), None, None);
