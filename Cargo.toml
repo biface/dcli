@@ -53,6 +53,10 @@ wasmtime = { version = "45.0.0", optional = true }
 tempfile = "3.13"
 #criterion = { version = "0.8", features = ["html_reports"] }
 
+# Non-blocking delay for async test/example fixtures (DD-022 mockup) —
+# runtime-agnostic, consistent with dynamic-cli not depending on tokio.
+futures-timer = "3"
+
 # CLI testing (for future use when binary is created)
 # assert_cmd = "2.1"
 # predicates = "3.1"
@@ -76,6 +80,11 @@ path = "tests/integration/system_plugin_test.rs"
 name = "wasm_plugin_test"
 path = "tests/integration/wasm_plugin_test.rs"
 required-features = ["wasm-plugins"]
+
+[[test]]
+name = "async_token_test"
+path = "tests/integration/async_token_test.rs"
+
 
 # Benchmark configuration (uncomment when benchmarks are implemented)
 # [[bench]]
