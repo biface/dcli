@@ -496,7 +496,7 @@ They require the `wasm-plugins` feature flag:
 
 ```toml
 [dependencies]
-dynamic-cli = { version = "0.4.0", features = ["wasm-plugins"] }
+dynamic-cli = { version = "0.5.0", features = ["wasm-plugins"] }
 ```
 
 ### Registering a WASM plugin
