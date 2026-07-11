@@ -40,7 +40,7 @@
 //!     }
 //! }
 //!
-//! registry.register(definition, Box::new(DummyHandler)).unwrap();
+//! registry.register_sync(definition, Box::new(DummyHandler)).unwrap();
 //!
 //! // Parse a REPL line
 //! let parser = ReplParser::new(&registry);
@@ -393,7 +393,9 @@ mod tests {
             implementation: "hello_handler".to_string(),
         };
 
-        registry.register(hello_def, Box::new(TestHandler)).unwrap();
+        registry
+            .register_sync(hello_def, Box::new(TestHandler))
+            .unwrap();
 
         // Register "process" command
         let process_def = CommandDefinition {
@@ -433,7 +435,7 @@ mod tests {
         };
 
         registry
-            .register(process_def, Box::new(TestHandler))
+            .register_sync(process_def, Box::new(TestHandler))
             .unwrap();
 
         registry

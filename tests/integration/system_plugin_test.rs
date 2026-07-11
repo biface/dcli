@@ -126,7 +126,7 @@ fn system_plugin_version_command_executes_via_full_chain() {
         .config(test_config())
         .context(Box::new(RecordingContext::default()))
         .register_plugin(Box::new(SystemPlugin::new()))
-        .register_handler(
+        .register_sync_handler(
             "greet_handler",
             Box::new(GreetHandler {
                 greeted: Arc::new(Mutex::new(Vec::new())),
@@ -150,7 +150,7 @@ fn system_plugin_help_command_executes_via_full_chain() {
         .config(test_config())
         .context(Box::new(RecordingContext::default()))
         .register_plugin(Box::new(SystemPlugin::new()))
-        .register_handler(
+        .register_sync_handler(
             "greet_handler",
             Box::new(GreetHandler {
                 greeted: Arc::new(Mutex::new(Vec::new())),
@@ -176,7 +176,7 @@ fn system_plugin_coexists_with_user_registered_handler() {
         .config(test_config())
         .context(Box::new(RecordingContext::default()))
         .register_plugin(Box::new(SystemPlugin::new()))
-        .register_handler(
+        .register_sync_handler(
             "greet_handler",
             Box::new(GreetHandler {
                 greeted: greeted.clone(),
@@ -206,7 +206,7 @@ fn system_plugin_alias_resolves_to_same_handler() {
         .config(test_config())
         .context(Box::new(RecordingContext::default()))
         .register_plugin(Box::new(SystemPlugin::new()))
-        .register_handler(
+        .register_sync_handler(
             "greet_handler",
             Box::new(GreetHandler {
                 greeted: Arc::new(Mutex::new(Vec::new())),
@@ -230,7 +230,7 @@ fn duplicate_plugin_registration_fails_at_build() {
         .context(Box::new(RecordingContext::default()))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_plugin(Box::new(SystemPlugin::new()))
-        .register_handler(
+        .register_sync_handler(
             "greet_handler",
             Box::new(GreetHandler {
                 greeted: Arc::new(Mutex::new(Vec::new())),

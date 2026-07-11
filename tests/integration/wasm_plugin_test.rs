@@ -293,7 +293,7 @@ fn wasm_plugin_coexists_with_native_handler() {
         .context(Box::new(TestContext))
         .register_wasm_plugin(wasm_file.path(), &[("ok_handler", "ok_handler")])
         .expect("loading a module with all mandatory exports should succeed")
-        .register_handler("native_handler", Box::new(NativeHandler))
+        .register_sync_handler("native_handler", Box::new(NativeHandler))
         .build()
         .expect("build should succeed with both a WASM plugin and a native handler");
 

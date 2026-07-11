@@ -50,14 +50,14 @@
 //!
 //! let config = load_config("commands.yaml")?;
 //! let mut registry = CommandRegistry::new();
-//! registry.register(config.commands[0].clone(), Box::new(HelloCommand))?;
+//! registry.register_sync(config.commands[0].clone(), Box::new(HelloCommand))?;
 //!
 //! // 4. Parse and execute
 //! let parser = ReplParser::new(&registry);
 //! let parsed = parser.parse_line("hello World")?;
 //!
 //! let mut context = MyContext::default();
-//! let handler = registry.get_handler(&parsed.command_name).unwrap();
+//! let handler = registry.get_handler_sync(&parsed.command_name).unwrap();
 //! handler.execute(&mut context, &parsed.arguments)?;
 //! # Ok(())
 //! # }

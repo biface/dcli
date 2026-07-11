@@ -491,12 +491,12 @@ fn main() -> Result<()> {
     CliBuilder::new()
         .config_file("examples/configs/task_runner.yaml")
         .context(Box::new(TaskRunnerContext::default()))
-        .register_handler("add_handler", Box::new(AddCommand))
-        .register_handler("list_handler", Box::new(ListCommand))
-        .register_handler("complete_handler", Box::new(CompleteCommand))
-        .register_handler("delete_handler", Box::new(DeleteCommand))
-        .register_handler("clear_handler", Box::new(ClearCommand))
-        .register_handler("stats_handler", Box::new(StatsCommand))
+        .register_sync_handler("add_handler", Box::new(AddCommand))
+        .register_sync_handler("list_handler", Box::new(ListCommand))
+        .register_sync_handler("complete_handler", Box::new(CompleteCommand))
+        .register_sync_handler("delete_handler", Box::new(DeleteCommand))
+        .register_sync_handler("clear_handler", Box::new(ClearCommand))
+        .register_sync_handler("stats_handler", Box::new(StatsCommand))
         .build()?
         .run()
 }

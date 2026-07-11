@@ -520,7 +520,7 @@ pub enum ExecutionError {
     ///     command: "run".to_string(),
     ///     implementation: "run_handler".to_string(),
     ///     suggestion: Some(
-    ///         "Ensure .register_handler(\"run_handler\", ...) was called before running."
+    ///         "Ensure .register_sync_handler(\"run_handler\", ...) was called before running."
     ///             .to_string()
     ///     ),
     /// };
@@ -662,7 +662,7 @@ pub enum RegistryError {
     /// let error = RegistryError::MissingHandler {
     ///     command: "export".to_string(),
     ///     suggestion: Some(
-    ///         "Call .register_handler(\"export\", ...) before running.".to_string()
+    ///         "Call .register_sync_handler(\"export\", ...) before running.".to_string()
     ///     ),
     /// };
     /// let msg = format!("{}", error);
@@ -1008,7 +1008,8 @@ impl ExecutionError {
     /// Create a handler-not-found error with an actionable suggestion
     ///
     /// The suggestion interpolates the implementation name so the user
-    /// knows exactly which `.register_handler()` call is missing.
+    /// knows exactly which `register_sync_handler()` or
+    /// `register_async_handler()` call is missing (DD-022).
     ///
     /// # Example
     ///
@@ -1028,7 +1029,8 @@ impl ExecutionError {
             command: command.to_string(),
             implementation: implementation.to_string(),
             suggestion: Some(format!(
-                "Ensure .register_handler(\"{implementation}\", ...) was called before running."
+                "Ensure .register_sync_handler(\"{implementation}\", ...) or \
+                 .register_async_handler(\"{implementation}\", ...) was called before running."
             )),
         }
     }
@@ -1038,7 +1040,7 @@ impl RegistryError {
     /// Create a missing-handler error with an actionable suggestion
     ///
     /// The suggestion interpolates the command name so the user
-    /// knows exactly which `.register_handler()` call is missing.
+    /// knows exactly which `.register_sync_handler()` call is missing.
     ///
     /// # Example
     ///
@@ -1057,7 +1059,7 @@ impl RegistryError {
         Self::MissingHandler {
             command: command.to_string(),
             suggestion: Some(format!(
-                "Call .register_handler(\"{command}\", ...) before running."
+                "Call .register_sync_handler(\"{command}\", ...) before running."
             )),
         }
     }
@@ -1382,7 +1384,7 @@ mod tests {
                 assert_eq!(implementation, "run_handler");
                 let s = suggestion.unwrap();
                 assert!(s.contains("run_handler"));
-                assert!(s.contains("register_handler"));
+                assert!(s.contains("register_sync_handler"));
             }
             _ => panic!("wrong variant"),
         }
@@ -1421,7 +1423,7 @@ mod tests {
                 assert_eq!(command, "export");
                 let s = suggestion.unwrap();
                 assert!(s.contains("export"));
-                assert!(s.contains("register_handler"));
+                assert!(s.contains("register_sync_handler"));
             }
             _ => panic!("wrong variant"),
         }

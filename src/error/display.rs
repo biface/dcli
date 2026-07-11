@@ -616,7 +616,7 @@ mod tests {
             command: "run".to_string(),
             implementation: "run_handler".to_string(),
             suggestion: Some(
-                "Ensure .register_handler(\"run_handler\", ...) was called.".to_string(),
+                "Ensure .register_sync_handler(\"run_handler\", ...) was called.".to_string(),
             ),
         }
         .into();
@@ -624,7 +624,7 @@ mod tests {
         let formatted = format_error(&error);
         assert!(formatted.contains("run"));
         assert!(formatted.contains("run_handler"));
-        assert!(formatted.contains("register_handler"));
+        assert!(formatted.contains("register_sync_handler"));
     }
 
     #[test]
@@ -654,13 +654,15 @@ mod tests {
     fn test_format_registry_missing_handler_with_suggestion() {
         let error: DynamicCliError = RegistryError::MissingHandler {
             command: "export".to_string(),
-            suggestion: Some("Call .register_handler(\"export\", ...) before running.".to_string()),
+            suggestion: Some(
+                "Call .register_sync_handler(\"export\", ...) before running.".to_string(),
+            ),
         }
         .into();
 
         let formatted = format_error(&error);
         assert!(formatted.contains("export"));
-        assert!(formatted.contains("register_handler"));
+        assert!(formatted.contains("register_sync_handler"));
     }
 
     #[test]

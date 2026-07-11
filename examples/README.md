@@ -346,7 +346,7 @@ fn main() -> Result<()> {
     CliBuilder::new()
         .config_file("config.yaml")
         .context(Box::new(MyContext::default()))
-        .register_handler("my_handler", Box::new(MyCommand))
+        .register_sync_handler("my_handler", Box::new(MyCommand))
         .build()?
         .run()
 }
@@ -415,9 +415,9 @@ ls examples/configs/
 
 **Problem:** Handler name in YAML doesn't match registered name.
 
-**Solution:** Check that the `implementation` field in YAML matches the name in `.register_handler()`:
-```rust
-.register_handler("my_handler", ...)  // Must match
+**Solution:** Check that the `implementation` field in YAML matches the name in `.register_sync_handler()`:
+```rust, ignore
+.register_sync_handler("my_handler", ...)  // Must match
 ```
 ```yaml
 implementation: "my_handler"  // Must match
@@ -428,7 +428,7 @@ implementation: "my_handler"  // Must match
 **Problem:** Wrong context type in handler.
 
 **Solution:** Ensure you're downcasting to the correct context type:
-```rust
+```rust, ignore
 let ctx = dynamic_cli::context::downcast_mut::<YourContext>(context)
     .ok_or_else(|| ...)?;
 ```
