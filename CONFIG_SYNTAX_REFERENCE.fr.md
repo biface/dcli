@@ -371,6 +371,23 @@ Détail complet d'une commande individuelle.
 - Convention : snake_case
 - Exemple : `"load_config"` correspond à `LoadConfigHandler`
 
+> **Sync vs async n'est pas une question de configuration (ref. #8).** Ce
+> champ est agnostique quant à la nature sync ou async du handler qui s'y
+> rattache — il n'existe pas de drapeau `async: true`, et il n'y en aura
+> pas. Le choix entre exécution synchrone ou asynchrone se fait entièrement
+> côté Rust, selon la méthode appelée lors du câblage du handler :
+> ```rust, ignore
+> // Handler synchrone
+> .register_sync_handler("load_config", Box::new(LoadConfigHandler))
+> // Handler asynchrone — même convention de nom, même YAML
+> .register_async_handler("fetch_remote", Box::new(FetchRemoteHandler))
+> ```
+> `CliBuilder::build()` résout chaque nom `implementation` selon le type
+> effectivement enregistré. Ajouter un drapeau au niveau de la config
+> créerait une seconde source de vérité susceptible de diverger de
+> l'enregistrement Rust réel — seul le câblage Rust fait autorité, et c'est
+> voulu.
+
 ---
 
 ## Arguments

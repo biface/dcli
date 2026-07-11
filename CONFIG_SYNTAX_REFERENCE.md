@@ -371,6 +371,22 @@ Detailed breakdown of a single command.
 - Convention: snake_case
 - Example: `"load_config"` maps to `LoadConfigHandler`
 
+> **Sync vs. async is not a config concern (ref. #8).** This field is
+> agnostic to whether the handler behind it is sync or async — there is no
+> `async: true` flag, and there won't be one. Whether a command executes
+> synchronously or asynchronously is decided entirely on the Rust side, by
+> which method the application calls when wiring up the handler:
+> ```rust, ignore
+> // Sync handler
+> .register_sync_handler("load_config", Box::new(LoadConfigHandler))
+> // Async handler — same implementation name convention, same YAML
+> .register_async_handler("fetch_remote", Box::new(FetchRemoteHandler))
+> ```
+> `CliBuilder::build()` resolves each `implementation` name against
+> whichever kind was registered. Adding a config-level flag would create a
+> second source of truth that could disagree with the actual Rust
+> registration — the binding alone is authoritative, deliberately.
+
 ---
 
 ## Arguments
