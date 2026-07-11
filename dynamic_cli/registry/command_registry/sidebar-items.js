@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CommandRegistry"]};
+window.SIDEBAR_ITEMS = {"enum":["StoredHandler"],"struct":["CommandRegistry"]};

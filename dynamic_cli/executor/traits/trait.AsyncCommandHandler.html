@@ -1,0 +1,93 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Async counterpart of `CommandHandler`."><title>AsyncCommandHandler in dynamic_cli::executor::traits - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-17e0aaed.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="dynamic_cli" data-themes="" data-resource-suffix="" data-rustdoc-version="1.96.1 (31fca3adb 2026-06-26)" data-channel="1.96.1" data-search-js="search-b5634cc7.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../../../static.files/storage-41dd4d93.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-5013f961.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">AsyncCommandHandler</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../dynamic_cli/index.html">dynamic_<wbr>cli</a><span class="version">0.5.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Async<wbr>Command<wbr>Handler</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#object-safety" title="Object Safety">Object Safety</a></li><li><a href="#thread-safety" title="Thread Safety">Thread Safety</a></li><li><a href="#why-a-separate-trait-instead-of-an-async-commandhandler" title="Why a separate trait instead of an async `CommandHandler`?">Why a separate trait instead of an async <code>CommandHandler</code>?</a></li><li><a href="#example" title="Example">Example</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.execute" title="execute">execute</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.validate" title="validate">validate</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In dynamic_<wbr>cli::<wbr>executor::<wbr>traits</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">dynamic_cli</a>::<wbr><a href="../index.html">executor</a>::<wbr><a href="index.html">traits</a></div><h1>Trait <span class="trait">Async<wbr>Command<wbr>Handler</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/dynamic_cli/executor/traits.rs.html#345-361">Source</a> </span></div><pre class="rust item-decl"><code>pub trait AsyncCommandHandler: <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> {
+    // Required method
+    fn <a href="#tymethod.execute" class="fn">execute</a>&lt;'life0, 'life1, 'life2, 'async_trait&gt;(
+        &amp;'life0 self,
+        context: &amp;'life1 mut dyn <a class="trait" href="../../context/traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext">ExecutionContext</a>,
+        args: &amp;'life2 <a class="struct" href="https://doc.rust-lang.org/1.96.1/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.96.1/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.96.1/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait,
+             'life1: 'async_trait,
+             'life2: 'async_trait</span>;
+
+    // Provided method
+    fn <a href="#method.validate" class="fn">validate</a>&lt;'life0, 'life1, 'async_trait&gt;(
+        &amp;'life0 self,
+        _args: &amp;'life1 <a class="struct" href="https://doc.rust-lang.org/1.96.1/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.96.1/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.96.1/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait,
+             'life1: 'async_trait</span> { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Async counterpart of <a href="trait.CommandHandler.html" title="trait dynamic_cli::executor::traits::CommandHandler"><code>CommandHandler</code></a>.</p>
+<p>Additive to <code>CommandHandler</code> (see DD-022) — it does not replace it.
+Implementations use this trait when their command body needs to perform
+async I/O (network calls, streaming, etc.). The signatures deliberately
+mirror <code>CommandHandler</code> exactly, <code>execute</code>/<code>validate</code> aside from the
+<code>async</code> keyword, so that migrating a handler from sync to async is a
+mechanical change.</p>
+<h2 id="object-safety"><a class="doc-anchor" href="#object-safety">§</a>Object Safety</h2>
+<p>Made <code>dyn</code>-compatible via <code>#[async_trait]</code> (which desugars <code>async fn</code> to
+a boxed, pinned future under the hood). Stored as <code>Box&lt;dyn AsyncCommandHandler&gt;</code> in the registry, exactly like <code>CommandHandler</code> is
+stored as <code>Box&lt;dyn CommandHandler&gt;</code>.</p>
+<h2 id="thread-safety"><a class="doc-anchor" href="#thread-safety">§</a>Thread Safety</h2>
+<p>Same constraint as <code>CommandHandler</code>: <code>Send + Sync</code> is required so the
+handler can be shared across the registry and, transitively, across
+threads if the application needs it.</p>
+<h2 id="why-a-separate-trait-instead-of-an-async-commandhandler"><a class="doc-anchor" href="#why-a-separate-trait-instead-of-an-async-commandhandler">§</a>Why a separate trait instead of an async <code>CommandHandler</code>?</h2>
+<p>Existing sync <code>CommandHandler</code> implementations (including downstream
+consumers) must keep compiling unchanged. See DD-022 for the full
+rationale, including why <code>tokio</code> is not a dependency of <code>dynamic-cli</code>
+itself and why driving the returned future via
+<code>futures::executor::block_on</code> at the dispatch site is safe.</p>
+<h2 id="example"><a class="doc-anchor" href="#example">§</a>Example</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>std::collections::HashMap;
+<span class="kw">use </span>async_trait::async_trait;
+<span class="kw">use </span>dynamic_cli::executor::AsyncCommandHandler;
+<span class="kw">use </span>dynamic_cli::context::ExecutionContext;
+<span class="kw">use </span>dynamic_cli::error::ExecutionError;
+<span class="kw">use </span>dynamic_cli::Result;
+
+<span class="kw">struct </span>FetchCommand;
+
+<span class="attr">#[async_trait]
+</span><span class="kw">impl </span>AsyncCommandHandler <span class="kw">for </span>FetchCommand {
+    <span class="kw">async fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        _context: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>ExecutionContext,
+        args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">let </span>url = args.get(<span class="string">"url"</span>).ok_or_else(|| {
+            ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Missing 'url' argument"</span>))
+        })<span class="question-mark">?</span>;
+        <span class="comment">// Real implementations would `.await` an async HTTP call here.
+        </span><span class="macro">println!</span>(<span class="string">"Fetching {url}..."</span>);
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">async fn </span>validate(<span class="kw-2">&amp;</span><span class="self">self</span>, args: <span class="kw-2">&amp;</span>HashMap&lt;String, String&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if </span>!args.contains_key(<span class="string">"url"</span>) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(ExecutionError::CommandFailed(<span class="macro">anyhow::anyhow!</span>(<span class="string">"url is required"</span>)).into());
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}</code></pre></div></div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.execute" class="method"><a class="src rightside" href="../../../src/dynamic_cli/executor/traits.rs.html#349-353">Source</a><h4 class="code-header">fn <a href="#tymethod.execute" class="fn">execute</a>&lt;'life0, 'life1, 'life2, 'async_trait&gt;(
+    &amp;'life0 self,
+    context: &amp;'life1 mut dyn <a class="trait" href="../../context/traits/trait.ExecutionContext.html" title="trait dynamic_cli::context::traits::ExecutionContext">ExecutionContext</a>,
+    args: &amp;'life2 <a class="struct" href="https://doc.rust-lang.org/1.96.1/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.96.1/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.96.1/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,
+    'life1: 'async_trait,
+    'life2: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Async equivalent of <a href="trait.CommandHandler.html#tymethod.execute" title="method dynamic_cli::executor::traits::CommandHandler::execute"><code>CommandHandler::execute</code></a>. Same contract:
+receives the mutable execution context and the parsed arguments,
+returns <code>Ok(())</code> on success or a <code>DynamicCliError</code> on failure.</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.validate" class="method"><a class="src rightside" href="../../../src/dynamic_cli/executor/traits.rs.html#358-360">Source</a><h4 class="code-header">fn <a href="#method.validate" class="fn">validate</a>&lt;'life0, 'life1, 'async_trait&gt;(
+    &amp;'life0 self,
+    _args: &amp;'life1 <a class="struct" href="https://doc.rust-lang.org/1.96.1/std/collections/hash/map/struct.HashMap.html" title="struct std::collections::hash::map::HashMap">HashMap</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>, <a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/string/struct.String.html" title="struct alloc::string::String">String</a>&gt;,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.96.1/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.96.1/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type dynamic_cli::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.96.1/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.96.1/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,
+    'life1: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Async equivalent of <a href="trait.CommandHandler.html#method.validate" title="method dynamic_cli::executor::traits::CommandHandler::validate"><code>CommandHandler::validate</code></a>. Same contract and
+same default (accepts all arguments) — override only for custom
+validation logic.</p>
+</div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../../trait.impl/dynamic_cli/executor/traits/trait.AsyncCommandHandler.js" async></script></section></div></main></body></html>

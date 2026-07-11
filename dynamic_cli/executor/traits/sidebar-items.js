@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":["CommandHandler"]};
+window.SIDEBAR_ITEMS = {"trait":["AsyncCommandHandler","CommandHandler"]};
