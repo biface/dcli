@@ -11,6 +11,7 @@
 //! - [`ValidationRule`]: Validation constraints
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Complete configuration for CLI/REPL commands
 ///
@@ -230,9 +231,33 @@ pub struct OptionDefinition {
 
     /// Restricted set of allowed values
     ///
-    /// If non-empty, the value must be one of these choices.
+    /// If non-empty, the value must be one of these choices. When
+    /// `repeatable` is `true`, this list also doubles as the set of
+    /// valid discriminants for each occurrence (see [`Self::option_parameters`]).
     #[serde(default)]
     pub choices: Vec<String>,
+
+    /// Whether this option can appear more than once on a single
+    /// command line, each occurrence carrying its own discriminant
+    /// (from `choices`) and `key=value` sub-parameters.
+    ///
+    /// Defaults to `false` — fully backward-compatible with existing
+    /// scalar options.
+    #[serde(default)]
+    pub repeatable: bool,
+
+    /// Per-discriminant shape of the `key=value` sub-parameters accepted
+    /// by a repeatable option.
+    ///
+    /// Keys must exactly match the entries in [`Self::choices`] (enforced
+    /// by the config validator, not at deserialization time). Each value
+    /// reuses [`ArgumentDefinition`] — the same vocabulary already used
+    /// for positional `arguments:` — rather than a dedicated mini-schema
+    /// type.
+    ///
+    /// Ignored (and should be empty) when `repeatable` is `false`.
+    #[serde(default)]
+    pub option_parameters: HashMap<String, Vec<ArgumentDefinition>>,
 }
 
 /// Supported argument and option types

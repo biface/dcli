@@ -64,6 +64,7 @@ use std::collections::HashMap;
 /// use dynamic_cli::config::schema::{
 ///     CommandDefinition, OptionDefinition, ArgumentType
 /// };
+/// use std::collections::HashMap;
 ///
 /// let definition = CommandDefinition {
 ///     name: "test".to_string(),
@@ -81,6 +82,8 @@ use std::collections::HashMap;
 ///             default: Some("false".to_string()),
 ///             description: "Verbose output".to_string(),
 ///             choices: vec![],
+///             repeatable: false,
+///             option_parameters: HashMap::new(),
 ///         }
 ///     ],
 ///     implementation: "handler".to_string(),
@@ -475,6 +478,8 @@ mod tests {
                     default: Some("false".to_string()),
                     description: "Verbose output".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 },
                 OptionDefinition {
                     name: "count".to_string(),
@@ -485,6 +490,8 @@ mod tests {
                     default: Some("10".to_string()),
                     description: "Count".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 },
             ],
             implementation: "handler".to_string(),

@@ -403,6 +403,7 @@ mod tests {
     use crate::config::schema::{
         ArgumentDefinition, ArgumentType, CommandDefinition, Metadata, OptionDefinition,
     };
+    use std::collections::HashMap;
 
     // Disable ANSI codes in tests so assertions work on plain text.
     fn no_color() {
@@ -443,6 +444,8 @@ mod tests {
                         default: None,
                         description: "Use uppercase".to_string(),
                         choices: vec![],
+                        repeatable: false,
+                        option_parameters: HashMap::new(),
                     }],
                     implementation: "hello_handler".to_string(),
                 },
