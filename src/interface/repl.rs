@@ -702,6 +702,8 @@ mod tests {
                     default: Some("false".to_string()),
                     description: "Loud greeting".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 }],
                 implementation: "hello_handler".to_string(),
             }],

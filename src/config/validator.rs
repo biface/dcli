@@ -495,6 +495,7 @@ fn check_name_conflicts(
 mod tests {
     use super::*;
     use crate::config::schema::CommandsConfig;
+    use std::collections::HashMap;
 
     #[test]
     fn test_validate_config_empty() {
@@ -681,6 +682,8 @@ mod tests {
             default: None,
             description: "Option".to_string(),
             choices: vec![],
+            repeatable: false,
+            option_parameters: HashMap::new(),
         }];
 
         let result = validate_options(&options, "test");
@@ -698,6 +701,8 @@ mod tests {
             default: Some("invalid".to_string()), // Not in choices!
             description: "Mode".to_string(),
             choices: vec!["fast".to_string(), "slow".to_string()],
+            repeatable: false,
+            option_parameters: HashMap::new(),
         }];
 
         let result = validate_options(&options, "test");
@@ -716,6 +721,8 @@ mod tests {
                 default: None,
                 description: "Option 1".to_string(),
                 choices: vec![],
+                repeatable: false,
+                option_parameters: HashMap::new(),
             },
             OptionDefinition {
                 name: "opt2".to_string(),
@@ -726,6 +733,8 @@ mod tests {
                 default: None,
                 description: "Option 2".to_string(),
                 choices: vec![],
+                repeatable: false,
+                option_parameters: HashMap::new(),
             },
         ];
 
@@ -744,6 +753,8 @@ mod tests {
             default: None,
             description: "Option".to_string(),
             choices: vec![],
+            repeatable: false,
+            option_parameters: HashMap::new(),
         }];
 
         let result = validate_option_flags(&options, "test");
@@ -770,6 +781,8 @@ mod tests {
             default: None,
             description: "Output".to_string(),
             choices: vec![],
+            repeatable: false,
+            option_parameters: HashMap::new(),
         }];
 
         let result = check_name_conflicts(&args, &options, "test");
@@ -805,6 +818,8 @@ mod tests {
                 default: Some("out.csv".to_string()),
                 description: "Output file".to_string(),
                 choices: vec![],
+                repeatable: false,
+                option_parameters: HashMap::new(),
             }],
             implementation: "process_handler".to_string(),
         };
@@ -823,6 +838,8 @@ mod tests {
             default: None,
             description: "A flag".to_string(),
             choices: vec!["true".to_string(), "false".to_string()], // Boolean can't have choices!
+            repeatable: false,
+            option_parameters: HashMap::new(),
         }];
 
         let result = validate_options(&options, "test");
