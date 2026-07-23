@@ -29,7 +29,7 @@ use std::sync::Arc;
 ///
 /// | Implementation name | Behaviour |
 /// |---------------------|-----------|
-/// | `system_help`       | Prints application or per-command help via the active [`HelpFormatter`][crate::help::HelpFormatter] |
+/// | `system_help`       | Prints application or per-command help via the active [`HelpFormatter`] |
 /// | `system_version`    | Prints the version from `metadata.version` in the config |
 /// | `system_exit`       | Runs the shutdown callback then exits (default: `std::process::exit(0)`) |
 ///
