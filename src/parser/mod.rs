@@ -256,6 +256,8 @@ mod tests {
                     default: Some("false".to_string()),
                     description: "Enable verbose output".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 },
                 OptionDefinition {
                     name: "iterations".to_string(),
@@ -266,6 +268,8 @@ mod tests {
                     default: Some("100".to_string()),
                     description: "Number of iterations".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 },
                 OptionDefinition {
                     name: "threshold".to_string(),
@@ -276,6 +280,8 @@ mod tests {
                     default: Some("0.5".to_string()),
                     description: "Analysis threshold".to_string(),
                     choices: vec![],
+                    repeatable: false,
+                    option_parameters: HashMap::new(),
                 },
             ],
             implementation: "analyze_handler".to_string(),
