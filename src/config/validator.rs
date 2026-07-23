@@ -379,6 +379,112 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
             .into());
         }
 
+        // --- DD-024: repeatable options and their option_parameters shapes ---
+        if opt.repeatable {
+            // Rule: a repeatable option's absence already means zero
+            // occurrences, so a default value would be ambiguous — reject
+            // it before the generic default/choices check below, so the
+            // repeatable-specific message takes priority.
+            if let Some(ref default) = opt.default {
+                return Err(ConfigError::Inconsistency {
+                    details: format!(
+                        "Repeatable option '{}' cannot have a default value ('{}')",
+                        opt.name, default
+                    ),
+                    suggestion: Some(
+                        "Remove `default` — a repeatable option's absence already \
+                         means zero occurrences, not an implicit one."
+                            .to_string(),
+                    ),
+                }
+                .into());
+            }
+
+            // Rule: choices doubles as the discriminant list, so it must
+            // be non-empty for a repeatable option.
+            if opt.choices.is_empty() {
+                return Err(ConfigError::InvalidSchema {
+                    reason: format!(
+                        "Repeatable option '{}' must declare at least one discriminant in choices",
+                        opt.name
+                    ),
+                    path: Some(format!("{}.options[{}].choices", context, idx)),
+                    suggestion: Some(
+                        "Add `choices: [...]` listing the valid discriminants for \
+                         this repeatable option."
+                            .to_string(),
+                    ),
+                }
+                .into());
+            }
+
+            // Rule: option_parameters keys must equal choices exactly —
+            // no discriminant left undeclared, no orphan key.
+            for discriminant in &opt.choices {
+                if !opt.option_parameters.contains_key(discriminant) {
+                    return Err(ConfigError::InvalidSchema {
+                        reason: format!(
+                            "Discriminant '{}' is declared in choices for repeatable \
+                             option '{}' but has no matching entry in option_parameters",
+                            discriminant, opt.name
+                        ),
+                        path: Some(format!("{}.options[{}].option_parameters", context, idx)),
+                        suggestion: Some(format!(
+                            "Add an `option_parameters.{}` entry describing this \
+                             discriminant's key=value parameters.",
+                            discriminant
+                        )),
+                    }
+                    .into());
+                }
+            }
+            let choices_set: HashSet<&String> = opt.choices.iter().collect();
+            for key in opt.option_parameters.keys() {
+                if !choices_set.contains(key) {
+                    return Err(ConfigError::InvalidSchema {
+                        reason: format!(
+                            "option_parameters key '{}' on option '{}' is not declared in choices",
+                            key, opt.name
+                        ),
+                        path: Some(format!(
+                            "{}.options[{}].option_parameters.{}",
+                            context, idx, key
+                        )),
+                        suggestion: Some(format!(
+                            "Add '{}' to choices, or remove this option_parameters entry.",
+                            key
+                        )),
+                    }
+                    .into());
+                }
+            }
+
+            // Rule: each discriminant's key=value shape reuses the
+            // existing argument validation — names and types, but
+            // explicitly not ordering, which is meaningless for named
+            // key=value pairs rather than positional arguments.
+            for (discriminant, params) in &opt.option_parameters {
+                let sub_context = format!(
+                    "{}.options[{}].option_parameters.{}",
+                    context, idx, discriminant
+                );
+                validate_argument_names(params, &sub_context)?;
+                validate_argument_types(params)?;
+            }
+        } else if !opt.option_parameters.is_empty() {
+            // Rule: option_parameters is meaningless without repeatable.
+            return Err(ConfigError::Inconsistency {
+                details: format!(
+                    "Option '{}' has option_parameters but repeatable is false",
+                    opt.name
+                ),
+                suggestion: Some(
+                    "Set `repeatable: true`, or remove `option_parameters`.".to_string(),
+                ),
+            }
+            .into());
+        }
+
         // Validate choices are consistent with default
         if let Some(ref default) = opt.default {
             if !opt.choices.is_empty() && !opt.choices.contains(default) {
@@ -844,5 +950,246 @@ mod tests {
 
         let result = validate_options(&options, "test");
         assert!(result.is_err());
+    }
+
+    // ── DD-024: repeatable options / option_parameters ──────────────────────
+
+    #[test]
+    fn test_validate_repeatable_requires_non_empty_choices() {
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec![], // Repeatable but no discriminants!
+            repeatable: true,
+            option_parameters: HashMap::new(),
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repeatable_missing_option_parameters_entry() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        // "plot" is in choices but has no option_parameters entry.
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec!["csv".to_string(), "plot".to_string()],
+            repeatable: true,
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repeatable_orphan_option_parameters_key() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        // "json" has an option_parameters entry but is not in choices.
+        option_parameters.insert(
+            "json".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec!["csv".to_string()],
+            repeatable: true,
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repeatable_option_parameters_reuses_argument_validation() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "".to_string(), // Empty name — invalid per validate_argument_names.
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec!["csv".to_string()],
+            repeatable: true,
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_non_repeatable_with_option_parameters_is_error() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Output".to_string(),
+            choices: vec!["csv".to_string()],
+            repeatable: false, // option_parameters set despite repeatable: false!
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repeatable_with_default_is_error() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: Some("csv".to_string()), // Forbidden when repeatable: true!
+            description: "Output".to_string(),
+            choices: vec!["csv".to_string()],
+            repeatable: true,
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_validate_repeatable_valid_config_passes() {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![
+                ArgumentDefinition {
+                    name: "file".to_string(),
+                    arg_type: ArgumentType::Path,
+                    required: true,
+                    description: "Destination CSV file".to_string(),
+                    validation: vec![],
+                    secure: false,
+                },
+                ArgumentDefinition {
+                    name: "resolution".to_string(),
+                    arg_type: ArgumentType::Integer,
+                    required: false,
+                    description: "Time-step resolution".to_string(),
+                    validation: vec![],
+                    secure: false,
+                },
+            ],
+        );
+        option_parameters.insert(
+            "plot".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination image file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+        let options = vec![OptionDefinition {
+            name: "output".to_string(),
+            short: None,
+            long: Some("output".to_string()),
+            option_type: ArgumentType::String,
+            required: false,
+            default: None,
+            description: "Write simulation results in one or more output kinds".to_string(),
+            choices: vec!["csv".to_string(), "plot".to_string()],
+            repeatable: true,
+            option_parameters,
+        }];
+
+        let result = validate_options(&options, "test");
+        assert!(result.is_ok());
     }
 }
