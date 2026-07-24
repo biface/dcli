@@ -42,7 +42,7 @@ use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
 use crate::help::HelpFormatter;
-use crate::parser::ReplParser;
+use crate::parser::{ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
 
 // ============================================================================
@@ -593,10 +593,18 @@ impl ReplInterface {
         // — one command finishes (readline blocks regardless) before the
         // next line is even read, so there is no other async task waiting
         // that `block_on` could starve.
+        //
+        // Wrapped via `from_scalars`: `ReplParser::parse_line` still
+        // produces a plain `HashMap<String, String>` (DD-024 addendum —
+        // repeatable options have no interactive REPL-typing use case, see
+        // `DESIGN_DECISIONS.md`). Every handler receives `&ParsedArgs`
+        // regardless of dispatch path (#39); the REPL path just never
+        // populates `ParsedValue::Repeated` entries.
+        let parsed_args = ParsedArgs::from_scalars(parsed.arguments);
         if let Some(handler) = self.registry.get_handler_sync(&parsed.command_name) {
-            handler.execute(&mut *self.context, &parsed.arguments)?;
+            handler.execute(&mut *self.context, &parsed_args)?;
         } else if let Some(handler) = self.registry.get_handler_async(&parsed.command_name) {
-            futures::executor::block_on(handler.execute(&mut *self.context, &parsed.arguments))?;
+            futures::executor::block_on(handler.execute(&mut *self.context, &parsed_args))?;
         } else {
             return Err(DynamicCliError::Execution(
                 ExecutionError::handler_not_found(&parsed.command_name, "unknown"),
@@ -645,11 +653,7 @@ mod tests {
     }
 
     impl crate::executor::CommandHandler for TestHandler {
-        fn execute(
-            &self,
-            context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             let ctx = crate::context::downcast_mut::<TestContext>(context)
                 .expect("Failed to downcast context");
             ctx.executed_commands.push(self.name.clone());
@@ -798,12 +802,8 @@ mod tests {
 
         struct GreetHandler;
         impl crate::executor::CommandHandler for GreetHandler {
-            fn execute(
-                &self,
-                _ctx: &mut dyn ExecutionContext,
-                args: &HashMap<String, String>,
-            ) -> Result<()> {
-                assert_eq!(args.get("name"), Some(&"Alice".to_string()));
+            fn execute(&self, _ctx: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
+                assert_eq!(args.get_scalar("name"), Some("Alice"));
                 Ok(())
             }
         }
@@ -1019,11 +1019,7 @@ mod tests {
         let cmd_def = make_help_config().commands.into_iter().next().unwrap();
         struct DummyHandler;
         impl crate::executor::CommandHandler for DummyHandler {
-            fn execute(
-                &self,
-                _: &mut dyn ExecutionContext,
-                _: &HashMap<String, String>,
-            ) -> Result<()> {
+            fn execute(&self, _: &mut dyn ExecutionContext, _: &ParsedArgs) -> Result<()> {
                 Ok(())
             }
         }
@@ -1054,11 +1050,7 @@ mod tests {
         let cmd_def = make_help_config().commands.into_iter().next().unwrap();
         struct DummyHandler;
         impl crate::executor::CommandHandler for DummyHandler {
-            fn execute(
-                &self,
-                _: &mut dyn ExecutionContext,
-                _: &HashMap<String, String>,
-            ) -> Result<()> {
+            fn execute(&self, _: &mut dyn ExecutionContext, _: &ParsedArgs) -> Result<()> {
                 Ok(())
             }
         }
@@ -1125,11 +1117,7 @@ mod tests {
 
         struct LoginHandler;
         impl crate::executor::CommandHandler for LoginHandler {
-            fn execute(
-                &self,
-                _ctx: &mut dyn ExecutionContext,
-                _args: &HashMap<String, String>,
-            ) -> Result<()> {
+            fn execute(&self, _ctx: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
                 Ok(())
             }
         }

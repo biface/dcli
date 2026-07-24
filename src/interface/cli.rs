@@ -27,7 +27,7 @@
 
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, Result};
-use crate::parser::CliParser;
+use crate::parser::{CliParser, ParsedArgs};
 use crate::registry::CommandRegistry;
 use std::process;
 
@@ -166,9 +166,11 @@ impl CliInterface {
             DynamicCliError::Registry(crate::error::RegistryError::missing_handler(resolved_name))
         })?;
 
-        // Parse arguments using CLI parser
+        // Parse arguments using CLI parser (DD-024/#39: typed to preserve
+        // repeatable-option occurrences; ParsedArgs is the shape every
+        // handler now receives).
         let parser = CliParser::new(definition);
-        let parsed_args = parser.parse(&args[1..])?;
+        let parsed_args = ParsedArgs::new(parser.parse_typed(&args[1..])?);
 
         // Get handler and execute command. Sync is tried first (unchanged
         // behaviour); if no sync handler matches, fall through to the async
@@ -249,7 +251,6 @@ impl CliInterface {
 mod tests {
     use super::*;
     use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition};
-    use std::collections::HashMap;
 
     // Test context
     #[derive(Default)]
@@ -273,11 +274,7 @@ mod tests {
     }
 
     impl crate::executor::CommandHandler for TestHandler {
-        fn execute(
-            &self,
-            context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             let ctx = crate::context::downcast_mut::<TestContext>(context)
                 .expect("Failed to downcast context");
             ctx.executed_command = Some(self.name.clone());
@@ -396,9 +393,9 @@ mod tests {
             fn execute(
                 &self,
                 _context: &mut dyn ExecutionContext,
-                args: &HashMap<String, String>,
+                args: &ParsedArgs,
             ) -> Result<()> {
-                assert_eq!(args.get("name"), Some(&"Alice".to_string()));
+                assert_eq!(args.get_scalar("name"), Some("Alice"));
                 Ok(())
             }
         }
