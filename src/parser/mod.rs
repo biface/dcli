@@ -187,6 +187,8 @@
 
 #[allow(unused_imports)]
 use crate::error::Result;
+use cli_parser::{OptionOccurrence, ParsedValue};
+use std::collections::HashMap;
 
 // Public submodules
 pub mod cli_parser;
@@ -196,6 +198,106 @@ pub mod type_parser;
 // Re-export commonly used types
 pub use cli_parser::CliParser;
 pub use repl_parser::{ParsedCommand, ReplParser};
+
+/// Parsed command arguments, passed to [`crate::executor::CommandHandler::execute`]
+/// and [`crate::executor::AsyncCommandHandler::execute`]
+///
+/// Wraps the output of [`CliParser::parse_typed`], exposing typed accessors
+/// so handlers never need to match on [`ParsedValue`] directly. Introduced
+/// in v0.6.0 (DD-024, #39) to replace `&HashMap<String, String>`, which
+/// could not represent repeatable options.
+///
+/// Lives directly in `parser` rather than nested under `cli_parser`: it is
+/// the shared type consumed by every handler regardless of dispatch path
+/// (CLI one-shot via [`CliParser::parse_typed`], or REPL via
+/// [`ParsedArgs::from_scalars`]) — not a CLI-specific detail.
+///
+/// # Example
+///
+/// ```
+/// use dynamic_cli::parser::ParsedArgs;
+///
+/// let args = ParsedArgs::from_scalars(
+///     [("name".to_string(), "World".to_string())].into_iter().collect(),
+/// );
+/// assert_eq!(args.get_scalar("name"), Some("World"));
+/// assert_eq!(args.get_scalar("missing"), None);
+/// ```
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct ParsedArgs(HashMap<String, ParsedValue>);
+
+impl ParsedArgs {
+    /// Wrap an already-typed result, as produced by [`CliParser::parse_typed`]
+    pub fn new(values: HashMap<String, ParsedValue>) -> Self {
+        Self(values)
+    }
+
+    /// Build a scalar-only `ParsedArgs` from a plain `HashMap<String, String>`
+    ///
+    /// Every entry becomes a [`ParsedValue::Scalar`]; there is no way to
+    /// represent [`ParsedValue::Repeated`] through this constructor.
+    ///
+    /// Used by the REPL dispatch path (`interface/repl.rs`), which relies
+    /// on [`crate::parser::repl_parser::ReplParser::parse_line`] — itself
+    /// untouched by DD-024, since repeatable options have no interactive
+    /// REPL-typing use case (see `DESIGN_DECISIONS.md`, DD-024 addendum,
+    /// 2026-07-24). Batch/scripted invocations are expected to go through
+    /// [`CliParser::parse_typed`] directly instead (see issue #41,
+    /// `ScriptLoaderPlugin`).
+    pub fn from_scalars(values: HashMap<String, String>) -> Self {
+        Self(
+            values
+                .into_iter()
+                .map(|(k, v)| (k, ParsedValue::Scalar(v)))
+                .collect(),
+        )
+    }
+
+    /// Get a scalar argument or option value by name
+    ///
+    /// Returns `None` both when the name is absent and when it is present
+    /// but holds a [`ParsedValue::Repeated`] value — mirroring
+    /// `HashMap::get`'s silent-on-absence semantics rather than
+    /// distinguishing "wrong kind" from "missing".
+    pub fn get_scalar(&self, name: &str) -> Option<&str> {
+        match self.0.get(name) {
+            Some(ParsedValue::Scalar(s)) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Get every occurrence of a repeatable option by name
+    ///
+    /// Returns `None` both when the name is absent and when it is present
+    /// but holds a [`ParsedValue::Scalar`] value — same silent-on-absence
+    /// contract as [`Self::get_scalar`].
+    pub fn get_repeated(&self, name: &str) -> Option<&[OptionOccurrence]> {
+        match self.0.get(name) {
+            Some(ParsedValue::Repeated(occurrences)) => Some(occurrences.as_slice()),
+            _ => None,
+        }
+    }
+
+    /// Collapse back down to a scalar-only `HashMap<String, String>`
+    ///
+    /// Every [`ParsedValue::Scalar`] entry is kept as-is; any
+    /// [`ParsedValue::Repeated`] entry is silently dropped — mirroring the
+    /// same "no consumer yet" rationale as [`Self::from_scalars`] (see the
+    /// DD-024 addendum in `DESIGN_DECISIONS.md`). Used at the boundary of
+    /// subsystems that predate DD-024 and have not been extended to
+    /// understand repeatable options, e.g. the WASM plugin ABI
+    /// ([`crate::plugin::wasm::WasmHandler`]), which serializes arguments
+    /// as flat `HashMap<String, String>` to the guest.
+    pub fn to_scalar_map(&self) -> HashMap<String, String> {
+        self.0
+            .iter()
+            .filter_map(|(k, v)| match v {
+                ParsedValue::Scalar(s) => Some((k.clone(), s.clone())),
+                ParsedValue::Repeated(_) => None,
+            })
+            .collect()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -212,11 +314,7 @@ mod tests {
     struct IntegrationTestHandler;
 
     impl CommandHandler for IntegrationTestHandler {
-        fn execute(
-            &self,
-            _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             Ok(())
         }
     }

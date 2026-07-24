@@ -44,18 +44,18 @@
 //! ## Simplicity
 //!
 //! The API is intentionally kept simple:
-//! - Arguments are passed as `HashMap<String, String>`
+//! - Arguments are passed as [`crate::parser::ParsedArgs`]
 //! - Context is accessed through trait objects
 //! - Error handling uses the framework's standard `Result` type
 //!
 //! # Quick Start
 //!
 //! ```
-//! use std::collections::HashMap;
 //! use dynamic_cli::error::ExecutionError;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
+//! use std::collections::HashMap;
 //!
 //! // 1. Define your context
 //! #[derive(Default)]
@@ -75,12 +75,12 @@
 //!     fn execute(
 //!         &self,
 //!         context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> Result<()> {
 //!         let ctx = dynamic_cli::context::downcast_mut::<AppContext>(context)
 //!             .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
 //!         
-//!         let amount: i32 = args.get("amount")
+//!         let amount: i32 = args.get_scalar("amount")
 //!             .and_then(|s| s.parse().ok())
 //!             .unwrap_or(1);
 //!         
@@ -94,8 +94,9 @@
 //! # fn main() -> Result<()> {
 //! let handler = IncrementCommand;
 //! let mut context = AppContext::default();
-//! let mut args = HashMap::new();
-//! args.insert("amount".to_string(), "5".to_string());
+//! let mut raw_args = HashMap::new();
+//! raw_args.insert("amount".to_string(), "5".to_string());
+//! let args = ParsedArgs::from_scalars(raw_args);
 //!
 //! handler.execute(&mut context, &args)?;
 //! assert_eq!(context.counter, 5);
@@ -108,8 +109,7 @@
 //! ## Basic Command
 //!
 //! ```
-//! use std::collections::HashMap;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
 //!
@@ -119,9 +119,9 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> Result<()> {
-//!         if let Some(message) = args.get("message") {
+//!         if let Some(message) = args.get_scalar("message") {
 //!             println!("{}", message);
 //!         }
 //!         Ok(())
@@ -132,9 +132,8 @@
 //! ## Command with Validation
 //!
 //! ```
-//! use std::collections::HashMap;
 //! use dynamic_cli::error::ExecutionError;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::DynamicCliError::Execution;
 //! use dynamic_cli::Result;
@@ -145,9 +144,9 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
-//!         let denom = args.get("denominator")
+//!         let denom = args.get_scalar("denominator")
 //!             .ok_or_else(|| {
 //!                 ExecutionError::CommandFailed(
 //!                     anyhow::anyhow!("Missing Denominator"))})?;
@@ -169,9 +168,8 @@
 //! ## Stateful Command
 //!
 //! ```
-//! use std::collections::HashMap;
 //! use dynamic_cli::error::ExecutionError;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
 //!
@@ -191,15 +189,15 @@
 //!     fn execute(
 //!         &self,
 //!         context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> Result<()> {
 //!         let ctx = dynamic_cli::context::downcast_mut::<FileContext>(context)
 //!             .ok_or_else(|| ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")))?;
 //!         
-//!         let filename = args.get("file")
+//!         let filename = args.get_scalar("file")
 //!             .ok_or_else(|| { ExecutionError::CommandFailed(anyhow::anyhow!("Missing file argument"))})?;
 //!         
-//!         ctx.current_file = Some(filename.clone());
+//!         ctx.current_file = Some(filename.to_string());
 //!         println!("Opened: {}", filename);
 //!         Ok(())
 //!     }
@@ -243,8 +241,7 @@
 //! ## Error Handling Pattern
 //!
 //! ```
-//! use std::collections::HashMap;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::error::ExecutionError;
 //! use dynamic_cli::Result;
@@ -255,9 +252,9 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> Result<()> {
-//!         let path = args.get("path")
+//!         let path = args.get_scalar("path")
 //!             .ok_or_else(|| { ExecutionError::CommandFailed(anyhow::anyhow!("Missing path argument"))})?;
 //!         
 //!         // Wrap application errors in ExecutionError
@@ -275,6 +272,7 @@
 pub mod traits;
 
 // Public re-exports for convenience
+pub use crate::parser::ParsedArgs;
 pub use traits::{AsyncCommandHandler, CommandHandler};
 
 #[cfg(test)]
@@ -313,17 +311,14 @@ mod tests {
         fn execute(
             &self,
             context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
+            args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             let ctx =
                 crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
                     ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
                 })?;
 
-            let message = args
-                .get("message")
-                .map(|s| s.as_str())
-                .unwrap_or("default message");
+            let message = args.get_scalar("message").unwrap_or("default message");
             ctx.log.push(message.to_string());
             Ok(())
         }
@@ -336,15 +331,15 @@ mod tests {
         fn execute(
             &self,
             context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
+            args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             let ctx =
                 crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
                     ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
                 })?;
 
-            if let (Some(key), Some(value)) = (args.get("key"), args.get("value")) {
-                ctx.state.insert(key.clone(), value.clone());
+            if let (Some(key), Some(value)) = (args.get_scalar("key"), args.get_scalar("value")) {
+                ctx.state.insert(key.to_string(), value.to_string());
             }
             Ok(())
         }
@@ -357,14 +352,14 @@ mod tests {
         fn execute(
             &self,
             context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
+            args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             let ctx =
                 crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(|| {
                     ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
                 })?;
 
-            if let Some(key) = args.get("key") {
+            if let Some(key) = args.get_scalar("key") {
                 if let Some(value) = ctx.state.get(key) {
                     ctx.log.push(format!("{} = {}", key, value));
                 } else {
@@ -397,11 +392,13 @@ mod tests {
         let log_cmd = LogCommand;
         let mut args1 = HashMap::new();
         args1.insert("message".to_string(), "First".to_string());
+        let args1 = ParsedArgs::from_scalars(args1);
         log_cmd.execute(&mut context, &args1).unwrap();
 
         // Execute second command
         let mut args2 = HashMap::new();
         args2.insert("message".to_string(), "Second".to_string());
+        let args2 = ParsedArgs::from_scalars(args2);
         log_cmd.execute(&mut context, &args2).unwrap();
 
         // Verify both commands executed
@@ -420,21 +417,25 @@ mod tests {
         let mut args1 = HashMap::new();
         args1.insert("key".to_string(), "name".to_string());
         args1.insert("value".to_string(), "Alice".to_string());
+        let args1 = ParsedArgs::from_scalars(args1);
         set_cmd.execute(&mut context, &args1).unwrap();
 
         let mut args2 = HashMap::new();
         args2.insert("key".to_string(), "age".to_string());
         args2.insert("value".to_string(), "30".to_string());
+        let args2 = ParsedArgs::from_scalars(args2);
         set_cmd.execute(&mut context, &args2).unwrap();
 
         // Retrieve values
         let get_cmd = GetCommand;
         let mut args3 = HashMap::new();
         args3.insert("key".to_string(), "name".to_string());
+        let args3 = ParsedArgs::from_scalars(args3);
         get_cmd.execute(&mut context, &args3).unwrap();
 
         let mut args4 = HashMap::new();
         args4.insert("key".to_string(), "age".to_string());
+        let args4 = ParsedArgs::from_scalars(args4);
         get_cmd.execute(&mut context, &args4).unwrap();
 
         // Verify workflow
@@ -463,15 +464,18 @@ mod tests {
 
         let mut args1 = HashMap::new();
         args1.insert("message".to_string(), "test".to_string());
+        let args1 = ParsedArgs::from_scalars(args1);
         handlers[0].execute(&mut context, &args1).unwrap();
 
         let mut args2 = HashMap::new();
         args2.insert("key".to_string(), "k".to_string());
         args2.insert("value".to_string(), "v".to_string());
+        let args2 = ParsedArgs::from_scalars(args2);
         handlers[1].execute(&mut context, &args2).unwrap();
 
         let mut args3 = HashMap::new();
         args3.insert("key".to_string(), "k".to_string());
+        let args3 = ParsedArgs::from_scalars(args3);
         handlers[2].execute(&mut context, &args3).unwrap();
 
         assert_eq!(context.log.len(), 2);
@@ -487,12 +491,14 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("key".to_string(), "shared".to_string());
         args.insert("value".to_string(), "value".to_string());
+        let args = ParsedArgs::from_scalars(args);
         set_cmd.execute(&mut context, &args).unwrap();
 
         // Another command can see the state
         let get_cmd = GetCommand;
         let mut args2 = HashMap::new();
         args2.insert("key".to_string(), "shared".to_string());
+        let args2 = ParsedArgs::from_scalars(args2);
         get_cmd.execute(&mut context, &args2).unwrap();
 
         assert!(context.log[0].contains("shared = value"));
@@ -507,7 +513,7 @@ mod tests {
             fn execute(
                 &self,
                 _context: &mut dyn ExecutionContext,
-                _args: &HashMap<String, String>,
+                _args: &ParsedArgs,
             ) -> crate::error::Result<()> {
                 Err(ExecutionError::CommandFailed(anyhow::anyhow!("Intentional failure")).into())
             }
@@ -516,6 +522,7 @@ mod tests {
         let handler = FailingCommand;
         let mut context = IntegrationContext::default();
         let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(args);
 
         let result = handler.execute(&mut context, &args);
 
@@ -533,7 +540,7 @@ mod tests {
             fn execute(
                 &self,
                 context: &mut dyn ExecutionContext,
-                _args: &HashMap<String, String>,
+                _args: &ParsedArgs,
             ) -> crate::error::Result<()> {
                 let ctx = crate::context::downcast_mut::<IntegrationContext>(context).ok_or_else(
                     || ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type")),
@@ -542,8 +549,8 @@ mod tests {
                 Ok(())
             }
 
-            fn validate(&self, args: &HashMap<String, String>) -> crate::error::Result<()> {
-                if !args.contains_key("required") {
+            fn validate(&self, args: &ParsedArgs) -> crate::error::Result<()> {
+                if args.get_scalar("required").is_none() {
                     return Err(ExecutionError::CommandFailed(anyhow::anyhow!(
                         "Missing required argument"
                     ))
@@ -558,12 +565,14 @@ mod tests {
 
         // Test validation failure
         let args_invalid = HashMap::new();
+        let args_invalid = ParsedArgs::from_scalars(args_invalid);
         assert!(handler.validate(&args_invalid).is_err());
         assert!(handler.execute(&mut context, &args_invalid).is_ok()); // Execute would work
 
         // Test validation success
         let mut args_valid = HashMap::new();
         args_valid.insert("required".to_string(), "value".to_string());
+        let args_valid = ParsedArgs::from_scalars(args_valid);
         assert!(handler.validate(&args_valid).is_ok());
         assert!(handler.execute(&mut context, &args_valid).is_ok());
     }
@@ -591,13 +600,16 @@ mod tests {
             fn execute(
                 &self,
                 context: &mut dyn ExecutionContext,
-                args: &HashMap<String, String>,
+                args: &ParsedArgs,
             ) -> crate::error::Result<()> {
                 let ctx = crate::context::downcast_mut::<AppContext>(context).ok_or_else(|| {
                     ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
                 })?;
 
-                let amount: i32 = args.get("amount").and_then(|s| s.parse().ok()).unwrap_or(1);
+                let amount: i32 = args
+                    .get_scalar("amount")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(1);
 
                 ctx.counter += amount;
                 Ok(())
@@ -608,6 +620,7 @@ mod tests {
         let mut context = AppContext::default();
         let mut args = HashMap::new();
         args.insert("amount".to_string(), "5".to_string());
+        let args = ParsedArgs::from_scalars(args);
 
         handler.execute(&mut context, &args).unwrap();
         assert_eq!(context.counter, 5);
@@ -623,24 +636,28 @@ mod tests {
         let mut args1 = HashMap::new();
         args1.insert("key".to_string(), "initialized".to_string());
         args1.insert("value".to_string(), "true".to_string());
+        let args1 = ParsedArgs::from_scalars(args1);
         set_cmd.execute(&mut context, &args1).unwrap();
 
         // Step 2: Log the initialization
         let log_cmd = LogCommand;
         let mut args2 = HashMap::new();
         args2.insert("message".to_string(), "System initialized".to_string());
+        let args2 = ParsedArgs::from_scalars(args2);
         log_cmd.execute(&mut context, &args2).unwrap();
 
         // Step 3: Set more state
         let mut args3 = HashMap::new();
         args3.insert("key".to_string(), "user".to_string());
         args3.insert("value".to_string(), "admin".to_string());
+        let args3 = ParsedArgs::from_scalars(args3);
         set_cmd.execute(&mut context, &args3).unwrap();
 
         // Step 4: Query state
         let get_cmd = GetCommand;
         let mut args4 = HashMap::new();
         args4.insert("key".to_string(), "user".to_string());
+        let args4 = ParsedArgs::from_scalars(args4);
         get_cmd.execute(&mut context, &args4).unwrap();
 
         // Verify the complete workflow

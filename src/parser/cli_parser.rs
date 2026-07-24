@@ -169,8 +169,10 @@ impl<'a> CliParser<'a> {
     /// (i.e. any `repeatable: true` option) is silently dropped from the
     /// result — no command definition predating DD-024 can have one, so
     /// existing callers see no behaviour change. Once the dispatch layer
-    /// is migrated to consume `ParsedArgs` directly (planned, DD-024,
-    /// tracked as a separate breaking change), this method can be removed.
+    /// is migrated to consume [`crate::parser::ParsedArgs`] directly
+    /// (#39, in progress — the type exists but `interface/cli.rs` and
+    /// `interface/repl.rs` still call this method, not `parse_typed`),
+    /// this method can be removed.
     ///
     /// # Arguments
     ///

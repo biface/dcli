@@ -18,10 +18,10 @@
 //!
 //! ## Simple Type Signatures
 //!
-//! Arguments are passed as `HashMap<String, String>` rather than generic types.
-//! This design choice:
+//! Arguments are passed as [`crate::parser::ParsedArgs`] rather than generic
+//! types. This design choice:
 //! - Maintains object safety
-//! - Provides flexibility in argument types
+//! - Represents both scalar and repeatable-option values (DD-024)
 //! - Delegates type parsing to the parser module
 //!
 //! ## Thread Safety
@@ -34,8 +34,7 @@
 //! # Example
 //!
 //! ```
-//! use std::collections::HashMap;
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
 //! use dynamic_cli::Result;
 //!
@@ -46,9 +45,9 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> Result<()> {
-//!         let name = args.get("name").map(|s| s.as_str()).unwrap_or("World");
+//!         let name = args.get_scalar("name").unwrap_or("World");
 //!         println!("Hello, {}!", name);
 //!         Ok(())
 //!     }
@@ -57,8 +56,8 @@
 
 use crate::context::ExecutionContext;
 use crate::error::Result;
+use crate::parser::ParsedArgs;
 use async_trait::async_trait;
-use std::collections::HashMap;
 
 /// Trait for command implementations
 ///
@@ -81,7 +80,7 @@ use std::collections::HashMap;
 ///
 /// # Execution Flow
 ///
-/// 1. Parser converts user input to `HashMap<String, String>`
+/// 1. Parser converts user input to [`crate::parser::ParsedArgs`]
 /// 2. Validator checks argument constraints
 /// 3. `validate()` is called for custom validation (optional)
 /// 4. `execute()` is called with validated arguments
@@ -89,9 +88,8 @@ use std::collections::HashMap;
 /// # Example
 ///
 /// ```
-/// use std::collections::HashMap;
 /// use dynamic_cli::error::ExecutionError;
-/// use dynamic_cli::executor::CommandHandler;
+/// use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 /// use dynamic_cli::context::ExecutionContext;
 /// use dynamic_cli::Result;
 ///
@@ -101,16 +99,16 @@ use std::collections::HashMap;
 ///     fn execute(
 ///         &self,
 ///         _context: &mut dyn ExecutionContext,
-///         args: &HashMap<String, String>,
+///         args: &ParsedArgs,
 ///     ) -> Result<()> {
-///         let name = args.get("name")
+///         let name = args.get_scalar("name")
 ///             .ok_or_else(|| {
 ///                 ExecutionError::CommandFailed(
 ///                     anyhow::anyhow!("Missing 'name' argument")
 ///              )
 ///          })?;
 ///         
-///         let greeting = if let Some(formal) = args.get("formal") {
+///         let greeting = if let Some(formal) = args.get_scalar("formal") {
 ///             if formal == "true" {
 ///                 format!("Good day, {}.", name)
 ///             } else {
@@ -124,9 +122,9 @@ use std::collections::HashMap;
 ///         Ok(())
 ///     }
 ///     
-///     fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
+///     fn validate(&self, args: &ParsedArgs) -> Result<()> {
 ///         // Custom validation: name must not be empty
-///         if let Some(name) = args.get("name") {
+///         if let Some(name) = args.get_scalar("name") {
 ///             if name.trim().is_empty() {
 ///                 return Err(ExecutionError::CommandFailed(
 ///                         anyhow::anyhow!("Name cannot be empty")
@@ -174,9 +172,8 @@ pub trait CommandHandler: Send + Sync {
     /// # Example
     ///
     /// ```
-    /// # use std::collections::HashMap;
     /// # use dynamic_cli::error::ExecutionError;
-    /// # use dynamic_cli::executor::CommandHandler;
+    /// # use dynamic_cli::executor::{CommandHandler, ParsedArgs};
     /// # use dynamic_cli::context::ExecutionContext;
     /// # use dynamic_cli::Result;
     /// #
@@ -186,9 +183,9 @@ pub trait CommandHandler: Send + Sync {
     ///     fn execute(
     ///         &self,
     ///         _context: &mut dyn ExecutionContext,
-    ///         args: &HashMap<String, String>,
+    ///         args: &ParsedArgs,
     ///     ) -> Result<()> {
-    ///         let path = args.get("path")
+    ///         let path = args.get_scalar("path")
     ///             .ok_or_else(|| {
     ///                ExecutionError::CommandFailed(
     ///                       anyhow::anyhow!("Missing path argument")
@@ -206,11 +203,7 @@ pub trait CommandHandler: Send + Sync {
     ///     }
     /// }
     /// ```
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()>;
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()>;
 
     /// Optional custom validation for arguments
     ///
@@ -235,8 +228,7 @@ pub trait CommandHandler: Send + Sync {
     /// # Example
     ///
     /// ```
-    /// # use std::collections::HashMap;
-    /// # use dynamic_cli::executor::CommandHandler;
+    /// # use dynamic_cli::executor::{CommandHandler, ParsedArgs};
     /// # use dynamic_cli::context::ExecutionContext;
     /// # use dynamic_cli::error::ExecutionError;
     /// # use dynamic_cli::Result;
@@ -247,15 +239,15 @@ pub trait CommandHandler: Send + Sync {
     ///     fn execute(
     ///         &self,
     ///         _context: &mut dyn ExecutionContext,
-    ///         args: &HashMap<String, String>,
+    ///         args: &ParsedArgs,
     ///     ) -> Result<()> {
     ///         // Execution logic here
     ///         Ok(())
     ///     }
     ///     
-    ///     fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
+    ///     fn validate(&self, args: &ParsedArgs) -> Result<()> {
     ///         // Custom validation: ensure min < max
-    ///         if let (Some(min), Some(max)) = (args.get("min"), args.get("max")) {
+    ///         if let (Some(min), Some(max)) = (args.get_scalar("min"), args.get_scalar("max")) {
     ///             let min_val: f64 = min.parse()
     ///                 .map_err(|_| {
     ///                     ExecutionError::CommandFailed(anyhow::anyhow!("Invalid min value"))
@@ -271,7 +263,7 @@ pub trait CommandHandler: Send + Sync {
     ///     }
     /// }
     /// ```
-    fn validate(&self, _args: &HashMap<String, String>) -> Result<()> {
+    fn validate(&self, _args: &ParsedArgs) -> Result<()> {
         Ok(())
     }
 }
@@ -309,9 +301,8 @@ pub trait CommandHandler: Send + Sync {
 /// # Example
 ///
 /// ```
-/// use std::collections::HashMap;
 /// use async_trait::async_trait;
-/// use dynamic_cli::executor::AsyncCommandHandler;
+/// use dynamic_cli::executor::{AsyncCommandHandler, ParsedArgs};
 /// use dynamic_cli::context::ExecutionContext;
 /// use dynamic_cli::error::ExecutionError;
 /// use dynamic_cli::Result;
@@ -323,9 +314,9 @@ pub trait CommandHandler: Send + Sync {
 ///     async fn execute(
 ///         &self,
 ///         _context: &mut dyn ExecutionContext,
-///         args: &HashMap<String, String>,
+///         args: &ParsedArgs,
 ///     ) -> Result<()> {
-///         let url = args.get("url").ok_or_else(|| {
+///         let url = args.get_scalar("url").ok_or_else(|| {
 ///             ExecutionError::CommandFailed(anyhow::anyhow!("Missing 'url' argument"))
 ///         })?;
 ///         // Real implementations would `.await` an async HTTP call here.
@@ -333,8 +324,8 @@ pub trait CommandHandler: Send + Sync {
 ///         Ok(())
 ///     }
 ///
-///     async fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
-///         if !args.contains_key("url") {
+///     async fn validate(&self, args: &ParsedArgs) -> Result<()> {
+///         if args.get_scalar("url").is_none() {
 ///             return Err(ExecutionError::CommandFailed(anyhow::anyhow!("url is required")).into());
 ///         }
 ///         Ok(())
@@ -346,16 +337,12 @@ pub trait AsyncCommandHandler: Send + Sync {
     /// Async equivalent of [`CommandHandler::execute`]. Same contract:
     /// receives the mutable execution context and the parsed arguments,
     /// returns `Ok(())` on success or a `DynamicCliError` on failure.
-    async fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()>;
+    async fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()>;
 
     /// Async equivalent of [`CommandHandler::validate`]. Same contract and
     /// same default (accepts all arguments) — override only for custom
     /// validation logic.
-    async fn validate(&self, _args: &HashMap<String, String>) -> Result<()> {
+    async fn validate(&self, _args: &ParsedArgs) -> Result<()> {
         Ok(())
     }
 }
@@ -365,7 +352,17 @@ mod tests {
     use super::*;
     use crate::error::ExecutionError;
     use std::any::Any;
-    use std::sync::{Arc, Mutex};
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    /// Test helper: build a scalar-only `ParsedArgs` from `[(key, value), ...]`.
+    fn scalar_args<const N: usize>(pairs: [(&str, &str); N]) -> ParsedArgs {
+        let map: HashMap<String, String> = pairs
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        ParsedArgs::from_scalars(map)
+    }
 
     // ============================================================================
     // TEST FIXTURES
@@ -391,16 +388,12 @@ mod tests {
     struct HelloCommand;
 
     impl CommandHandler for HelloCommand {
-        fn execute(
-            &self,
-            context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
             let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
                 ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
             })?;
 
-            let name = args.get("name").map(|s| s.as_str()).unwrap_or("World");
+            let name = args.get_scalar("name").unwrap_or("World");
             ctx.state = format!("Hello, {}!", name);
             Ok(())
         }
@@ -410,17 +403,13 @@ mod tests {
     struct ValidatedCommand;
 
     impl CommandHandler for ValidatedCommand {
-        fn execute(
-            &self,
-            _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             Ok(())
         }
 
-        fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
+        fn validate(&self, args: &ParsedArgs) -> Result<()> {
             // Require "count" argument to be present and > 0
-            if let Some(count) = args.get("count") {
+            if let Some(count) = args.get_scalar("count") {
                 let count_val: i32 = count.parse().map_err(|_| {
                     ExecutionError::CommandFailed(anyhow::anyhow!("count must be an integer"))
                 })?;
@@ -444,11 +433,7 @@ mod tests {
     struct FailingCommand;
 
     impl CommandHandler for FailingCommand {
-        fn execute(
-            &self,
-            _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             Err(ExecutionError::CommandFailed(anyhow::anyhow!("Simulated failure")).into())
         }
     }
@@ -457,16 +442,12 @@ mod tests {
     struct StatefulCommand;
 
     impl CommandHandler for StatefulCommand {
-        fn execute(
-            &self,
-            context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
             let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
                 ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
             })?;
 
-            let value = args.get("value").map(|s| s.as_str()).unwrap_or("default");
+            let value = args.get_scalar("value").unwrap_or("default");
             ctx.state.push_str(value);
             Ok(())
         }
@@ -480,8 +461,7 @@ mod tests {
     fn test_basic_execution() {
         let handler = HelloCommand;
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "Rust".to_string());
+        let args = scalar_args([("name", "Rust")]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -493,7 +473,7 @@ mod tests {
     fn test_execution_without_args() {
         let handler = HelloCommand;
         let mut context = TestContext::default();
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = handler.execute(&mut context, &args);
 
@@ -505,8 +485,7 @@ mod tests {
     fn test_execution_with_empty_name() {
         let handler = HelloCommand;
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "".to_string());
+        let args = scalar_args([("name", "")]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -521,8 +500,7 @@ mod tests {
     #[test]
     fn test_default_validation_accepts_all() {
         let handler = HelloCommand;
-        let mut args = HashMap::new();
-        args.insert("random".to_string(), "value".to_string());
+        let args = scalar_args([("random", "value")]);
 
         let result = handler.validate(&args);
 
@@ -532,8 +510,7 @@ mod tests {
     #[test]
     fn test_custom_validation_success() {
         let handler = ValidatedCommand;
-        let mut args = HashMap::new();
-        args.insert("count".to_string(), "5".to_string());
+        let args = scalar_args([("count", "5")]);
 
         let result = handler.validate(&args);
 
@@ -543,7 +520,7 @@ mod tests {
     #[test]
     fn test_custom_validation_missing_arg() {
         let handler = ValidatedCommand;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = handler.validate(&args);
 
@@ -555,8 +532,7 @@ mod tests {
     #[test]
     fn test_custom_validation_invalid_value() {
         let handler = ValidatedCommand;
-        let mut args = HashMap::new();
-        args.insert("count".to_string(), "0".to_string());
+        let args = scalar_args([("count", "0")]);
 
         let result = handler.validate(&args);
 
@@ -568,8 +544,7 @@ mod tests {
     #[test]
     fn test_custom_validation_non_integer() {
         let handler = ValidatedCommand;
-        let mut args = HashMap::new();
-        args.insert("count".to_string(), "abc".to_string());
+        let args = scalar_args([("count", "abc")]);
 
         let result = handler.validate(&args);
 
@@ -586,7 +561,7 @@ mod tests {
     fn test_execution_failure() {
         let handler = FailingCommand;
         let mut context = TestContext::default();
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = handler.execute(&mut context, &args);
 
@@ -613,7 +588,7 @@ mod tests {
 
         let handler = HelloCommand;
         let mut wrong_context = WrongContext::default();
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = handler.execute(&mut wrong_context, &args);
 
@@ -631,8 +606,7 @@ mod tests {
         let handler = StatefulCommand;
         let mut context = TestContext::default();
         context.state = "initial".to_string();
-        let mut args = HashMap::new();
-        args.insert("value".to_string(), "_modified".to_string());
+        let args = scalar_args([("value", "_modified")]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -646,14 +620,12 @@ mod tests {
         let mut context = TestContext::default();
 
         // First execution
-        let mut args1 = HashMap::new();
-        args1.insert("value".to_string(), "first".to_string());
+        let args1 = scalar_args([("value", "first")]);
         handler.execute(&mut context, &args1).unwrap();
         assert_eq!(context.state, "first");
 
         // Second execution
-        let mut args2 = HashMap::new();
-        args2.insert("value".to_string(), "_second".to_string());
+        let args2 = scalar_args([("value", "_second")]);
         handler.execute(&mut context, &args2).unwrap();
         assert_eq!(context.state, "first_second");
     }
@@ -667,8 +639,7 @@ mod tests {
         // Verify that CommandHandler can be used as a trait object
         let handler: Box<dyn CommandHandler> = Box::new(HelloCommand);
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "TraitObject".to_string());
+        let args = scalar_args([("name", "TraitObject")]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -685,15 +656,13 @@ mod tests {
         let mut context = TestContext::default();
 
         // Execute first handler
-        let mut args1 = HashMap::new();
-        args1.insert("name".to_string(), "First".to_string());
+        let args1 = scalar_args([("name", "First")]);
         handlers[0].execute(&mut context, &args1).unwrap();
         assert_eq!(context.state, "Hello, First!");
 
         // Execute second handler
         context.state.clear();
-        let mut args2 = HashMap::new();
-        args2.insert("value".to_string(), "Second".to_string());
+        let args2 = scalar_args([("value", "Second")]);
         handlers[1].execute(&mut context, &args2).unwrap();
         assert_eq!(context.state, "Second");
     }
@@ -724,13 +693,11 @@ mod tests {
         let handler_clone = handler.clone();
 
         let handle = std::thread::spawn(move || {
-            let mut args = HashMap::new();
-            args.insert("count".to_string(), "10".to_string());
+            let args = scalar_args([("count", "10")]);
             handler_clone.validate(&args)
         });
 
-        let mut args = HashMap::new();
-        args.insert("count".to_string(), "5".to_string());
+        let args = scalar_args([("count", "5")]);
         let result1 = handler.validate(&args);
 
         let result2 = handle.join().unwrap();
@@ -747,7 +714,7 @@ mod tests {
     fn test_empty_args() {
         let handler = StatefulCommand;
         let mut context = TestContext::default();
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         // Should use default value
         let result = handler.execute(&mut context, &args);
@@ -760,8 +727,7 @@ mod tests {
     fn test_args_with_special_characters() {
         let handler = HelloCommand;
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "Hello, 世界! 🌍".to_string());
+        let args = scalar_args([("name", "Hello, 世界! 🌍")]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -773,9 +739,8 @@ mod tests {
     fn test_very_long_argument() {
         let handler = HelloCommand;
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
         let long_name = "x".repeat(10000);
-        args.insert("name".to_string(), long_name.clone());
+        let args = scalar_args([("name", long_name.as_str())]);
 
         let result = handler.execute(&mut context, &args);
 
@@ -794,12 +759,10 @@ mod tests {
         let handler2 = StatefulCommand;
         let mut context = TestContext::default();
 
-        let mut args1 = HashMap::new();
-        args1.insert("value".to_string(), "A".to_string());
+        let args1 = scalar_args([("value", "A")]);
         handler1.execute(&mut context, &args1).unwrap();
 
-        let mut args2 = HashMap::new();
-        args2.insert("value".to_string(), "B".to_string());
+        let args2 = scalar_args([("value", "B")]);
         handler2.execute(&mut context, &args2).unwrap();
 
         assert_eq!(context.state, "AB");
@@ -845,12 +808,12 @@ mod tests {
         async fn execute(
             &self,
             context: &mut dyn ExecutionContext,
-            args: &HashMap<String, String>,
+            args: &ParsedArgs,
         ) -> Result<()> {
             let ctx = crate::context::downcast_mut::<TestContext>(context).ok_or_else(|| {
                 ExecutionError::CommandFailed(anyhow::anyhow!("Wrong context type"))
             })?;
-            let name = args.get("name").map(|s| s.as_str()).unwrap_or("World");
+            let name = args.get_scalar("name").unwrap_or("World");
             ctx.state = format!("Hello, {}!", name);
             Ok(())
         }
@@ -864,13 +827,13 @@ mod tests {
         async fn execute(
             &self,
             _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> Result<()> {
             Ok(())
         }
 
-        async fn validate(&self, args: &HashMap<String, String>) -> Result<()> {
-            if !args.contains_key("count") {
+        async fn validate(&self, args: &ParsedArgs) -> Result<()> {
+            if args.get_scalar("count").is_none() {
                 return Err(
                     ExecutionError::CommandFailed(anyhow::anyhow!("count is required")).into(),
                 );
@@ -887,7 +850,7 @@ mod tests {
         async fn execute(
             &self,
             _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> Result<()> {
             Err(ExecutionError::CommandFailed(anyhow::anyhow!("Simulated async failure")).into())
         }
@@ -897,8 +860,7 @@ mod tests {
     fn test_async_basic_execution() {
         let handler = AsyncHelloCommand;
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "Rust".to_string());
+        let args = scalar_args([("name", "Rust")]);
 
         let result = futures::executor::block_on(handler.execute(&mut context, &args));
 
@@ -909,8 +871,7 @@ mod tests {
     #[test]
     fn test_async_default_validation_accepts_all() {
         let handler = AsyncHelloCommand;
-        let mut args = HashMap::new();
-        args.insert("random".to_string(), "value".to_string());
+        let args = scalar_args([("random", "value")]);
 
         let result = futures::executor::block_on(handler.validate(&args));
 
@@ -920,7 +881,7 @@ mod tests {
     #[test]
     fn test_async_custom_validation_missing_arg() {
         let handler = AsyncValidatedCommand;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = futures::executor::block_on(handler.validate(&args));
 
@@ -932,8 +893,7 @@ mod tests {
     #[test]
     fn test_async_custom_validation_success() {
         let handler = AsyncValidatedCommand;
-        let mut args = HashMap::new();
-        args.insert("count".to_string(), "5".to_string());
+        let args = scalar_args([("count", "5")]);
 
         let result = futures::executor::block_on(handler.validate(&args));
 
@@ -944,7 +904,7 @@ mod tests {
     fn test_async_execution_failure() {
         let handler = AsyncFailingCommand;
         let mut context = TestContext::default();
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = futures::executor::block_on(handler.execute(&mut context, &args));
 
@@ -959,8 +919,7 @@ mod tests {
         // the core object-safety guarantee DD-022 depends on.
         let handler: Box<dyn AsyncCommandHandler> = Box::new(AsyncHelloCommand);
         let mut context = TestContext::default();
-        let mut args = HashMap::new();
-        args.insert("name".to_string(), "TraitObject".to_string());
+        let args = scalar_args([("name", "TraitObject")]);
 
         let result = futures::executor::block_on(handler.execute(&mut context, &args));
 
