@@ -21,7 +21,6 @@ use dynamic_cli::config::schema::{CommandDefinition, Metadata};
 use dynamic_cli::executor::AsyncCommandHandler;
 use dynamic_cli::prelude::*;
 use std::any::Any;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -66,7 +65,7 @@ impl AsyncCommandHandler for TokenFetchHandler {
     async fn execute(
         &self,
         _ctx: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
+        _args: &ParsedArgs,
     ) -> dynamic_cli::Result<()> {
         futures_timer::Delay::new(self.delay).await;
         self.tokens.lock().unwrap().push("tok_9f3a2b1c".to_string());

@@ -315,7 +315,7 @@ impl CommandHandler for MyCommand {
     fn execute(
         &self,
         context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
+        args: &ParsedArgs,
     ) -> Result<()> {
         // Your command logic
         Ok(())

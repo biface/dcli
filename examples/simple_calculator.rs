@@ -15,7 +15,6 @@
 //! ```
 
 use dynamic_cli::prelude::*;
-use std::collections::HashMap;
 
 // ============================================================================
 // EXECUTION CONTEXT
@@ -46,11 +45,7 @@ impl ExecutionContext for CalculatorContext {
 struct AddCommand;
 
 impl CommandHandler for AddCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -62,8 +57,8 @@ impl CommandHandler for AddCommand {
             })?;
 
         // Parse arguments
-        let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
-        let b = dynamic_cli::parse_float(args.get("b").unwrap(), "b")?;
+        let a = dynamic_cli::parse_float(args.get_scalar("a").unwrap(), "a")?;
+        let b = dynamic_cli::parse_float(args.get_scalar("b").unwrap(), "b")?;
 
         // Calculate
         let result = a + b;
@@ -81,11 +76,7 @@ impl CommandHandler for AddCommand {
 struct SubtractCommand;
 
 impl CommandHandler for SubtractCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -96,8 +87,8 @@ impl CommandHandler for SubtractCommand {
                 )
             })?;
 
-        let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
-        let b = dynamic_cli::parse_float(args.get("b").unwrap(), "b")?;
+        let a = dynamic_cli::parse_float(args.get_scalar("a").unwrap(), "a")?;
+        let b = dynamic_cli::parse_float(args.get_scalar("b").unwrap(), "b")?;
 
         let result = a - b;
         ctx.last_result = Some(result);
@@ -113,11 +104,7 @@ impl CommandHandler for SubtractCommand {
 struct MultiplyCommand;
 
 impl CommandHandler for MultiplyCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -128,8 +115,8 @@ impl CommandHandler for MultiplyCommand {
                 )
             })?;
 
-        let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
-        let b = dynamic_cli::parse_float(args.get("b").unwrap(), "b")?;
+        let a = dynamic_cli::parse_float(args.get_scalar("a").unwrap(), "a")?;
+        let b = dynamic_cli::parse_float(args.get_scalar("b").unwrap(), "b")?;
 
         let result = a * b;
         ctx.last_result = Some(result);
@@ -145,11 +132,7 @@ impl CommandHandler for MultiplyCommand {
 struct DivideCommand;
 
 impl CommandHandler for DivideCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -160,8 +143,8 @@ impl CommandHandler for DivideCommand {
                 )
             })?;
 
-        let a = dynamic_cli::parse_float(args.get("a").unwrap(), "a")?;
-        let b = dynamic_cli::parse_float(args.get("b").unwrap(), "b")?;
+        let a = dynamic_cli::parse_float(args.get_scalar("a").unwrap(), "a")?;
+        let b = dynamic_cli::parse_float(args.get_scalar("b").unwrap(), "b")?;
 
         // Check for division by zero
         if b == 0.0 {
@@ -186,11 +169,7 @@ impl CommandHandler for DivideCommand {
 struct HistoryCommand;
 
 impl CommandHandler for HistoryCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_ref::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -216,11 +195,7 @@ impl CommandHandler for HistoryCommand {
 struct ClearCommand;
 
 impl CommandHandler for ClearCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -243,11 +218,7 @@ impl CommandHandler for ClearCommand {
 struct LastCommand;
 
 impl CommandHandler for LastCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_ref::<CalculatorContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(

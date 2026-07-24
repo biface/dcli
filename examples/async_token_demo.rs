@@ -16,7 +16,6 @@ use dynamic_cli::config::schema::{CommandDefinition, Metadata};
 use dynamic_cli::executor::AsyncCommandHandler;
 use dynamic_cli::prelude::*;
 use std::any::Any;
-use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 #[derive(Default)]
@@ -43,7 +42,7 @@ impl AsyncCommandHandler for TokenFetchHandler {
     async fn execute(
         &self,
         _ctx: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
+        _args: &ParsedArgs,
     ) -> dynamic_cli::Result<()> {
         println!("Fetching token... (this genuinely takes 10 seconds)");
         let started = Instant::now();
