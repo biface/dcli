@@ -117,7 +117,6 @@
 //! use dynamic_cli::prelude::*;
 //! use dynamic_cli::config::loader::load_config;
 //! use dynamic_cli::interface::CliInterface;
-//! use std::collections::HashMap;
 //!
 //! // Define context
 //! #[derive(Default)]
@@ -137,11 +136,11 @@
 //!     fn execute(
 //!         &self,
 //!         context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
 //!         let ctx = dynamic_cli::context::downcast_mut::<AppContext>(context).unwrap();
-//!         let item = args.get("item").unwrap();
-//!         ctx.data.push(item.clone());
+//!         let item = args.get_scalar("item").unwrap();
+//!         ctx.data.push(item.to_string());
 //!         println!("Added: {}", item);
 //!         Ok(())
 //!     }
@@ -171,7 +170,6 @@
 //! use dynamic_cli::prelude::*;
 //! use dynamic_cli::config::loader::load_config;
 //! use dynamic_cli::interface::ReplInterface;
-//! use std::collections::HashMap;
 //!
 //! // Same context and handler as above
 //! # #[derive(Default)]
@@ -182,10 +180,10 @@
 //! # }
 //! # struct AddCommand;
 //! # impl CommandHandler for AddCommand {
-//! #     fn execute(&self, context: &mut dyn ExecutionContext, args: &HashMap<String, String>) -> dynamic_cli::Result<()> {
+//! #     fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> dynamic_cli::Result<()> {
 //! #         let ctx = dynamic_cli::context::downcast_mut::<AppContext>(context).unwrap();
-//! #         let item = args.get("item").unwrap();
-//! #         ctx.data.push(item.clone());
+//! #         let item = args.get_scalar("item").unwrap();
+//! #         ctx.data.push(item.to_string());
 //! #         println!("Added: {}", item);
 //! #         Ok(())
 //! #     }
@@ -229,7 +227,6 @@ mod tests {
     use super::*;
     use crate::config::schema::CommandDefinition;
     use crate::prelude::*;
-    use std::collections::HashMap;
 
     // Test context
     #[derive(Default)]
@@ -252,7 +249,7 @@ mod tests {
         fn execute(
             &self,
             _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> crate::Result<()> {
             Ok(())
         }
