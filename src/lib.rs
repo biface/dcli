@@ -17,7 +17,6 @@
 //!
 //! ```no_run
 //! use dynamic_cli::prelude::*;
-//! use std::collections::HashMap;
 //!
 //! // 1. Define the execution context
 //! #[derive(Default)]
@@ -35,10 +34,9 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
-//!         let default_name = "World".to_string();
-//!         let name = args.get("name").unwrap_or(&default_name);
+//!         let name = args.get_scalar("name").unwrap_or("World");
 //!         println!("Hello, {}!", name);
 //!         Ok(())
 //!     }
@@ -58,7 +56,8 @@
 //!
 //! let mut context = MyContext::default();
 //! let handler = registry.get_handler_sync(&parsed.command_name).unwrap();
-//! handler.execute(&mut context, &parsed.arguments)?;
+//! let args = ParsedArgs::from_scalars(parsed.arguments);
+//! handler.execute(&mut context, &args)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -121,7 +120,7 @@ pub use config::schema::{
 pub use registry::CommandRegistry;
 
 // Parser types
-pub use parser::{CliParser, ParsedCommand, ReplParser};
+pub use parser::{CliParser, ParsedArgs, ParsedCommand, ReplParser};
 
 // Validator functions
 pub use validator::{validate_file_exists, validate_file_extension, validate_range};
@@ -188,7 +187,7 @@ pub mod prelude {
     pub use crate::registry::CommandRegistry;
 
     // Parsing
-    pub use crate::parser::{CliParser, ParsedCommand, ReplParser};
+    pub use crate::parser::{CliParser, ParsedArgs, ParsedCommand, ReplParser};
 
     // Validation
     pub use crate::validator::{validate_file_exists, validate_file_extension, validate_range};

@@ -7,7 +7,6 @@
 //!
 //! ```no_run
 //! use dynamic_cli::prelude::*;
-//! use std::collections::HashMap;
 //!
 //! // Define context
 //! #[derive(Default)]
@@ -25,7 +24,7 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
 //!         println!("Hello!");
 //!         Ok(())
@@ -80,7 +79,7 @@ use std::path::PathBuf;
 /// # }
 /// # struct MyHandler;
 /// # impl CommandHandler for MyHandler {
-/// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+/// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 /// # }
 /// # fn main() -> dynamic_cli::Result<()> {
 /// let app = CliBuilder::new()
@@ -241,7 +240,6 @@ impl CliBuilder {
     ///
     /// ```
     /// use dynamic_cli::prelude::*;
-    /// use std::collections::HashMap;
     ///
     /// struct MyCommand;
     ///
@@ -249,7 +247,7 @@ impl CliBuilder {
     ///     fn execute(
     ///         &self,
     ///         _ctx: &mut dyn ExecutionContext,
-    ///         _args: &HashMap<String, String>,
+    ///         _args: &ParsedArgs,
     ///     ) -> dynamic_cli::Result<()> {
     ///         println!("Executed!");
     ///         Ok(())
@@ -303,7 +301,6 @@ impl CliBuilder {
     /// ```
     /// use dynamic_cli::prelude::*;
     /// use dynamic_cli::executor::AsyncCommandHandler;
-    /// use std::collections::HashMap;
     /// use async_trait::async_trait;
     ///
     /// struct FetchCommand;
@@ -313,7 +310,7 @@ impl CliBuilder {
     ///     async fn execute(
     ///         &self,
     ///         _ctx: &mut dyn ExecutionContext,
-    ///         _args: &HashMap<String, String>,
+    ///         _args: &ParsedArgs,
     ///     ) -> dynamic_cli::Result<()> {
     ///         println!("Fetched!");
     ///         Ok(())
@@ -505,7 +502,7 @@ impl CliBuilder {
     /// # }
     /// # struct MyHandler;
     /// # impl CommandHandler for MyHandler {
-    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # fn main() -> dynamic_cli::Result<()> {
     /// let app = CliBuilder::new()
@@ -662,7 +659,7 @@ impl Default for CliBuilder {
 /// # }
 /// # struct MyHandler;
 /// # impl CommandHandler for MyHandler {
-/// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+/// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 /// # }
 /// # fn main() -> dynamic_cli::Result<()> {
 /// let app = CliBuilder::new()
@@ -729,7 +726,7 @@ impl CliApp {
     /// # }
     /// # struct MyHandler;
     /// # impl CommandHandler for MyHandler {
-    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # fn main() -> dynamic_cli::Result<()> {
     /// # let app = CliBuilder::new()
@@ -787,7 +784,7 @@ impl CliApp {
     /// # }
     /// # struct MyHandler;
     /// # impl CommandHandler for MyHandler {
-    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # fn main() -> dynamic_cli::Result<()> {
     /// # let app = CliBuilder::new()
@@ -835,7 +832,7 @@ impl CliApp {
     /// # }
     /// # struct MyHandler;
     /// # impl CommandHandler for MyHandler {
-    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &std::collections::HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # fn main() -> dynamic_cli::Result<()> {
     /// # let app = CliBuilder::new()
@@ -863,7 +860,8 @@ impl CliApp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::schema::{ArgumentDefinition, ArgumentType, CommandDefinition, Metadata};
+    use crate::config::schema::{CommandDefinition, Metadata};
+    use crate::parser::ParsedArgs;
 
     // Test context
     #[derive(Default)]
@@ -887,11 +885,7 @@ mod tests {
     }
 
     impl CommandHandler for TestHandler {
-        fn execute(
-            &self,
-            context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
-        ) -> Result<()> {
+        fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
             let ctx =
                 crate::context::downcast_mut::<TestContext>(context).expect("Failed to downcast");
             ctx.executed.push(self.name.clone());
@@ -908,7 +902,7 @@ mod tests {
         async fn execute(
             &self,
             context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> Result<()> {
             let ctx =
                 crate::context::downcast_mut::<TestContext>(context).expect("Failed to downcast");
