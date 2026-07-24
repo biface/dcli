@@ -100,6 +100,40 @@ pub struct CliParser<'a> {
     definition: &'a CommandDefinition,
 }
 
+/// A single occurrence of a repeatable option
+///
+/// Produced when a `repeatable: true` option is encountered on the
+/// command line: `--output csv file=results.csv resolution=100` becomes
+/// `OptionOccurrence { discriminant: "csv", params: {"file": "results.csv",
+/// "resolution": "100"} }`.
+///
+/// `params` values are stored as strings after type validation against
+/// `option_parameters[discriminant]`, consistent with how scalar option
+/// and argument values are stored (see [`ParsedValue::Scalar`]).
+#[derive(Debug, Clone, PartialEq)]
+pub struct OptionOccurrence {
+    /// The token immediately following the flag, validated against the
+    /// option's `choices`.
+    pub discriminant: String,
+    /// The `key=value` pairs supplied for this occurrence.
+    pub params: HashMap<String, String>,
+}
+
+/// The value parsed for a single positional argument or option
+///
+/// [`CliParser::parse_typed`] returns `HashMap<String, ParsedValue>` so
+/// that repeatable options (which may occur zero or more times, each
+/// with their own sub-parameters) and plain scalar values can coexist in
+/// a single result map. [`CliParser::parse`] remains additive and
+/// unaffected — see its docs for how the two relate.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParsedValue {
+    /// A plain positional argument or non-repeatable option value.
+    Scalar(String),
+    /// Every occurrence of a repeatable option, in command-line order.
+    Repeated(Vec<OptionOccurrence>),
+}
+
 impl<'a> CliParser<'a> {
     /// Create a new CLI parser for the given command definition
     ///
@@ -128,11 +162,15 @@ impl<'a> CliParser<'a> {
         Self { definition }
     }
 
-    /// Parse command-line arguments into a HashMap
+    /// Parse command-line arguments into a HashMap of strings
     ///
-    /// Parses the provided arguments according to the command definition.
-    /// Positional arguments are matched in order, and options are matched
-    /// by their short or long forms.
+    /// Thin, non-breaking wrapper around [`Self::parse_typed`] for callers
+    /// that only deal in scalar values. Any [`ParsedValue::Repeated`] entry
+    /// (i.e. any `repeatable: true` option) is silently dropped from the
+    /// result — no command definition predating DD-024 can have one, so
+    /// existing callers see no behaviour change. Once the dispatch layer
+    /// is migrated to consume `ParsedArgs` directly (planned, DD-024,
+    /// tracked as a separate breaking change), this method can be removed.
     ///
     /// # Arguments
     ///
@@ -183,6 +221,40 @@ impl<'a> CliParser<'a> {
     /// assert_eq!(result.get("name"), Some(&"Alice".to_string()));
     /// ```
     pub fn parse(&self, args: &[String]) -> Result<HashMap<String, String>> {
+        let typed = self.parse_typed(args)?;
+
+        Ok(typed
+            .into_iter()
+            .filter_map(|(name, value)| match value {
+                ParsedValue::Scalar(s) => Some((name, s)),
+                ParsedValue::Repeated(_) => None,
+            })
+            .collect())
+    }
+
+    /// Parse command-line arguments into a HashMap of [`ParsedValue`]
+    ///
+    /// Like [`Self::parse`], but preserves repeatable options as
+    /// [`ParsedValue::Repeated`] instead of dropping them. This is the
+    /// method that actually implements DD-024 parsing; `parse()` is a
+    /// filtering wrapper around it.
+    ///
+    /// # Arguments
+    ///
+    /// * `args` - Slice of argument strings (excluding the command name)
+    ///
+    /// # Errors
+    ///
+    /// In addition to the errors documented on [`Self::parse`]:
+    /// - [`ParseError::UnknownDiscriminant`] if the token following a
+    ///   repeatable option's flag is not in that option's `choices`
+    /// - [`ParseError::UnknownOptionParameter`] if a `key=value` pair uses
+    ///   a key not declared in `option_parameters[discriminant]`
+    /// - [`ParseError::MissingRequiredOptionParameter`] if a required key
+    ///   is absent from an occurrence
+    /// - [`ParseError::DuplicateOptionOccurrence`] if the same
+    ///   discriminant is supplied twice with identical `key=value` pairs
+    pub fn parse_typed(&self, args: &[String]) -> Result<HashMap<String, ParsedValue>> {
         let mut result = HashMap::new();
         let mut positional_index = 0;
         let mut i = 0;
@@ -233,7 +305,7 @@ impl<'a> CliParser<'a> {
         arg: &str,
         args: &[String],
         index: &mut usize,
-        result: &mut HashMap<String, String>,
+        result: &mut HashMap<String, ParsedValue>,
     ) -> Result<()> {
         let arg_without_dashes = &arg[2..];
 
@@ -243,18 +315,36 @@ impl<'a> CliParser<'a> {
             let value = &arg_without_dashes[eq_pos + 1..];
 
             let option = self.find_option_by_long(option_name)?;
+            if option.repeatable {
+                // A repeatable option's discriminant/params are never
+                // attached via `=` — only the space-separated form is
+                // supported (see parse_repeatable_occurrence).
+                return Err(ParseError::InvalidSyntax {
+                    details: format!(
+                        "Option --{} is repeatable and does not support --{}=<value>",
+                        option.name, option.name
+                    ),
+                    hint: Some(format!(
+                        "Usage: --{} <{}> [key=value ...]",
+                        option.name,
+                        option.choices.join("|")
+                    )),
+                }
+                .into());
+            }
             let parsed_value = type_parser::parse_value(value, option.option_type)?;
-            result.insert(option.name.clone(), parsed_value);
+            result.insert(option.name.clone(), ParsedValue::Scalar(parsed_value));
         } else {
             // --option format (value might be next arg)
             let option = self.find_option_by_long(arg_without_dashes)?;
 
-            // For boolean options, presence means true
-            if matches!(
+            if option.repeatable {
+                self.parse_repeatable_occurrence(option, args, index, result)?;
+            } else if matches!(
                 option.option_type,
                 crate::config::schema::ArgumentType::Bool
             ) {
-                result.insert(option.name.clone(), "true".to_string());
+                result.insert(option.name.clone(), ParsedValue::Scalar("true".to_string()));
             } else {
                 // Non-boolean: expect value in next argument
                 *index += 1;
@@ -275,7 +365,7 @@ impl<'a> CliParser<'a> {
 
                 let value = &args[*index];
                 let parsed_value = type_parser::parse_value(value, option.option_type)?;
-                result.insert(option.name.clone(), parsed_value);
+                result.insert(option.name.clone(), ParsedValue::Scalar(parsed_value));
             }
         }
 
@@ -288,23 +378,38 @@ impl<'a> CliParser<'a> {
         arg: &str,
         args: &[String],
         index: &mut usize,
-        result: &mut HashMap<String, String>,
+        result: &mut HashMap<String, ParsedValue>,
     ) -> Result<()> {
         let short_flag = &arg[1..2];
         let option = self.find_option_by_short(short_flag)?;
 
-        // For boolean options, presence means true
-        if matches!(
+        if option.repeatable {
+            if arg.len() > 2 {
+                return Err(ParseError::InvalidSyntax {
+                    details: format!(
+                        "Option -{} is repeatable and does not support an attached value",
+                        short_flag
+                    ),
+                    hint: Some(format!(
+                        "Usage: -{} <{}> [key=value ...]",
+                        short_flag,
+                        option.choices.join("|")
+                    )),
+                }
+                .into());
+            }
+            self.parse_repeatable_occurrence(option, args, index, result)?;
+        } else if matches!(
             option.option_type,
             crate::config::schema::ArgumentType::Bool
         ) {
-            result.insert(option.name.clone(), "true".to_string());
+            result.insert(option.name.clone(), ParsedValue::Scalar("true".to_string()));
         } else {
             // Check if value is attached (e.g., -ovalue)
             if arg.len() > 2 {
                 let value = &arg[2..];
                 let parsed_value = type_parser::parse_value(value, option.option_type)?;
-                result.insert(option.name.clone(), parsed_value);
+                result.insert(option.name.clone(), ParsedValue::Scalar(parsed_value));
             } else {
                 // Value is next argument
                 *index += 1;
@@ -321,7 +426,7 @@ impl<'a> CliParser<'a> {
 
                 let value = &args[*index];
                 let parsed_value = type_parser::parse_value(value, option.option_type)?;
-                result.insert(option.name.clone(), parsed_value);
+                result.insert(option.name.clone(), ParsedValue::Scalar(parsed_value));
             }
         }
 
@@ -333,7 +438,7 @@ impl<'a> CliParser<'a> {
         &self,
         value: &str,
         index: usize,
-        result: &mut HashMap<String, String>,
+        result: &mut HashMap<String, ParsedValue>,
     ) -> Result<()> {
         if index >= self.definition.arguments.len() {
             return Err(ParseError::too_many_arguments(
@@ -346,19 +451,168 @@ impl<'a> CliParser<'a> {
 
         let arg_def = &self.definition.arguments[index];
         let parsed_value = type_parser::parse_value(value, arg_def.arg_type)?;
-        result.insert(arg_def.name.clone(), parsed_value);
+        result.insert(arg_def.name.clone(), ParsedValue::Scalar(parsed_value));
+
+        Ok(())
+    }
+
+    /// Parse one occurrence of a repeatable option
+    ///
+    /// On entry, `index` points at the option's flag token. Reads the
+    /// discriminant token immediately following it, validates it against
+    /// `option.choices`, then consumes `key=value` tokens until the next
+    /// flag (any token starting with `-`) or the end of input — a
+    /// `key=value` pair can never start with `-` itself, so this is
+    /// unambiguous, unlike the top-level positional/negative-number case.
+    ///
+    /// On return, `index` points at the last token consumed (the
+    /// discriminant if no parameters followed, or the last `key=value`
+    /// token), matching the convention already used by
+    /// [`Self::parse_long_option`] / [`Self::parse_short_option`] — the
+    /// caller's own `i += 1` advances past it.
+    fn parse_repeatable_occurrence(
+        &self,
+        option: &OptionDefinition,
+        args: &[String],
+        index: &mut usize,
+        result: &mut HashMap<String, ParsedValue>,
+    ) -> Result<()> {
+        // Read the discriminant token.
+        *index += 1;
+        if *index >= args.len() {
+            return Err(ParseError::InvalidSyntax {
+                details: format!("Option --{} requires a discriminant", option.name),
+                hint: Some(format!(
+                    "Usage: --{} <{}> [key=value ...]",
+                    option.name,
+                    option.choices.join("|")
+                )),
+            }
+            .into());
+        }
+        let discriminant = args[*index].clone();
+        if !option.choices.contains(&discriminant) {
+            return Err(ParseError::UnknownDiscriminant {
+                option: option.name.clone(),
+                value: discriminant,
+                valid_choices: option.choices.clone(),
+                suggestion: Some(format!(
+                    "Run --help {} to see valid --{} kinds.",
+                    self.definition.name, option.name
+                )),
+            }
+            .into());
+        }
+
+        // Guaranteed present by validate_options() (#36) once
+        // repeatable/choices/option_parameters consistency has been
+        // validated at config-load time.
+        let empty: Vec<ArgumentDefinition> = Vec::new();
+        let param_defs = option
+            .option_parameters
+            .get(&discriminant)
+            .unwrap_or(&empty);
+
+        // Consume key=value tokens until the next flag or end of input.
+        let mut params: HashMap<String, String> = HashMap::new();
+        while *index + 1 < args.len() {
+            let next = &args[*index + 1];
+            if next.starts_with('-') {
+                break;
+            }
+
+            let eq_pos = match next.find('=') {
+                Some(pos) => pos,
+                None => {
+                    return Err(ParseError::InvalidSyntax {
+                        details: format!(
+                            "Expected key=value for --{} {}, got: '{}'",
+                            option.name, discriminant, next
+                        ),
+                        hint: Some("Sub-parameters must use the key=value form.".to_string()),
+                    }
+                    .into());
+                }
+            };
+            let key = &next[..eq_pos];
+            let value = &next[eq_pos + 1..];
+
+            let arg_def = param_defs.iter().find(|a| a.name == key).ok_or_else(|| {
+                ParseError::UnknownOptionParameter {
+                    option: option.name.clone(),
+                    discriminant: discriminant.clone(),
+                    key: key.to_string(),
+                    valid_keys: param_defs.iter().map(|a| a.name.clone()).collect(),
+                    suggestion: Some(format!(
+                        "Run --help {} to see valid keys for --{} {}.",
+                        self.definition.name, option.name, discriminant
+                    )),
+                }
+            })?;
+
+            let typed_value = type_parser::parse_value(value, arg_def.arg_type)?;
+            params.insert(key.to_string(), typed_value);
+
+            *index += 1;
+        }
+
+        // Validate required keys are present.
+        for arg_def in param_defs {
+            if arg_def.required && !params.contains_key(&arg_def.name) {
+                return Err(ParseError::MissingRequiredOptionParameter {
+                    option: option.name.clone(),
+                    discriminant: discriminant.clone(),
+                    key: arg_def.name.clone(),
+                    suggestion: Some(format!(
+                        "Run --help {} to see required keys for --{} {}.",
+                        self.definition.name, option.name, discriminant
+                    )),
+                }
+                .into());
+            }
+        }
+
+        let occurrence = OptionOccurrence {
+            discriminant: discriminant.clone(),
+            params,
+        };
+
+        match result
+            .entry(option.name.clone())
+            .or_insert_with(|| ParsedValue::Repeated(Vec::new()))
+        {
+            ParsedValue::Repeated(occurrences) => {
+                if occurrences.contains(&occurrence) {
+                    return Err(ParseError::DuplicateOptionOccurrence {
+                        option: option.name.clone(),
+                        discriminant: occurrence.discriminant.clone(),
+                        params: occurrence.params.clone().into_iter().collect(),
+                        suggestion: Some(format!(
+                            "Remove one of the two identical --{} {} occurrences.",
+                            option.name, discriminant
+                        )),
+                    }
+                    .into());
+                }
+                occurrences.push(occurrence);
+            }
+            ParsedValue::Scalar(_) => unreachable!(
+                "option '{}' marked repeatable cannot already hold a Scalar value",
+                option.name
+            ),
+        }
 
         Ok(())
     }
 
     /// Apply default values for options not provided
-    fn apply_defaults(&self, result: &mut HashMap<String, String>) -> Result<()> {
+    fn apply_defaults(&self, result: &mut HashMap<String, ParsedValue>) -> Result<()> {
         for option in &self.definition.options {
             if !result.contains_key(&option.name) {
                 if let Some(ref default) = option.default {
                     // Validate the default value
                     let parsed_default = type_parser::parse_value(default, option.option_type)?;
-                    result.insert(option.name.clone(), parsed_default);
+                    result.insert(option.name.clone(), ParsedValue::Scalar(parsed_default));
                 }
             }
         }
@@ -366,7 +620,7 @@ impl<'a> CliParser<'a> {
     }
 
     /// Validate that all required arguments are present
-    fn validate_required_arguments(&self, result: &HashMap<String, String>) -> Result<()> {
+    fn validate_required_arguments(&self, result: &HashMap<String, ParsedValue>) -> Result<()> {
         for arg in &self.definition.arguments {
             if arg.required && !result.contains_key(&arg.name) {
                 return Err(ParseError::missing_argument(&arg.name, &self.definition.name).into());
@@ -376,7 +630,7 @@ impl<'a> CliParser<'a> {
     }
 
     /// Validate that all required options are present
-    fn validate_required_options(&self, result: &HashMap<String, String>) -> Result<()> {
+    fn validate_required_options(&self, result: &HashMap<String, ParsedValue>) -> Result<()> {
         for option in &self.definition.options {
             if option.required && !result.contains_key(&option.name) {
                 return Err(ParseError::missing_option(
@@ -765,5 +1019,302 @@ mod tests {
         assert_eq!(result.get("output"), Some(&"output.txt".to_string()));
         assert_eq!(result.get("verbose"), Some(&"true".to_string()));
         assert_eq!(result.get("count"), Some(&"50".to_string()));
+    }
+
+    // ========================================================================
+    // DD-024: repeatable options with option_parameters (#38)
+    // ========================================================================
+
+    /// Helper: a command with a repeatable `--output` option, mirroring
+    /// the chrom-rs motivating example (csv with an optional resolution,
+    /// plot with just a file).
+    fn create_repeatable_test_definition() -> CommandDefinition {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![
+                ArgumentDefinition {
+                    name: "file".to_string(),
+                    arg_type: ArgumentType::Path,
+                    required: true,
+                    description: "Destination CSV file".to_string(),
+                    validation: vec![],
+                    secure: false,
+                },
+                ArgumentDefinition {
+                    name: "resolution".to_string(),
+                    arg_type: ArgumentType::Integer,
+                    required: false,
+                    description: "Time-step resolution".to_string(),
+                    validation: vec![],
+                    secure: false,
+                },
+            ],
+        );
+        option_parameters.insert(
+            "plot".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination image file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+
+        CommandDefinition {
+            name: "export".to_string(),
+            aliases: vec![],
+            description: "Export simulation results".to_string(),
+            required: false,
+            arguments: vec![],
+            options: vec![OptionDefinition {
+                name: "output".to_string(),
+                short: None,
+                long: Some("output".to_string()),
+                option_type: ArgumentType::String,
+                required: false,
+                default: None,
+                description: "Write results in one or more output kinds".to_string(),
+                choices: vec!["csv".to_string(), "plot".to_string()],
+                repeatable: true,
+                option_parameters,
+            }],
+            implementation: "export_handler".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_single_occurrence() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=results.csv".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(occurrences.len(), 1);
+                assert_eq!(occurrences[0].discriminant, "csv");
+                assert_eq!(
+                    occurrences[0].params.get("file"),
+                    Some(&"results.csv".to_string())
+                );
+            }
+            other => panic!("Expected Repeated([csv]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_optional_param_can_be_omitted() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=results.csv".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(occurrences[0].params.get("resolution"), None);
+            }
+            other => panic!("Expected Repeated([csv]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_with_optional_param_provided() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=results.csv".to_string(),
+            "resolution=100".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(
+                    occurrences[0].params.get("resolution"),
+                    Some(&"100".to_string())
+                );
+            }
+            other => panic!("Expected Repeated([csv]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_multiple_discriminants_both_parse() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=results.csv".to_string(),
+            "--output".to_string(),
+            "plot".to_string(),
+            "file=chart.png".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(occurrences.len(), 2);
+                assert_eq!(occurrences[0].discriminant, "csv");
+                assert_eq!(occurrences[1].discriminant, "plot");
+            }
+            other => panic!("Expected Repeated([csv, plot]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_same_discriminant_different_params_both_kept() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=a.csv".to_string(),
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=b.csv".to_string(),
+            "resolution=50".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(occurrences.len(), 2);
+            }
+            other => panic!("Expected Repeated([csv, csv]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_duplicate_occurrence_errors() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=a.csv".to_string(),
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=a.csv".to_string(),
+        ];
+        let result = parser.parse_typed(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Parse(ParseError::DuplicateOptionOccurrence {
+                ..
+            }) => {}
+            other => panic!("Expected DuplicateOptionOccurrence error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_missing_required_param_errors() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        // "file" is required for the csv discriminant and is not supplied.
+        let args = vec!["--output".to_string(), "csv".to_string()];
+        let result = parser.parse_typed(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Parse(ParseError::MissingRequiredOptionParameter {
+                key,
+                ..
+            }) => {
+                assert_eq!(key, "file");
+            }
+            other => panic!(
+                "Expected MissingRequiredOptionParameter error, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_unknown_param_key_errors() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=a.csv".to_string(),
+            "compression=gzip".to_string(),
+        ];
+        let result = parser.parse_typed(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Parse(ParseError::UnknownOptionParameter {
+                key,
+                ..
+            }) => {
+                assert_eq!(key, "compression");
+            }
+            other => panic!("Expected UnknownOptionParameter error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_repeatable_option_unknown_discriminant_errors() {
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "xml".to_string(),
+            "file=a.xml".to_string(),
+        ];
+        let result = parser.parse_typed(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Parse(ParseError::UnknownDiscriminant {
+                value, ..
+            }) => {
+                assert_eq!(value, "xml");
+            }
+            other => panic!("Expected UnknownDiscriminant error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_legacy_drops_repeated_values() {
+        // parse() (Option A design: non-breaking wrapper) must keep
+        // working for definitions with no repeatable options — and
+        // silently drop Repeated entries rather than erroring, since no
+        // pre-DD-024 caller can represent them anyway.
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=a.csv".to_string(),
+        ];
+        let result = parser.parse(&args).unwrap();
+
+        assert_eq!(result.get("output"), None);
     }
 }
