@@ -38,7 +38,6 @@
 
 use dynamic_cli::prelude::*;
 use std::any::Any;
-use std::collections::HashMap;
 
 /// ================================================================================================
 /// Execution context
@@ -167,11 +166,7 @@ impl ExecutionContext for SimpleRpnContext {
 struct PushCommand;
 
 impl CommandHandler for PushCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let rpn_context = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -180,7 +175,7 @@ impl CommandHandler for PushCommand {
         })?;
 
         // Parse the value arguments
-        let cli_value = args.get("value").ok_or_else(|| {
+        let cli_value = args.get_scalar("value").ok_or_else(|| {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::MissingArgument {
                 argument: "value".to_string(),
                 command: "push".to_string(),
@@ -193,7 +188,7 @@ impl CommandHandler for PushCommand {
             DynamicCliError::Parse(dynamic_cli::error::ParseError::TypeParseError {
                 arg_name: "value".to_string(),
                 expected_type: "float".to_string(),
-                value: cli_value.clone(),
+                value: cli_value.to_string(),
                 details: Some("not a valid number".to_string()),
             })
         })?;
@@ -211,11 +206,7 @@ impl CommandHandler for PushCommand {
 struct PopCommand;
 
 impl CommandHandler for PopCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -237,11 +228,7 @@ impl CommandHandler for PopCommand {
 struct LastXCommand;
 
 impl CommandHandler for LastXCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -263,11 +250,7 @@ impl CommandHandler for LastXCommand {
 struct SwapCommand;
 
 impl CommandHandler for SwapCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -289,11 +272,7 @@ impl CommandHandler for SwapCommand {
 struct PeekCommand;
 
 impl CommandHandler for PeekCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -317,11 +296,7 @@ impl CommandHandler for PeekCommand {
 struct ShowCommand;
 
 impl CommandHandler for ShowCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -341,11 +316,7 @@ impl CommandHandler for ShowCommand {
 struct ClearCommand;
 
 impl CommandHandler for ClearCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -365,11 +336,7 @@ impl CommandHandler for ClearCommand {
 struct AddCommand;
 
 impl CommandHandler for AddCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -388,11 +355,7 @@ impl CommandHandler for AddCommand {
 struct SubCommand;
 
 impl CommandHandler for SubCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -412,11 +375,7 @@ impl CommandHandler for SubCommand {
 struct MulCommand;
 
 impl CommandHandler for MulCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -435,11 +394,7 @@ impl CommandHandler for MulCommand {
 struct DivCommand;
 
 impl CommandHandler for DivCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -459,11 +414,7 @@ impl CommandHandler for DivCommand {
 struct LnFunction;
 
 impl CommandHandler for LnFunction {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let rpn_ctx = downcast_mut::<SimpleRpnContext>(context).ok_or_else(|| {
             DynamicCliError::Execution(dynamic_cli::error::ExecutionError::ContextDowncastFailed {
                 expected_type: "RPN Calculator context".to_string(),
@@ -514,6 +465,7 @@ fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::f64::consts::PI;
     #[test]
     fn test_rpn_context_push_pop() {
@@ -577,6 +529,7 @@ mod tests {
         let handler = PushCommand;
 
         _args.insert("value".to_string(), "45.0".to_string());
+        let _args = ParsedArgs::from_scalars(_args);
         handler
             .execute(rpn_execution_test.as_mut(), &_args)
             .unwrap();
@@ -593,6 +546,7 @@ mod tests {
         ctx_test.push_x(1.0);
         let mut rpn_execution_test: Box<dyn ExecutionContext> = Box::new(ctx_test);
         let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(args);
         let handler = LnFunction;
 
         handler.execute(rpn_execution_test.as_mut(), &args).unwrap();
@@ -613,7 +567,10 @@ mod tests {
         let push_cmd = PushCommand;
         _args.insert("value".to_string(), "45.0".to_string());
         push_cmd
-            .execute(rpn_execution_test.as_mut(), &_args)
+            .execute(
+                rpn_execution_test.as_mut(),
+                &ParsedArgs::from_scalars(_args.clone()),
+            )
             .unwrap();
         let ctx_copy =
             dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
@@ -621,7 +578,10 @@ mod tests {
         assert_eq!(ctx_copy.peek(), Some(45.0));
         _args.insert("value".to_string(), "5".to_string());
         push_cmd
-            .execute(rpn_execution_test.as_mut(), &_args)
+            .execute(
+                rpn_execution_test.as_mut(),
+                &ParsedArgs::from_scalars(_args.clone()),
+            )
             .unwrap();
         let ctx_copy =
             dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())
@@ -631,7 +591,10 @@ mod tests {
 
         let add_command = AddCommand;
         add_command
-            .execute(rpn_execution_test.as_mut(), &_args)
+            .execute(
+                rpn_execution_test.as_mut(),
+                &ParsedArgs::from_scalars(_args),
+            )
             .unwrap();
         let ctx_test =
             dynamic_cli::context::downcast_ref::<SimpleRpnContext>(rpn_execution_test.as_ref())

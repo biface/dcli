@@ -15,7 +15,6 @@ use dynamic_cli::config::schema::{CommandDefinition, Metadata};
 use dynamic_cli::plugin::SystemPlugin;
 use dynamic_cli::prelude::*;
 use std::any::Any;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 // ============================================================================
@@ -52,12 +51,9 @@ impl CommandHandler for GreetHandler {
     fn execute(
         &self,
         _ctx: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
+        args: &ParsedArgs,
     ) -> dynamic_cli::Result<()> {
-        let name = args
-            .get("name")
-            .cloned()
-            .unwrap_or_else(|| "World".to_string());
+        let name = args.get_scalar("name").unwrap_or("World").to_string();
         self.greeted.lock().unwrap().push(name);
         Ok(())
     }

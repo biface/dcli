@@ -24,7 +24,6 @@ use dynamic_cli::config::schema::{CommandDefinition, Metadata};
 use dynamic_cli::error::{DynamicCliError, WasmError};
 use dynamic_cli::prelude::*;
 use std::any::Any;
-use std::collections::HashMap;
 use std::io::Write;
 use tempfile::NamedTempFile;
 
@@ -52,7 +51,7 @@ impl CommandHandler for NativeHandler {
     fn execute(
         &self,
         _ctx: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
+        _args: &ParsedArgs,
     ) -> dynamic_cli::Result<()> {
         Ok(())
     }
