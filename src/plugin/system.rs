@@ -10,9 +10,9 @@ use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::executor::CommandHandler;
 use crate::help::{DefaultHelpFormatter, HelpFormatter};
+use crate::parser::ParsedArgs;
 use crate::plugin::Plugin;
 use crate::Result;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 // ============================================================================
@@ -241,16 +241,12 @@ struct SystemHelpHandler {
 }
 
 impl CommandHandler for SystemHelpHandler {
-    fn execute(
-        &self,
-        _ctx: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, _ctx: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let formatter = DefaultHelpFormatter::new();
 
         match self.config.as_ref() {
             Some(cfg) => {
-                if let Some(command) = args.get("command") {
+                if let Some(command) = args.get_scalar("command") {
                     print!("{}", formatter.format_command(cfg, command));
                 } else {
                     print!("{}", formatter.format_app(cfg));
@@ -270,11 +266,7 @@ struct SystemVersionHandler {
 }
 
 impl CommandHandler for SystemVersionHandler {
-    fn execute(
-        &self,
-        _ctx: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, _ctx: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         match self.config.as_ref() {
             Some(cfg) => println!("{}", cfg.metadata.version),
             None => println!("(version unknown)"),
@@ -293,11 +285,7 @@ struct SystemExitHandler {
 }
 
 impl CommandHandler for SystemExitHandler {
-    fn execute(
-        &self,
-        _ctx: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, _ctx: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         // Run the shutdown sequence supplied by the application.
         // The default implementation calls std::process::exit(0).
         (self.exit_fn)();
@@ -317,6 +305,7 @@ mod tests {
     use super::*;
     use crate::config::schema::{CommandsConfig, Metadata};
     use std::any::Any;
+    use std::collections::HashMap;
 
     // -------------------------------------------------------------------------
     // Test fixtures
@@ -395,7 +384,9 @@ mod tests {
             .unwrap();
         assert_eq!(name, "system_version");
         let mut ctx = TestContext;
-        assert!(handler.execute(&mut ctx, &HashMap::new()).is_ok());
+        assert!(handler
+            .execute(&mut ctx, &ParsedArgs::from_scalars(HashMap::new()))
+            .is_ok());
     }
 
     #[test]
@@ -406,7 +397,9 @@ mod tests {
             .find(|(n, _)| n == "system_version")
             .unwrap();
         let mut ctx = TestContext;
-        assert!(handler.execute(&mut ctx, &HashMap::new()).is_ok());
+        assert!(handler
+            .execute(&mut ctx, &ParsedArgs::from_scalars(HashMap::new()))
+            .is_ok());
     }
 
     #[test]
@@ -415,7 +408,9 @@ mod tests {
         let handlers = plugin.handlers();
         let (_, handler) = handlers.iter().find(|(n, _)| n == "system_help").unwrap();
         let mut ctx = TestContext;
-        assert!(handler.execute(&mut ctx, &HashMap::new()).is_ok());
+        assert!(handler
+            .execute(&mut ctx, &ParsedArgs::from_scalars(HashMap::new()))
+            .is_ok());
     }
 
     #[test]
@@ -426,6 +421,7 @@ mod tests {
         let mut ctx = TestContext;
         let mut args = HashMap::new();
         args.insert("command".to_string(), "nonexistent".to_string());
+        let args = ParsedArgs::from_scalars(args);
         assert!(handler.execute(&mut ctx, &args).is_ok());
     }
 
@@ -434,7 +430,9 @@ mod tests {
         let handlers = SystemPlugin::new().handlers();
         let (_, handler) = handlers.iter().find(|(n, _)| n == "system_help").unwrap();
         let mut ctx = TestContext;
-        assert!(handler.execute(&mut ctx, &HashMap::new()).is_ok());
+        assert!(handler
+            .execute(&mut ctx, &ParsedArgs::from_scalars(HashMap::new()))
+            .is_ok());
     }
 
     // -------------------------------------------------------------------------
@@ -467,7 +465,7 @@ mod tests {
         let (_, handler) = handlers.iter().find(|(n, _)| n == "system_exit").unwrap();
 
         let mut ctx = TestContext;
-        let result = handler.execute(&mut ctx, &HashMap::new());
+        let result = handler.execute(&mut ctx, &ParsedArgs::from_scalars(HashMap::new()));
 
         assert!(result.is_ok());
         assert!(
@@ -493,6 +491,7 @@ mod tests {
         let mut ctx = TestContext;
         let mut args = HashMap::new();
         args.insert("unexpected_arg".to_string(), "value".to_string());
+        let args = ParsedArgs::from_scalars(args);
 
         assert!(handler.execute(&mut ctx, &args).is_ok());
         assert!(called.load(Ordering::SeqCst));
