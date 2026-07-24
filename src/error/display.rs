@@ -203,7 +203,11 @@ fn format_parse_error(output: &mut String, error: &ParseError) {
 
         ParseError::MissingArgument { suggestion, .. }
         | ParseError::MissingOption { suggestion, .. }
-        | ParseError::TooManyArguments { suggestion, .. } => {
+        | ParseError::TooManyArguments { suggestion, .. }
+        | ParseError::UnknownOptionParameter { suggestion, .. }
+        | ParseError::MissingRequiredOptionParameter { suggestion, .. }
+        | ParseError::UnknownDiscriminant { suggestion, .. }
+        | ParseError::DuplicateOptionOccurrence { suggestion, .. } => {
             append_suggestion(output, suggestion.as_deref());
         }
 
@@ -515,6 +519,118 @@ mod tests {
         let formatted = format_error(&error);
         assert!(formatted.contains("run"));
         assert!(formatted.contains("Run --help run"));
+    }
+
+    // ── format_error — Parse (DD-024 repeatable options, #37) ───────────
+
+    #[test]
+    fn test_format_parse_unknown_option_parameter_with_suggestion() {
+        let error: DynamicCliError = ParseError::UnknownOptionParameter {
+            option: "output".to_string(),
+            discriminant: "csv".to_string(),
+            key: "compression".to_string(),
+            valid_keys: vec!["file".to_string(), "resolution".to_string()],
+            suggestion: Some("Run --help export to see valid keys for --output csv.".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("compression"));
+        assert!(formatted.contains("csv"));
+        assert!(formatted.contains("file"));
+        assert!(formatted.contains("resolution"));
+        assert!(formatted.contains("Run --help export"));
+    }
+
+    #[test]
+    fn test_format_parse_missing_required_option_parameter_with_suggestion() {
+        let error: DynamicCliError = ParseError::MissingRequiredOptionParameter {
+            option: "output".to_string(),
+            discriminant: "csv".to_string(),
+            key: "file".to_string(),
+            suggestion: Some(
+                "Run --help export to see required keys for --output csv.".to_string(),
+            ),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("file"));
+        assert!(formatted.contains("csv"));
+        assert!(formatted.contains("Run --help export"));
+    }
+
+    #[test]
+    fn test_format_parse_unknown_discriminant_with_suggestion() {
+        let error: DynamicCliError = ParseError::UnknownDiscriminant {
+            option: "output".to_string(),
+            value: "xml".to_string(),
+            valid_choices: vec!["csv".to_string(), "plot".to_string()],
+            suggestion: Some("Run --help export to see valid --output kinds.".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("xml"));
+        assert!(formatted.contains("csv"));
+        assert!(formatted.contains("plot"));
+        assert!(formatted.contains("Run --help export"));
+    }
+
+    #[test]
+    fn test_format_parse_duplicate_option_occurrence_with_suggestion() {
+        let error: DynamicCliError = ParseError::DuplicateOptionOccurrence {
+            option: "output".to_string(),
+            discriminant: "csv".to_string(),
+            params: vec![("file".to_string(), "results.csv".to_string())],
+            suggestion: Some(
+                "Remove one of the two identical --output csv occurrences.".to_string(),
+            ),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("results.csv"));
+        assert!(formatted.contains("csv"));
+        assert!(formatted.contains("Remove one of the two identical"));
+    }
+
+    #[test]
+    fn test_debug_new_parse_error_variants_dd024() {
+        // Debug is derived; a smoke test is enough to guard against a
+        // silent #[derive(Debug)] removal on ParseError.
+        let variants: Vec<ParseError> = vec![
+            ParseError::UnknownOptionParameter {
+                option: "output".to_string(),
+                discriminant: "csv".to_string(),
+                key: "compression".to_string(),
+                valid_keys: vec!["file".to_string()],
+                suggestion: None,
+            },
+            ParseError::MissingRequiredOptionParameter {
+                option: "output".to_string(),
+                discriminant: "csv".to_string(),
+                key: "file".to_string(),
+                suggestion: None,
+            },
+            ParseError::UnknownDiscriminant {
+                option: "output".to_string(),
+                value: "xml".to_string(),
+                valid_choices: vec!["csv".to_string()],
+                suggestion: None,
+            },
+            ParseError::DuplicateOptionOccurrence {
+                option: "output".to_string(),
+                discriminant: "csv".to_string(),
+                params: vec![("file".to_string(), "results.csv".to_string())],
+                suggestion: None,
+            },
+        ];
+
+        for variant in variants {
+            let debug_str = format!("{:?}", variant);
+            assert!(!debug_str.is_empty());
+        }
     }
 
     #[test]
