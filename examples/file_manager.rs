@@ -16,7 +16,6 @@
 //! ```
 
 use dynamic_cli::prelude::*;
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -50,11 +49,7 @@ impl ExecutionContext for FileManagerContext {
 struct ListCommand;
 
 impl CommandHandler for ListCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -66,7 +61,7 @@ impl CommandHandler for ListCommand {
             })?;
 
         // Get directory path
-        let dir = args.get("directory").map(|s| s.as_str()).unwrap_or(".");
+        let dir = args.get_scalar("directory").unwrap_or(".");
         let path = Path::new(dir);
 
         // Validate directory exists
@@ -150,11 +145,7 @@ impl CommandHandler for ListCommand {
 struct InfoCommand;
 
 impl CommandHandler for InfoCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -165,7 +156,7 @@ impl CommandHandler for InfoCommand {
                 )
             })?;
 
-        let file = args.get("file").unwrap();
+        let file = args.get_scalar("file").unwrap();
         let path = Path::new(file);
 
         // Validate file exists
@@ -222,11 +213,7 @@ impl CommandHandler for InfoCommand {
 struct SearchCommand;
 
 impl CommandHandler for SearchCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_mut::<FileManagerContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
@@ -237,8 +224,8 @@ impl CommandHandler for SearchCommand {
                 )
             })?;
 
-        let dir = args.get("directory").map(|s| s.as_str()).unwrap_or(".");
-        let pattern = args.get("pattern").map(|s| s.as_str()).unwrap_or("*");
+        let dir = args.get_scalar("directory").unwrap_or(".");
+        let pattern = args.get_scalar("pattern").unwrap_or("*");
 
         let path = Path::new(dir);
 
@@ -302,11 +289,7 @@ impl CommandHandler for SearchCommand {
 struct StatsCommand;
 
 impl CommandHandler for StatsCommand {
-    fn execute(
-        &self,
-        context: &mut dyn ExecutionContext,
-        _args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
         let ctx =
             dynamic_cli::context::downcast_ref::<FileManagerContext>(context).ok_or_else(|| {
                 DynamicCliError::Execution(
