@@ -16,8 +16,7 @@
 //! ```
 //! use dynamic_cli::registry::CommandRegistry;
 //! use dynamic_cli::config::schema::CommandDefinition;
-//! use dynamic_cli::executor::CommandHandler;
-//! use std::collections::HashMap;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //!
 //! // Create a registry
 //! let mut registry = CommandRegistry::new();
@@ -39,7 +38,7 @@
 //!     fn execute(
 //!         &self,
 //!         _ctx: &mut dyn dynamic_cli::context::ExecutionContext,
-//!         _args: &HashMap<String, String>,
+//!         _args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
 //!         println!("Hello!");
 //!         Ok(())
@@ -106,7 +105,7 @@ enum StoredHandler {
 /// # };
 /// # struct TestCommand;
 /// # impl CommandHandler for TestCommand {
-/// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+/// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 /// # }
 /// registry.register_sync(definition, Box::new(TestCommand))?;
 ///
@@ -224,8 +223,7 @@ impl CommandRegistry {
     /// ```
     /// use dynamic_cli::registry::CommandRegistry;
     /// use dynamic_cli::config::schema::CommandDefinition;
-    /// use dynamic_cli::executor::CommandHandler;
-    /// use std::collections::HashMap;
+    /// use dynamic_cli::executor::{CommandHandler, ParsedArgs};
     ///
     /// let mut registry = CommandRegistry::new();
     ///
@@ -244,7 +242,7 @@ impl CommandRegistry {
     ///     fn execute(
     ///         &self,
     ///         _: &mut dyn dynamic_cli::context::ExecutionContext,
-    ///         _: &HashMap<String, String>,
+    ///         _: &ParsedArgs,
     ///     ) -> dynamic_cli::Result<()> {
     ///         Ok(())
     ///     }
@@ -310,8 +308,7 @@ impl CommandRegistry {
     /// ```
     /// use dynamic_cli::registry::CommandRegistry;
     /// use dynamic_cli::config::schema::CommandDefinition;
-    /// use dynamic_cli::executor::AsyncCommandHandler;
-    /// use std::collections::HashMap;
+    /// use dynamic_cli::executor::{AsyncCommandHandler, ParsedArgs};
     /// use async_trait::async_trait;
     ///
     /// let mut registry = CommandRegistry::new();
@@ -332,7 +329,7 @@ impl CommandRegistry {
     ///     async fn execute(
     ///         &self,
     ///         _: &mut dyn dynamic_cli::context::ExecutionContext,
-    ///         _: &HashMap<String, String>,
+    ///         _: &ParsedArgs,
     ///     ) -> dynamic_cli::Result<()> {
     ///         Ok(())
     ///     }
@@ -395,7 +392,7 @@ impl CommandRegistry {
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
-    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// // Resolve command name
@@ -448,7 +445,7 @@ impl CommandRegistry {
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
-    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// // Get by name
@@ -507,7 +504,7 @@ impl CommandRegistry {
     /// # };
     /// # struct ExecCmd;
     /// # impl CommandHandler for ExecCmd {
-    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_sync(definition, Box::new(ExecCmd)).unwrap();
     /// // Get handler by name
@@ -569,7 +566,7 @@ impl CommandRegistry {
     /// # struct FetchCmd;
     /// # #[async_trait]
     /// # impl AsyncCommandHandler for FetchCmd {
-    /// #     async fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     async fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_async(definition, Box::new(FetchCmd)).unwrap();
     /// assert!(registry.get_handler_async("fetch").is_some());
@@ -620,7 +617,7 @@ impl CommandRegistry {
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
-    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
     /// # registry.register_sync(def2, Box::new(TestCmd)).unwrap();
@@ -685,7 +682,7 @@ impl CommandRegistry {
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
-    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+    /// #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
     /// # }
     /// # registry.register_sync(definition, Box::new(TestCmd)).unwrap();
     /// assert!(registry.contains("test"));
@@ -707,6 +704,7 @@ impl Default for CommandRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::ParsedArgs;
     use std::any::Any;
 
     // Test fixtures
@@ -728,7 +726,7 @@ mod tests {
         fn execute(
             &self,
             _context: &mut dyn crate::context::ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             Ok(())
         }
@@ -741,7 +739,7 @@ mod tests {
         async fn execute(
             &self,
             _context: &mut dyn crate::context::ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             Ok(())
         }
