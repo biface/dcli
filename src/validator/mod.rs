@@ -20,7 +20,7 @@
 //!     ↓
 //! ValidationRule definitions
 //!     ↓
-//! Parsed arguments (HashMap<String, String>)
+//! Parsed arguments (ParsedArgs — scalar and repeatable values)
 //!     ↓
 //! Validators (this module)
 //!     ↓

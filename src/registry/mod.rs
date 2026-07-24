@@ -48,8 +48,7 @@
 //! ```
 //! use dynamic_cli::registry::CommandRegistry;
 //! use dynamic_cli::config::schema::CommandDefinition;
-//! use dynamic_cli::executor::CommandHandler;
-//! use std::collections::HashMap;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //!
 //! // 1. Create a registry
 //! let mut registry = CommandRegistry::new();
@@ -71,10 +70,9 @@
 //!     fn execute(
 //!         &self,
 //!         _ctx: &mut dyn dynamic_cli::context::ExecutionContext,
-//!         args: &HashMap<String, String>,
+//!         args: &ParsedArgs,
 //!     ) -> dynamic_cli::Result<()> {
-//!         let default_world = "World".to_string();
-//!         let name = args.get("name").unwrap_or(&default_world);
+//!         let name = args.get_scalar("name").unwrap_or("World");
 //!         println!("Hello, {}!", name);
 //!         Ok(())
 //!     }
@@ -103,7 +101,6 @@
 //! use dynamic_cli::registry::CommandRegistry;
 //! # use dynamic_cli::config::schema::CommandDefinition;
 //! # use dynamic_cli::executor::CommandHandler;
-//! # use std::collections::HashMap;
 //!
 //! let mut registry = CommandRegistry::new();
 //!
@@ -118,7 +115,7 @@
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
-//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
 //! registry.register_sync(definition, Box::new(TestCmd))?;
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
@@ -130,7 +127,6 @@
 //! # use dynamic_cli::registry::CommandRegistry;
 //! # use dynamic_cli::config::schema::CommandDefinition;
 //! # use dynamic_cli::executor::CommandHandler;
-//! # use std::collections::HashMap;
 //! # let mut registry = CommandRegistry::new();
 //! let definition = CommandDefinition {
 //!     name: "simulate".to_string(),
@@ -148,7 +144,7 @@
 //!
 //! # struct SimCmd;
 //! # impl CommandHandler for SimCmd {
-//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
 //! registry.register_sync(definition, Box::new(SimCmd))?;
 //!
@@ -166,7 +162,6 @@
 //! # use dynamic_cli::registry::CommandRegistry;
 //! # use dynamic_cli::config::schema::CommandDefinition;
 //! # use dynamic_cli::executor::CommandHandler;
-//! # use std::collections::HashMap;
 //! # let mut registry = CommandRegistry::new();
 //! # let def1 = CommandDefinition {
 //! #     name: "cmd1".to_string(),
@@ -188,7 +183,7 @@
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
-//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
 //! # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
 //! # registry.register_sync(def2, Box::new(TestCmd)).unwrap();
@@ -205,7 +200,6 @@
 //! # use dynamic_cli::config::schema::CommandDefinition;
 //! # use dynamic_cli::executor::CommandHandler;
 //! # use dynamic_cli::error::{DynamicCliError, RegistryError};
-//! # use std::collections::HashMap;
 //! # let mut registry = CommandRegistry::new();
 //! # let def1 = CommandDefinition {
 //! #     name: "test".to_string(),
@@ -227,7 +221,7 @@
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
-//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &HashMap<String, String>) -> dynamic_cli::Result<()> { Ok(()) }
+//! #     fn execute(&self, _: &mut dyn dynamic_cli::context::ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
 //! # }
 //! # registry.register_sync(def1, Box::new(TestCmd)).unwrap();
 //! // Try to register duplicate
@@ -271,7 +265,7 @@
 //!     registry: &CommandRegistry,
 //!     command_name: &str,
 //!     context: &mut dyn ExecutionContext,
-//!     args: &HashMap<String, String>,
+//!     args: &ParsedArgs,
 //! ) -> Result<()> {
 //!     let handler = registry.get_handler_sync(command_name)
 //!         .ok_or_else(|| anyhow::anyhow!("Unknown command"))?;
@@ -315,6 +309,7 @@ mod tests {
     use crate::config::schema::CommandDefinition;
     use crate::context::ExecutionContext;
     use crate::executor::CommandHandler;
+    use crate::parser::ParsedArgs;
     use std::any::Any;
     use std::collections::HashMap;
 
@@ -337,7 +332,7 @@ mod tests {
         fn execute(
             &self,
             _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             Ok(())
         }
@@ -433,7 +428,7 @@ mod tests {
         if let Some(canonical_name) = registry.resolve_name(user_input) {
             if let Some(handler) = registry.get_handler_sync(canonical_name) {
                 let mut context = TestContext;
-                let args = HashMap::new();
+                let args = ParsedArgs::from_scalars(HashMap::new());
 
                 // Execute would happen here
                 let result = handler.execute(&mut context, &args);

@@ -10,9 +10,8 @@
 //! use dynamic_cli::parser::repl_parser::ReplParser;
 //! use dynamic_cli::registry::CommandRegistry;
 //! use dynamic_cli::config::schema::{CommandDefinition, ArgumentType};
-//! use dynamic_cli::executor::CommandHandler;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //! use dynamic_cli::context::ExecutionContext;
-//! use std::collections::HashMap;
 //!
 //! // Create registry
 //! let mut registry = CommandRegistry::new();
@@ -34,7 +33,7 @@
 //!     fn execute(
 //!         &self,
 //!         _context: &mut dyn ExecutionContext,
-//!         _args: &HashMap<String, String>,
+//!         _args: &ParsedArgs,
 //!     ) -> dynamic_cli::error::Result<()> {
 //!         Ok(())
 //!     }
@@ -347,7 +346,7 @@ mod tests {
         ArgumentDefinition, ArgumentType, CommandDefinition, OptionDefinition,
     };
     use crate::context::ExecutionContext;
-    use crate::executor::CommandHandler;
+    use crate::executor::{CommandHandler, ParsedArgs};
 
     // Dummy handler for tests
     struct TestHandler;
@@ -356,7 +355,7 @@ mod tests {
         fn execute(
             &self,
             _context: &mut dyn ExecutionContext,
-            _args: &HashMap<String, String>,
+            _args: &ParsedArgs,
         ) -> crate::error::Result<()> {
             Ok(())
         }

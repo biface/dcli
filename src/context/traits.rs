@@ -99,7 +99,7 @@ use std::any::Any;
 ///
 /// ```
 /// use dynamic_cli::context::{ExecutionContext, downcast_mut};
-/// use std::collections::HashMap;///
+/// use dynamic_cli::parser::ParsedArgs;
 /// #
 /// use rustyline::Context;
 ///
@@ -111,7 +111,7 @@ use std::any::Any;
 /// #
 /// fn my_handler(
 ///     context: &mut dyn ExecutionContext,
-///     args: &HashMap<String, String>,
+///     args: &ParsedArgs,
 /// ) -> Result<(), Box<dyn std::error::Error>> {
 ///     // Downcast to concrete type
 ///     let ctx = downcast_mut::<MyContext>(context)
