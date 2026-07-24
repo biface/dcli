@@ -76,6 +76,7 @@
 use crate::context::ExecutionContext;
 use crate::error::WasmError;
 use crate::executor::CommandHandler;
+use crate::parser::ParsedArgs;
 use crate::plugin::Plugin;
 use crate::Result;
 use std::collections::HashMap;
@@ -447,14 +448,15 @@ impl WasmHandler {
 }
 
 impl CommandHandler for WasmHandler {
-    fn execute(
-        &self,
-        _ctx: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
-    ) -> Result<()> {
+    fn execute(&self, _ctx: &mut dyn ExecutionContext, args: &ParsedArgs) -> Result<()> {
         // ExecutionContext is intentionally not forwarded to the guest —
         // see the module-level "Known limitation" section.
-        self.call_guest(args)
+        //
+        // The WASM ABI (DD-021) predates repeatable options (DD-024) and
+        // has not been extended to represent them across the host/guest
+        // boundary; any `ParsedValue::Repeated` entry is silently dropped
+        // by `to_scalar_map()`, same rationale as the REPL path.
+        self.call_guest(&args.to_scalar_map())
     }
 }
 
@@ -653,7 +655,7 @@ mod tests {
         let (_, handler) = &handlers[0];
 
         let mut ctx = TestContext;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
         assert!(handler.execute(&mut ctx, &args).is_ok());
     }
 
@@ -669,6 +671,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("name".to_string(), "World".to_string());
         args.insert("count".to_string(), "3".to_string());
+        let args = ParsedArgs::from_scalars(args);
         assert!(handler.execute(&mut ctx, &args).is_ok());
     }
 
@@ -685,7 +688,7 @@ mod tests {
 
         let mut ctx = TestContext;
         for _ in 0..50 {
-            let args = HashMap::new();
+            let args = ParsedArgs::from_scalars(HashMap::new());
             assert!(handler.execute(&mut ctx, &args).is_ok());
         }
     }
@@ -703,7 +706,7 @@ mod tests {
         let (_, handler) = &handlers[0];
 
         let mut ctx = TestContext;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
         let result = handler.execute(&mut ctx, &args);
         assert!(result.is_err());
 
@@ -725,7 +728,7 @@ mod tests {
         let (_, handler) = &handlers[0];
 
         let mut ctx = TestContext;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
         let result = handler.execute(&mut ctx, &args);
         assert!(result.is_err());
 
@@ -747,7 +750,7 @@ mod tests {
         let (_, handler) = &handlers[0];
 
         let mut ctx = TestContext;
-        let args = HashMap::new();
+        let args = ParsedArgs::from_scalars(HashMap::new());
         assert!(handler.execute(&mut ctx, &args).is_err());
     }
 

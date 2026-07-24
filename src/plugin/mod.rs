@@ -25,8 +25,7 @@
 //!
 //! ```
 //! use dynamic_cli::plugin::{Plugin, SystemPlugin};
-//! use dynamic_cli::executor::CommandHandler;
-//! use std::collections::HashMap;
+//! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //!
 //! // A minimal plugin supplying one handler
 //! struct GreetPlugin;
@@ -42,10 +41,9 @@
 //!             fn execute(
 //!                 &self,
 //!                 _ctx: &mut dyn dynamic_cli::context::ExecutionContext,
-//!                 args: &HashMap<String, String>,
+//!                 args: &ParsedArgs,
 //!             ) -> dynamic_cli::Result<()> {
-//!                 let default = "World".to_string();
-//!                 println!("Hello, {}!", args.get("name").unwrap_or(&default));
+//!                 println!("Hello, {}!", args.get_scalar("name").unwrap_or("World"));
 //!                 Ok(())
 //!             }
 //!         }
@@ -105,9 +103,8 @@ pub use system::SystemPlugin;
 ///
 /// ```
 /// use dynamic_cli::plugin::{Plugin, SystemPlugin};
-/// use dynamic_cli::executor::CommandHandler;
+/// use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 /// use dynamic_cli::context::ExecutionContext;
-/// use std::collections::HashMap;
 ///
 /// struct MyPlugin;
 ///
@@ -122,7 +119,7 @@ pub use system::SystemPlugin;
 ///             fn execute(
 ///                 &self,
 ///                 _ctx: &mut dyn ExecutionContext,
-///                 _args: &HashMap<String, String>,
+///                 _args: &ParsedArgs,
 ///             ) -> dynamic_cli::Result<()> {
 ///                 println!("executed");
 ///                 Ok(())
@@ -164,6 +161,7 @@ pub trait Plugin: Send + Sync {
 mod tests {
     use super::*;
     use crate::context::ExecutionContext;
+    use crate::parser::ParsedArgs;
     use crate::Result;
     use std::any::Any;
     use std::collections::HashMap;
@@ -203,9 +201,9 @@ mod tests {
                 fn execute(
                     &self,
                     _ctx: &mut dyn ExecutionContext,
-                    args: &HashMap<String, String>,
+                    args: &ParsedArgs,
                 ) -> Result<()> {
-                    for (k, v) in args {
+                    for (k, v) in args.to_scalar_map() {
                         println!("{k}={v}");
                     }
                     Ok(())
@@ -231,11 +229,7 @@ mod tests {
         fn handlers(&self) -> Vec<(String, Box<dyn CommandHandler>)> {
             struct NoopHandler;
             impl CommandHandler for NoopHandler {
-                fn execute(
-                    &self,
-                    _: &mut dyn ExecutionContext,
-                    _: &HashMap<String, String>,
-                ) -> Result<()> {
+                fn execute(&self, _: &mut dyn ExecutionContext, _: &ParsedArgs) -> Result<()> {
                     Ok(())
                 }
             }
@@ -308,6 +302,7 @@ mod tests {
         let mut ctx = TestContext;
         let mut args = HashMap::new();
         args.insert("key".to_string(), "value".to_string());
+        let args = ParsedArgs::from_scalars(args);
         assert!(handler.execute(&mut ctx, &args).is_ok());
     }
 
