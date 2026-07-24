@@ -225,7 +225,13 @@ pub enum ConfigError {
 ///
 /// These errors occur when analyzing arguments provided
 /// by the user in CLI or REPL mode.
+///
+/// Marked `#[non_exhaustive]` (DD-024, #37): repeatable-option parsing
+/// added four variants in one release, and more argument-shape features
+/// are expected before v1.0.0. External `match` expressions must include
+/// a wildcard arm.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum ParseError {
     /// Unknown command
     ///
@@ -350,6 +356,125 @@ pub enum ParseError {
         details: String,
         /// Example of correct syntax
         hint: Option<String>,
+    },
+
+    /// Unknown key inside a repeatable option's occurrence
+    ///
+    /// The discriminant itself was valid, but a `key=value` pair used a
+    /// key not declared in that discriminant's `option_parameters`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::ParseError;
+    ///
+    /// let error = ParseError::UnknownOptionParameter {
+    ///     option: "output".to_string(),
+    ///     discriminant: "csv".to_string(),
+    ///     key: "compression".to_string(),
+    ///     valid_keys: vec!["file".to_string(), "resolution".to_string()],
+    ///     suggestion: Some("Run --help export to see valid keys for --output csv.".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("compression"));
+    /// ```
+    #[error("Unknown parameter '{key}' for option --{option} (discriminant '{discriminant}'). Valid keys: {}", 
+        .valid_keys.join(", "))]
+    UnknownOptionParameter {
+        option: String,
+        discriminant: String,
+        key: String,
+        valid_keys: Vec<String>,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
+
+    /// Required key missing from a repeatable option's occurrence
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::ParseError;
+    ///
+    /// let error = ParseError::MissingRequiredOptionParameter {
+    ///     option: "output".to_string(),
+    ///     discriminant: "csv".to_string(),
+    ///     key: "file".to_string(),
+    ///     suggestion: Some("Run --help export to see required keys for --output csv.".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("file"));
+    /// ```
+    #[error(
+        "Missing required parameter '{key}' for option --{option} (discriminant '{discriminant}')"
+    )]
+    MissingRequiredOptionParameter {
+        option: String,
+        discriminant: String,
+        key: String,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
+
+    /// Unknown discriminant for a repeatable option
+    ///
+    /// The token immediately after a repeatable option's flag did not
+    /// match any entry in that option's `choices`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::ParseError;
+    ///
+    /// let error = ParseError::UnknownDiscriminant {
+    ///     option: "output".to_string(),
+    ///     value: "xml".to_string(),
+    ///     valid_choices: vec!["csv".to_string(), "plot".to_string()],
+    ///     suggestion: Some("Run --help export to see valid --output kinds.".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("xml"));
+    /// ```
+    #[error("Unknown discriminant '{value}' for option --{option}. Valid choices: {}", 
+        .valid_choices.join(", "))]
+    UnknownDiscriminant {
+        option: String,
+        value: String,
+        valid_choices: Vec<String>,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
+
+    /// The same repeatable-option occurrence was supplied twice
+    ///
+    /// Raised only when two occurrences share both the same discriminant
+    /// and exactly the same `key=value` pairs — a pure equality check the
+    /// framework can make without domain knowledge. Partially-overlapping
+    /// occurrences (same discriminant, different values) are *not*
+    /// rejected here; that stays the handler's responsibility (DD-024).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::ParseError;
+    ///
+    /// let error = ParseError::DuplicateOptionOccurrence {
+    ///     option: "output".to_string(),
+    ///     discriminant: "csv".to_string(),
+    ///     params: vec![("file".to_string(), "results.csv".to_string())],
+    ///     suggestion: Some("Remove one of the two identical --output csv occurrences.".to_string()),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("results.csv"));
+    /// ```
+    #[error("Duplicate occurrence of --{option} {discriminant} with identical parameters: {}", 
+        .params.iter().map(|(k, v)| format!("{}={}", k, v)).collect::<Vec<_>>().join(", "))]
+    DuplicateOptionOccurrence {
+        option: String,
+        discriminant: String,
+        params: Vec<(String, String)>,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
     },
 }
 
