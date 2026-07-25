@@ -17,6 +17,7 @@
 - [Définition de commande](#définition-de-commande)
 - [Arguments](#arguments)
 - [Options](#options)
+- [Options répétables](#options-répétables)
 - [Types d'arguments](#types-darguments)
 - [Règles de validation](#règles-de-validation)
 - [Exemple complet](#exemple-complet)
@@ -555,6 +556,127 @@ monapp lancer -n warn
 monapp lancer                   # Utilise la valeur par défaut : info
 monapp lancer -n invalide       # ERREUR : choix invalide
 ```
+
+---
+
+## Options répétables
+
+*Depuis la v0.6.0 ([DD-024](https://github.com/biface/dcli/issues/21)).*
+
+Une option répétable peut apparaître plusieurs fois sur la même ligne de
+commande. Chaque occurrence commence par un **discriminant** — un jeton nu
+immédiatement après le drapeau, tiré de `choices` — suivi de zéro ou
+plusieurs sous-paramètres `clé=valeur`. `dynamic-cli` accumule chaque
+occurrence dans l'ordre de la ligne de commande ; le handler les reçoit
+toutes.
+
+### Structure
+
+```yaml
+options:
+  - name: string                          # Requis
+    long: string                          # Optionnel
+    short: string                         # Optionnel
+    option_type: ArgumentType             # Requis
+    required: boolean                     # Requis
+    description: string                   # Requis
+    choices: [string]                     # Requis si repeatable — discriminants valides
+    repeatable: true                      # Requis pour activer ce comportement
+    option_parameters:                    # Requis — une entrée par discriminant
+      <discriminant>:
+        - name: string
+          arg_type: ArgumentType
+          required: boolean
+          description: string
+          validation: []                  # Optionnel
+          secure: false                   # Optionnel
+```
+
+### Règles
+
+- `choices` doit être non vide et liste les discriminants valides.
+- Les clés de `option_parameters` doivent correspondre **exactement** à
+  `choices` — aucune clé orpheline, aucun discriminant non déclaré. Le
+  chargement de la configuration échoue sinon.
+- Chaque entrée `option_parameters[discriminant]` est une
+  [`ArgumentDefinition`](#arguments) classique (mêmes champs que les
+  `arguments:` positionnels), mais seuls `name` / `arg_type` / `required` /
+  `description` / `validation` / `secure` ont un sens — l'ordre n'a aucun
+  effet puisque les sous-paramètres sont associés par clé, pas par
+  position.
+- `default` n'est **pas autorisé** quand `repeatable: true` : l'absence de
+  l'option signifie déjà zéro occurrence, une valeur par défaut implicite
+  serait ambiguë.
+- `option_parameters` sur une option avec `repeatable: false` (ou absent)
+  est une erreur de configuration.
+- Deux occurrences du même discriminant avec des paires `clé=valeur`
+  différentes sont toutes deux conservées. Deux occurrences **strictement
+  identiques** (même discriminant, mêmes paires clé=valeur) sont rejetées
+  — c'est le seul chevauchement que le framework peut détecter sans
+  connaissance du domaine ; les occurrences partiellement chevauchantes
+  (même `file`, `resolution` différente, par exemple) sont acceptées et
+  laissées à la charge du handler.
+
+### Exemple
+
+```yaml
+- name: "output"
+  long: "output"
+  option_type: "string"
+  required: false
+  description: "Écrit les résultats sous une ou plusieurs formes de sortie"
+  choices: ["csv", "plot"]
+  repeatable: true
+  option_parameters:
+    csv:
+      - name: "file"
+        arg_type: "path"
+        required: true
+        description: "Fichier CSV de destination"
+      - name: "resolution"
+        arg_type: "integer"
+        required: false
+        description: "Résolution du pas de temps"
+    plot:
+      - name: "file"
+        arg_type: "path"
+        required: true
+        description: "Fichier image de destination"
+```
+
+**Utilisation** :
+```bash
+monapp export --output csv file=resultats.csv resolution=100
+monapp export --output csv file=resultats.csv --output plot file=graphe.png
+monapp export --output csv file=a.csv --output csv file=b.csv   # les deux conservées — `file` différent
+monapp export --output csv file=a.csv --output csv file=a.csv   # ERREUR : DuplicateOptionOccurrence
+monapp export --output json file=out.json                       # ERREUR : UnknownDiscriminant
+monapp export --output csv                                      # ERREUR : MissingRequiredOptionParameter (file)
+monapp export --output csv file=a.csv depth=3                   # ERREUR : UnknownOptionParameter (depth)
+```
+
+### Côté handler
+
+`CommandHandler::execute` (et `validate`) reçoivent désormais une valeur
+`ParsedArgs` (voir la
+[documentation du module `executor`](https://docs.rs/dynamic-cli/latest/dynamic_cli/executor/))
+plutôt qu'une simple `HashMap<String, String>`, précisément pour pouvoir
+représenter les occurrences d'une option répétable aux côtés des options
+scalaires :
+
+```rust
+let occurrences = args.get_repeated("output").unwrap_or(&[]);
+for occ in occurrences {
+    match occ.discriminant.as_str() {
+        "csv" => { /* occ.params.get("file"), occ.params.get("resolution") */ }
+        "plot" => { /* occ.params.get("file") */ }
+        _ => unreachable!(), // la validation de config a déjà rejeté les autres discriminants
+    }
+}
+```
+
+Voir `CHANGELOG.md` (v0.6.0) pour le chemin de migration complet
+`HashMap<String, String>` → `ParsedArgs` des handlers existants.
 
 ---
 

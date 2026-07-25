@@ -17,6 +17,7 @@
 - [Command Definition](#command-definition)
 - [Arguments](#arguments)
 - [Options](#options)
+- [Repeatable Options](#repeatable-options)
 - [Argument Types](#argument-types)
 - [Validation Rules](#validation-rules)
 - [Complete Example](#complete-example)
@@ -554,6 +555,121 @@ myapp run -l warn
 myapp run                   # Uses default: info
 myapp run -l invalid        # ERROR: invalid choice
 ```
+
+---
+
+## Repeatable Options
+
+*Since v0.6.0 ([DD-024](https://github.com/biface/dcli/issues/21)).*
+
+A repeatable option can appear more than once on the same command line.
+Each occurrence starts with a **discriminant** — a bare token immediately
+after the flag, drawn from `choices` — followed by zero or more `key=value`
+sub-parameters. `dynamic-cli` accumulates every occurrence in command-line
+order; the handler receives them all.
+
+### Structure
+
+```yaml
+options:
+  - name: string                          # Required
+    long: string                          # Optional
+    short: string                         # Optional
+    option_type: ArgumentType             # Required
+    required: boolean                     # Required
+    description: string                   # Required
+    choices: [string]                     # Required when repeatable — valid discriminants
+    repeatable: true                      # Required to enable this behaviour
+    option_parameters:                    # Required — one entry per discriminant
+      <discriminant>:
+        - name: string
+          arg_type: ArgumentType
+          required: boolean
+          description: string
+          validation: []                  # Optional
+          secure: false                   # Optional
+```
+
+### Rules
+
+- `choices` must be non-empty and lists the valid discriminants.
+- `option_parameters` keys must match `choices` **exactly** — no orphan
+  key, no discriminant left undeclared. Config loading fails otherwise.
+- Each `option_parameters[discriminant]` entry is a regular
+  [`ArgumentDefinition`](#arguments) (same fields as positional
+  `arguments:`), but only `name` / `arg_type` / `required` / `description`
+  / `validation` / `secure` are meaningful — ordering has no effect, since
+  sub-parameters are matched by key, not position.
+- `default` is **not allowed** when `repeatable: true`: the option's
+  absence already means zero occurrences, so an implicit default would be
+  ambiguous.
+- `option_parameters` on an option with `repeatable: false` (or absent) is
+  a config error.
+- Two occurrences of the same discriminant with different `key=value`
+  pairs are both kept. Two occurrences that are **strictly identical**
+  (same discriminant, same key=value pairs) are rejected — this is the
+  only overlap the framework can detect without domain knowledge;
+  partially-overlapping occurrences (same `file`, different `resolution`,
+  say) are accepted and left to the handler to reconcile.
+
+### Example
+
+```yaml
+- name: "output"
+  long: "output"
+  option_type: "string"
+  required: false
+  description: "Write results in one or more output kinds"
+  choices: ["csv", "plot"]
+  repeatable: true
+  option_parameters:
+    csv:
+      - name: "file"
+        arg_type: "path"
+        required: true
+        description: "Destination CSV file"
+      - name: "resolution"
+        arg_type: "integer"
+        required: false
+        description: "Time-step resolution"
+    plot:
+      - name: "file"
+        arg_type: "path"
+        required: true
+        description: "Destination image file"
+```
+
+**Usage**:
+```bash
+myapp export --output csv file=results.csv resolution=100
+myapp export --output csv file=results.csv --output plot file=chart.png
+myapp export --output csv file=a.csv --output csv file=b.csv   # both kept — different `file`
+myapp export --output csv file=a.csv --output csv file=a.csv   # ERROR: DuplicateOptionOccurrence
+myapp export --output json file=out.json                       # ERROR: UnknownDiscriminant
+myapp export --output csv                                      # ERROR: MissingRequiredOptionParameter (file)
+myapp export --output csv file=a.csv depth=3                   # ERROR: UnknownOptionParameter (depth)
+```
+
+### Handler side
+
+`CommandHandler::execute` (and `validate`) receive a `ParsedArgs` value
+(see the [`executor` module docs](https://docs.rs/dynamic-cli/latest/dynamic_cli/executor/))
+rather than a flat `HashMap<String, String>`, precisely so a repeatable option's occurrences
+can be represented alongside scalar options:
+
+```rust
+let occurrences = args.get_repeated("output").unwrap_or(&[]);
+for occ in occurrences {
+    match occ.discriminant.as_str() {
+        "csv" => { /* occ.params.get("file"), occ.params.get("resolution") */ }
+        "plot" => { /* occ.params.get("file") */ }
+        _ => unreachable!(), // config validation already rejected other discriminants
+    }
+}
+```
+
+See `CHANGELOG.md` (v0.6.0) for the full `HashMap<String, String>` →
+`ParsedArgs` migration path for existing handlers.
 
 ---
 
