@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CliParser"]};
+window.SIDEBAR_ITEMS = {"enum":["ParsedValue"],"struct":["CliParser","OptionOccurrence"]};
