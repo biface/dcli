@@ -21,37 +21,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.6.0] - Planned (Q1 2027)
+## [0.6.0] - 2026-07-24 *(date to confirm at tag/publish time)*
 
-**Theme**: Polish & Advanced Features  
-**Estimated Effort**: 4-6 weeks  
-**Dependencies**: None
+**Theme**: Advanced Options — Repeatable Options with Typed Sub-Parameters
+**Decision**: [DD-024](https://github.com/biface/dcli/issues/21)
 
-### Planned
+### Added
 
-#### Configuration Management
-- **Configuration hot-reload**: Watch config file and reload without restart
-  - File system watching with `notify` crate
-  - Graceful handler replacement
-  - Validation before applying changes
-  - Rollback on errors
+#### Repeatable options (`OptionDefinition::repeatable`)
+- **`OptionDefinition` gains two additive fields** (`src/config/schema.rs`):
+  ```rust
+  #[serde(default)]
+  pub repeatable: bool,
 
-#### Customization
-- **Color scheme customization**: User-defined color themes
-  - Theme definition in config file
-  - Pre-defined themes (dark, light, high-contrast)
-  - Per-element color control (errors, warnings, prompts, etc.)
-  - Support for RGB and named colors
+  #[serde(default)]
+  pub option_parameters: HashMap<String, Vec<ArgumentDefinition>>,
+  ```
+  `choices` doubles as the set of valid discriminants when `repeatable: true`
+  — no change to its existing meaning for scalar options. Both fields
+  default to `false` / empty, so no existing YAML config breaks.
+- **Config-load-time validation** (`src/config/validator.rs::validate_options()`):
+  `repeatable: true` requires non-empty `choices`; `option_parameters` keys
+  must equal `choices` exactly (no orphan key, no undeclared discriminant);
+  each `option_parameters[discriminant]` is validated via the existing
+  `validate_argument_names` / `validate_argument_types` (explicitly *not*
+  `validate_argument_ordering`, meaningless for named `key=value` pairs);
+  `repeatable: false` with non-empty `option_parameters` is rejected;
+  `repeatable: true` with `default: Some(_)` is rejected — a repeatable
+  option's absence means zero occurrences, not an implicit one.
+- **New `ParseError` variants** (`src/error/types.rs`): `UnknownOptionParameter`,
+  `MissingRequiredOptionParameter`, `UnknownDiscriminant`,
+  `DuplicateOptionOccurrence` — each with an actionable `suggestion`
+  pointing at `--help`, consistent with the DD-011 convention.
+- **Parser support** (`src/parser/cli_parser.rs`): new `OptionOccurrence`
+  and `ParsedValue::{Scalar, Repeated}` types; `--output csv file=... [k=v ...]`
+  accumulates into `Vec<OptionOccurrence>` in command-line order. Two
+  occurrences of the same discriminant with different `key=value` pairs are
+  both kept; identical occurrences are rejected
+  (`DuplicateOptionOccurrence`) — partially-overlapping occurrences are
+  *not* framework-rejected, since `dynamic-cli` has no way to know which
+  key is domain-significant; that stays the handler's responsibility.
 
-#### REPL Enhancements
-- **Command history search**: Fuzzy search in history (Ctrl+R)
-- **Multi-line command support**: Continue commands across lines with `\`
-- **Command macros**: Define custom shortcuts in config
+### Changed — Breaking
 
-#### Quality of Life
-- **Verbose mode**: `-v`/`--verbose` for detailed output
-- **Quiet mode**: `-q`/`--quiet` for minimal output
-- **Debug mode**: `--debug` for troubleshooting
+- **`CommandHandler::execute` / `validate` and `AsyncCommandHandler::execute`
+  / `validate`** now take `&ParsedArgs` instead of
+  `&HashMap<String, String>`. `HashMap<String, String>` could not represent
+  both a scalar option and a repeated-occurrence option in the same map;
+  `validate()` moves alongside `execute()` so a handler sees the same
+  argument shape in both — otherwise it could not validate repeatable-option
+  occurrences before `execute()` runs.
+
+  ```rust
+  pub struct ParsedArgs(HashMap<String, ParsedValue>);
+
+  impl ParsedArgs {
+      pub fn get_scalar(&self, name: &str) -> Option<&str> { .. }
+      pub fn get_repeated(&self, name: &str) -> Option<&[OptionOccurrence]> { .. }
+      pub fn to_scalar_map(&self) -> HashMap<String, String> { .. }
+  }
+  ```
+
+  **Before**:
+  ```rust
+  impl CommandHandler for MyCommand {
+      fn execute(
+          &self,
+          context: &mut dyn ExecutionContext,
+          args: &HashMap<String, String>,
+      ) -> Result<()> {
+          let name = args.get("name").unwrap();
+          // ...
+      }
+  }
+  ```
+
+  **After**:
+  ```rust
+  impl CommandHandler for MyCommand {
+      fn execute(
+          &self,
+          context: &mut dyn ExecutionContext,
+          args: &ParsedArgs,
+      ) -> Result<()> {
+          let name = args.get_scalar("name").unwrap();
+          // ...
+      }
+  }
+  ```
+
+  For handlers that never use repeatable options, migration is close to a
+  find-and-replace: `args.get("x")` → `args.get_scalar("x")`. Subsystems
+  that predate DD-024 and still expect a flat `HashMap<String, String>`
+  (e.g. the WASM plugin ABI in `src/plugin/wasm.rs`, which serializes
+  arguments across the guest boundary) bridge via
+  `args.to_scalar_map()` rather than being rewritten — repeatable options
+  are silently dropped for those consumers, matching the pre-DD-024
+  behaviour they were built against.
+
+- All in-crate examples (`examples/*.rs`) and the `README.md` / `README.fr.md`
+  quick-start handler migrated to the new signature.
+
+**Deviation from the v0.5.0 roadmap note**: this signature change was
+previously expected to land at v1.0.0, batched with the removal of the
+`register()` / `get_handler()` / `register_handler()` deprecated aliases.
+It ships here instead, at v0.6.0, since DD-024 is itself a breaking change
+and batching it further only delays real-world validation against
+`chrom-rs`. The deprecated-alias removal is unaffected and still targets
+v1.0.0.
+
+### Documentation
+- **`CONFIG_SYNTAX_REFERENCE.md`** / **`.fr.md`**: new section on
+  `repeatable` and `option_parameters`, with the `--output csv file=...
+  resolution=...` / `--output plot file=...` worked example.
+- **`README.md`** / **`.fr.md`**: install snippet bumped to `0.6.0`;
+  quick-start handler example migrated to `ParsedArgs`.
+- **`DESIGN_DECISIONS.md`**: DD-024 moved from "decided — implementation
+  pending" to closed.
+
+**Breaking Changes**: Yes — every existing `CommandHandler` /
+`AsyncCommandHandler` implementation must migrate both `execute()` and
+`validate()`. `chrom-rs`'s migration is tracked separately in its own
+issue tracker.
+
+**Roadmap follow-up**: the `register()` / `get_handler()` /
+`register_handler()` deprecated aliases (introduced in v0.5.0) are still
+scheduled for removal at **v1.0.0**, unaffected by this release.
 
 ---
 
@@ -572,10 +667,10 @@ dynamic-cli/
 | **0.1.0** | Initial Release          | Complete framework                  | -         | ✅ Released           |
 | **0.2.0** | Help & Errors            | Built-in help, better errors        | 3-4 weeks | ✅ Released           |
 | **0.3.0** | Shell Completions        | REPL completion, secure history     | 3-4 weeks | ✅ Released           |
-| **0.4.0** | Plugin System            | Extensible handlers                 | 4-6 weeks | 🔵 Planned Q3 2026   |
-| **0.5.0** | Async Support            | Async handlers (optional)           | 4-6 weeks | 🔵 Planned Q4 2026   |
-| **0.6.0** | Advanced Options         | Repeatable options, typed sub-params| 4-6 weeks | 🔵 Planned Q1 2027   |
-| **1.0.0** | Stable                   | Production-ready, locked API        | -         | 🔵 Planned Q1 2028   |
+| **0.4.0** | Plugin System            | Extensible handlers                 | 4-6 weeks | ✅ Released           |
+| **0.5.0** | Async Support            | Async handlers (optional)           | 4-6 weeks | ✅ Released           |
+| **0.6.0** | Advanced Options         | Repeatable options, typed sub-params| 4-6 weeks | ✅ Released           |
+| **1.0.0** | Stable                   | Production-ready, locked API        | -         | 🔵 Planned            |
 
 ---
 
