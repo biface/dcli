@@ -35,10 +35,10 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.5.0"
+dynamic-cli = "0.6.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.5.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.6.0", features = ["wasm-plugins"] }
 ```
 
 ### Exemple Basique
@@ -83,7 +83,6 @@ global_options: []
 
 ```rust
 use dynamic_cli::prelude::*;
-use std::collections::HashMap;
 
 // Définissez le contexte de votre application
 #[derive(Default)]
@@ -103,10 +102,10 @@ impl CommandHandler for CommandeSaluer {
     fn execute(
         &self,
         _context: &mut dyn ExecutionContext,
-        args: &HashMap<String, String>,
+        args: &ParsedArgs,
     ) -> dynamic_cli::Result<()> {
-        let nom = args.get("nom").unwrap();
-        let fort = args.get("fort").map(|v| v == "true").unwrap_or(false);
+        let nom = args.get_scalar("nom").unwrap();
+        let fort = args.get_scalar("fort").map(|v| v == "true").unwrap_or(false);
         
         let salutation = format!("Bonjour, {} !", nom);
         println!("{}", if fort { salutation.to_uppercase() } else { salutation });
@@ -369,4 +368,4 @@ Si vous trouvez dynamic-cli utile, veuillez :
 - 📢 **Partager** avec d'autres qui pourraient le trouver utile
 - 📝 **Écrire** un article de blog ou un tutoriel !
 
-**Dernière mise à jour** : 2026-06-19
+**Dernière mise à jour** : 2026-07-24
