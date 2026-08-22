@@ -137,7 +137,7 @@ pub use help::{DefaultHelpFormatter, HelpFormatter};
 // Plugin system
 #[cfg(feature = "wasm-plugins")]
 pub use plugin::wasm::{WasmPlugin, WasmSerializationFormat};
-pub use plugin::{Plugin, SystemPlugin};
+pub use plugin::{ExitPlugin, HelpPlugin, Plugin, SystemPlugin, VersionPlugin};
 
 // Utility functions
 pub use utils::{
@@ -204,7 +204,7 @@ pub mod prelude {
     // Plugin system
     #[cfg(feature = "wasm-plugins")]
     pub use crate::plugin::wasm::{WasmPlugin, WasmSerializationFormat};
-    pub use crate::plugin::{Plugin, SystemPlugin};
+    pub use crate::plugin::{ExitPlugin, HelpPlugin, Plugin, SystemPlugin, VersionPlugin};
 
     // Utilities (most commonly used)
     pub use crate::utils::{detect_type, is_blank, normalize, parse_bool, parse_float, parse_int};
