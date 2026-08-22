@@ -229,7 +229,6 @@ mod tests {
     use crate::prelude::*;
 
     // Test context
-    #[derive(Default)]
     struct TestContext;
 
     impl ExecutionContext for TestContext {
@@ -280,7 +279,7 @@ mod tests {
             .register_sync(cmd_def, Box::new(TestHandler))
             .unwrap();
 
-        let context = Box::new(TestContext::default());
+        let context = Box::new(TestContext);
         let _cli = CliInterface::new(registry, context);
     }
 
@@ -302,7 +301,7 @@ mod tests {
             .register_sync(cmd_def, Box::new(TestHandler))
             .unwrap();
 
-        let context = Box::new(TestContext::default());
+        let context = Box::new(TestContext);
         let _repl = ReplInterface::new(registry, context, "test".to_string(), None, None);
     }
 }

@@ -39,9 +39,9 @@
 use dynamic_cli::prelude::*;
 use std::any::Any;
 
-/// ================================================================================================
-/// Execution context
-/// ================================================================================================
+// ================================================================================================
+// Execution context
+// ================================================================================================
 
 /// Execution context for the simple rpn calculator
 ///
@@ -63,7 +63,7 @@ impl SimpleRpnContext {
 
     /// Push a value onto the stack and lastx register
     fn push_x(&mut self, value: f64) {
-        self.last_x = value.clone();
+        self.last_x = value;
         self.push(value);
     }
 
@@ -78,7 +78,7 @@ impl SimpleRpnContext {
 
     /// Show the last x register
     fn last_x(&self) -> f64 {
-        self.last_x.clone()
+        self.last_x
     }
 
     /// Swap registers
@@ -152,13 +152,13 @@ impl ExecutionContext for SimpleRpnContext {
     }
 }
 
-/// ================================================================================================
-/// Command handlers
-///
-///  - Stack commands
-///  - Arithmetic functions
-///
-/// ================================================================================================
+// ================================================================================================
+// Command handlers
+//
+//  - Stack commands
+//  - Arithmetic functions
+//
+// ================================================================================================
 
 /// handler for push command
 ///
@@ -202,7 +202,6 @@ impl CommandHandler for PushCommand {
 /// Handler for pop command
 ///
 /// Removes and display the top value
-
 struct PopCommand;
 
 impl CommandHandler for PopCommand {
@@ -224,7 +223,6 @@ impl CommandHandler for PopCommand {
 /// Handler for lastx command
 ///
 /// Displays the last x register which stores the last value pushed
-
 struct LastXCommand;
 
 impl CommandHandler for LastXCommand {
@@ -246,7 +244,6 @@ impl CommandHandler for LastXCommand {
 /// Handler for swap command
 ///
 /// Exchange x register and y register in the stack
-
 struct SwapCommand;
 
 impl CommandHandler for SwapCommand {
@@ -268,7 +265,6 @@ impl CommandHandler for SwapCommand {
 /// Handler for peek command
 ///
 /// Displays the top value without removes it
-
 struct PeekCommand;
 
 impl CommandHandler for PeekCommand {
@@ -292,7 +288,6 @@ impl CommandHandler for PeekCommand {
 /// Handler for show command
 ///
 /// shows the entire stack as a list
-
 struct ShowCommand;
 
 impl CommandHandler for ShowCommand {
@@ -312,7 +307,6 @@ impl CommandHandler for ShowCommand {
 /// Handler for clear command
 ///
 /// sets the rpn context to default values
-
 struct ClearCommand;
 
 impl CommandHandler for ClearCommand {
@@ -332,7 +326,6 @@ impl CommandHandler for ClearCommand {
 /// Handler for add function
 ///
 /// Pops two values and pushes their sum
-
 struct AddCommand;
 
 impl CommandHandler for AddCommand {
@@ -351,7 +344,6 @@ impl CommandHandler for AddCommand {
 /// Handler for sub function
 ///
 /// Pops two value and pushes their difference
-
 struct SubCommand;
 
 impl CommandHandler for SubCommand {
@@ -371,7 +363,6 @@ impl CommandHandler for SubCommand {
 /// Handler for mul function
 ///
 /// Pops two values and pushed their product
-
 struct MulCommand;
 
 impl CommandHandler for MulCommand {
@@ -390,7 +381,6 @@ impl CommandHandler for MulCommand {
 /// Handler for div function
 ///
 /// Pops two values and pushes their quotient
-
 struct DivCommand;
 
 impl CommandHandler for DivCommand {
@@ -410,7 +400,6 @@ impl CommandHandler for DivCommand {
 /// Hander fon natural logarithm
 ///
 /// Pops the value and pushes the natural logarithm
-
 struct LnFunction;
 
 impl CommandHandler for LnFunction {
@@ -427,13 +416,13 @@ impl CommandHandler for LnFunction {
     }
 }
 
-/// ================================================================================================
-/// Main application
-///
-///  - Load the configuration file
-///  - Register command and function
-///  - Build and run the app
-/// ================================================================================================
+// ================================================================================================
+// Main application
+//
+//  - Load the configuration file
+//  - Register command and function
+//  - Build and run the app
+// ================================================================================================
 fn main() -> Result<()> {
     println!("🔢 Simple RPN Calculator - Powered by dynamic-cli");
     println!("═════════════════════════════════════════════════\n");
@@ -458,9 +447,9 @@ fn main() -> Result<()> {
     app.run()
 }
 
-/// ================================================================================================
-/// Tests
-/// ================================================================================================
+// ================================================================================================
+// Tests
+// ================================================================================================
 
 #[cfg(test)]
 mod tests {

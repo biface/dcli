@@ -414,6 +414,10 @@ mod tests {
     }
 
     #[test]
+    // `3.14` is an intentional, intuitive decimal literal for testing string
+    // parsing — not a mistyped π. clippy::approx_constant would otherwise
+    // suggest std::f64::consts::PI, which is not what this test is about.
+    #[allow(clippy::approx_constant)]
     fn test_parse_float_decimal() {
         assert_eq!(parse_float("3.14").unwrap(), 3.14);
         assert_eq!(parse_float("-1.5").unwrap(), -1.5);
@@ -448,37 +452,37 @@ mod tests {
     #[test]
     fn test_parse_bool_true_variants() {
         // All true variants
-        assert_eq!(parse_bool("true").unwrap(), true);
-        assert_eq!(parse_bool("True").unwrap(), true);
-        assert_eq!(parse_bool("TRUE").unwrap(), true);
-        assert_eq!(parse_bool("yes").unwrap(), true);
-        assert_eq!(parse_bool("YES").unwrap(), true);
-        assert_eq!(parse_bool("y").unwrap(), true);
-        assert_eq!(parse_bool("Y").unwrap(), true);
-        assert_eq!(parse_bool("1").unwrap(), true);
-        assert_eq!(parse_bool("on").unwrap(), true);
-        assert_eq!(parse_bool("ON").unwrap(), true);
+        assert!(parse_bool("true").unwrap());
+        assert!(parse_bool("True").unwrap());
+        assert!(parse_bool("TRUE").unwrap());
+        assert!(parse_bool("yes").unwrap());
+        assert!(parse_bool("YES").unwrap());
+        assert!(parse_bool("y").unwrap());
+        assert!(parse_bool("Y").unwrap());
+        assert!(parse_bool("1").unwrap());
+        assert!(parse_bool("on").unwrap());
+        assert!(parse_bool("ON").unwrap());
     }
 
     #[test]
     fn test_parse_bool_false_variants() {
         // All false variants
-        assert_eq!(parse_bool("false").unwrap(), false);
-        assert_eq!(parse_bool("False").unwrap(), false);
-        assert_eq!(parse_bool("FALSE").unwrap(), false);
-        assert_eq!(parse_bool("no").unwrap(), false);
-        assert_eq!(parse_bool("NO").unwrap(), false);
-        assert_eq!(parse_bool("n").unwrap(), false);
-        assert_eq!(parse_bool("N").unwrap(), false);
-        assert_eq!(parse_bool("0").unwrap(), false);
-        assert_eq!(parse_bool("off").unwrap(), false);
-        assert_eq!(parse_bool("OFF").unwrap(), false);
+        assert!(!parse_bool("false").unwrap());
+        assert!(!parse_bool("False").unwrap());
+        assert!(!parse_bool("FALSE").unwrap());
+        assert!(!parse_bool("no").unwrap());
+        assert!(!parse_bool("NO").unwrap());
+        assert!(!parse_bool("n").unwrap());
+        assert!(!parse_bool("N").unwrap());
+        assert!(!parse_bool("0").unwrap());
+        assert!(!parse_bool("off").unwrap());
+        assert!(!parse_bool("OFF").unwrap());
     }
 
     #[test]
     fn test_parse_bool_with_whitespace() {
-        assert_eq!(parse_bool("  true  ").unwrap(), true);
-        assert_eq!(parse_bool("\tfalse\n").unwrap(), false);
+        assert!(parse_bool("  true  ").unwrap());
+        assert!(!parse_bool("\tfalse\n").unwrap());
     }
 
     #[test]

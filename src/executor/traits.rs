@@ -573,7 +573,6 @@ mod tests {
     #[test]
     fn test_context_downcast_failure() {
         // Use a different context type to trigger downcast failure
-        #[derive(Default)]
         struct WrongContext;
 
         impl ExecutionContext for WrongContext {
@@ -587,7 +586,7 @@ mod tests {
         }
 
         let handler = HelloCommand;
-        let mut wrong_context = WrongContext::default();
+        let mut wrong_context = WrongContext;
         let args = ParsedArgs::from_scalars(HashMap::new());
 
         let result = handler.execute(&mut wrong_context, &args);
@@ -604,8 +603,9 @@ mod tests {
     #[test]
     fn test_context_state_modification() {
         let handler = StatefulCommand;
-        let mut context = TestContext::default();
-        context.state = "initial".to_string();
+        let mut context = TestContext {
+            state: "initial".to_string(),
+        };
         let args = scalar_args([("value", "_modified")]);
 
         let result = handler.execute(&mut context, &args);

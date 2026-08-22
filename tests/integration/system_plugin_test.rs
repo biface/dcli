@@ -21,15 +21,13 @@ use std::sync::{Arc, Mutex};
 // Test fixtures
 // ============================================================================
 
-/// Execution context that records invocations of the user-defined handler.
+/// Execution context placeholder for these tests.
 ///
-/// Shared via `Arc<Mutex<_>>` so the test can inspect side effects after
-/// `run_cli()` returns (handlers only receive `&mut dyn ExecutionContext`,
-/// not an owned, inspectable value).
-#[derive(Default)]
-struct RecordingContext {
-    greeted: Arc<Mutex<Vec<String>>>,
-}
+/// The actual recording mechanism lives in [`GreetHandler`]'s own
+/// `greeted` field, shared with the test via a separate `Arc<Mutex<_>>`
+/// clone — this context doesn't need to hold anything itself, only to
+/// satisfy `ExecutionContext`.
+struct RecordingContext;
 
 impl ExecutionContext for RecordingContext {
     fn as_any(&self) -> &dyn Any {
@@ -120,7 +118,7 @@ fn test_config() -> CommandsConfig {
 fn system_plugin_version_command_executes_via_full_chain() {
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(RecordingContext::default()))
+        .context(Box::new(RecordingContext))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_sync_handler(
             "greet_handler",
@@ -144,7 +142,7 @@ fn system_plugin_version_command_executes_via_full_chain() {
 fn system_plugin_help_command_executes_via_full_chain() {
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(RecordingContext::default()))
+        .context(Box::new(RecordingContext))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_sync_handler(
             "greet_handler",
@@ -170,7 +168,7 @@ fn system_plugin_coexists_with_user_registered_handler() {
 
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(RecordingContext::default()))
+        .context(Box::new(RecordingContext))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_sync_handler(
             "greet_handler",
@@ -200,7 +198,7 @@ fn system_plugin_coexists_with_user_registered_handler() {
 fn system_plugin_alias_resolves_to_same_handler() {
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(RecordingContext::default()))
+        .context(Box::new(RecordingContext))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_sync_handler(
             "greet_handler",
@@ -223,7 +221,7 @@ fn system_plugin_alias_resolves_to_same_handler() {
 fn duplicate_plugin_registration_fails_at_build() {
     let result = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(RecordingContext::default()))
+        .context(Box::new(RecordingContext))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_plugin(Box::new(SystemPlugin::new()))
         .register_sync_handler(
