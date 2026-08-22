@@ -28,15 +28,13 @@ use std::time::{Duration, Instant};
 // Test fixtures
 // ============================================================================
 
-/// Execution context that records the token(s) received.
+/// Execution context placeholder for these tests.
 ///
-/// Shared via `Arc<Mutex<_>>` so the test can inspect side effects after
-/// `run_cli()` returns (handlers only receive `&mut dyn ExecutionContext`,
-/// not an owned, inspectable value).
-#[derive(Default)]
-struct TokenContext {
-    tokens: Arc<Mutex<Vec<String>>>,
-}
+/// The actual recording mechanism lives in [`TokenFetchHandler`]'s own
+/// `tokens` field, shared with the test via a separate `Arc<Mutex<_>>`
+/// clone — this context doesn't need to hold anything itself, only to
+/// satisfy `ExecutionContext`.
+struct TokenContext;
 
 impl ExecutionContext for TokenContext {
     fn as_any(&self) -> &dyn Any {
@@ -110,7 +108,7 @@ fn async_token_handler_executes_via_full_chain() {
 
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(TokenContext::default()))
+        .context(Box::new(TokenContext))
         .register_async_handler(
             "token_handler",
             Box::new(TokenFetchHandler {
@@ -149,7 +147,7 @@ fn async_token_handler_alias_resolves() {
 
     let app = CliBuilder::new()
         .config(test_config())
-        .context(Box::new(TokenContext::default()))
+        .context(Box::new(TokenContext))
         .register_async_handler(
             "token_handler",
             Box::new(TokenFetchHandler {
@@ -174,7 +172,7 @@ fn async_token_handler_alias_resolves() {
 fn required_command_satisfied_by_async_handler_only() {
     let app = CliBuilder::new()
         .config(test_config()) // "fetch-token" is `required: true`
-        .context(Box::new(TokenContext::default()))
+        .context(Box::new(TokenContext))
         .register_async_handler(
             "token_handler",
             Box::new(TokenFetchHandler {

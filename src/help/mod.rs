@@ -472,6 +472,11 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[test]
+    // Intentional: this test locks in the public API guarantee that
+    // `::new()` and `::default()` are equivalent construction paths
+    // (documented at the struct's rustdoc, line ~111) — not leftover
+    // test scaffolding, so the `::default()` call must stay.
+    #[allow(clippy::default_constructed_unit_structs)]
     fn test_new_and_default_are_equivalent() {
         // Both construction paths compile and produce the same type.
         let _a = DefaultHelpFormatter::new();

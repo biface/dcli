@@ -606,6 +606,10 @@ mod tests {
     }
 
     #[test]
+    // `3.14` is an intentional, intuitive decimal literal for testing string
+    // parsing — not a mistyped π. clippy::approx_constant would otherwise
+    // suggest std::f64::consts::PI, which is not what this test is about.
+    #[allow(clippy::approx_constant)]
     fn test_parse_float_valid() {
         assert_eq!(parse_float("3.14", "pi").unwrap(), 3.14);
         assert_eq!(parse_float("42", "value").unwrap(), 42.0);
@@ -614,15 +618,15 @@ mod tests {
 
     #[test]
     fn test_parse_bool_various() {
-        assert_eq!(parse_bool("true").unwrap(), true);
-        assert_eq!(parse_bool("YES").unwrap(), true);
-        assert_eq!(parse_bool("1").unwrap(), true);
-        assert_eq!(parse_bool("on").unwrap(), true);
+        assert!(parse_bool("true").unwrap());
+        assert!(parse_bool("YES").unwrap());
+        assert!(parse_bool("1").unwrap());
+        assert!(parse_bool("on").unwrap());
 
-        assert_eq!(parse_bool("false").unwrap(), false);
-        assert_eq!(parse_bool("no").unwrap(), false);
-        assert_eq!(parse_bool("0").unwrap(), false);
-        assert_eq!(parse_bool("off").unwrap(), false);
+        assert!(!parse_bool("false").unwrap());
+        assert!(!parse_bool("no").unwrap());
+        assert!(!parse_bool("0").unwrap());
+        assert!(!parse_bool("off").unwrap());
 
         assert!(parse_bool("maybe").is_err());
     }

@@ -299,11 +299,11 @@ mod tests {
         }
     }
 
-    /// Alternative context type for testing type mismatch
-    #[derive(Default)]
-    struct OtherContext {
-        data: Vec<u8>,
-    }
+    /// Alternative context type for testing type mismatch.
+    ///
+    /// Unit struct: only its distinct *type* matters for these
+    /// downcast-mismatch tests, no payload is ever read.
+    struct OtherContext;
 
     impl ExecutionContext for OtherContext {
         fn as_any(&self) -> &dyn Any {
@@ -487,7 +487,7 @@ mod tests {
             Ok(())
         }
 
-        let mut ctx = OtherContext::default();
+        let mut ctx = OtherContext;
 
         // Should fail because we're passing OtherContext
         let result = handler(&mut ctx);
@@ -534,7 +534,7 @@ mod tests {
 
         // Verify changes
         assert_eq!(*ctx.counters.get("visits").unwrap(), 1);
-        assert_eq!(ctx.flags[0], false);
+        assert!(!ctx.flags[0]);
         assert!(ctx.optional_data.is_none());
     }
 

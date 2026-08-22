@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn test_validate_fails_at_first_invalid_rule() {
         let f = temp_file_with_ext("txt", "content");
-        let rules = vec![
+        let rules = [
             ValidationRule::MustExist { must_exist: true },
             ValidationRule::Extensions {
                 extensions: vec!["csv".to_string()], // Wrong extension!
