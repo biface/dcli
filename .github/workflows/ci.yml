@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt
+
       - name: Cache Cargo registry
         uses: actions/cache@v5
         with:
@@ -38,6 +43,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: clippy
+
       - name: Cache Cargo registry
         uses: actions/cache@v5
         with:
@@ -54,6 +64,9 @@ jobs:
       - name: cargo clippy — feature wasm-plugins
         run: cargo clippy --features wasm-plugins -- -D warnings
 
+      - name: cargo clippy — all features (combined)
+        run: cargo clippy --all-features -- -D warnings
+
       # v0.5.0+ — activate when async feature flag is declared in Cargo.toml
       # - name: cargo clippy — feature async
       #   run: cargo clippy --features async -- -D warnings
@@ -67,6 +80,9 @@ jobs:
     needs: fmt
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
@@ -107,6 +123,9 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
 
       - name: Cache Cargo registry
         uses: actions/cache@v5
