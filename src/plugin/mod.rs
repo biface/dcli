@@ -1,25 +1,25 @@
 //! Plugin system for `dynamic-cli`
 //!
 //! This module defines the [`Plugin`] trait, the standard extension mechanism
-//! for `dynamic-cli` applications. A plugin groups related command handlers
+//! for `dynamic-cli` applications. A builtin groups related command handlers
 //! under a single unit of deployment with explicit metadata.
 //!
 //! # Design
 //!
-//! The plugin system follows the principle established by DD-001 and DD-002:
+//! The builtin system follows the principle established by DD-001 and DD-002:
 //! - **The YAML config is the sole source of truth** for command definitions.
 //! - **Plugins supply handlers only** — identified by their `implementation`
 //!   name, exactly as [`CliBuilder::register_handler`] does.
-//! - **The framework controls registration** — the plugin declares what it
+//! - **The framework controls registration** — the builtin declares what it
 //!   provides via [`Plugin::handlers`]; the framework validates and registers.
-//!   The plugin never receives a `&mut CommandRegistry`.
+//!   The builtin never receives a `&mut CommandRegistry`.
 //!
-//! # Standard plugin
+//! # Standard builtin
 //!
 //! [`SystemPlugin`] is provided out of the box. It supplies handlers for the
 //! common system commands (`help`, `version`, `exit` / `quit`) that every
 //! application typically needs. Users declare the corresponding commands in
-//! their YAML config and register the plugin with a single call.
+//! their YAML config and register the builtin with a single call.
 //!
 //! # Example
 //!
@@ -27,7 +27,7 @@
 //! use dynamic_cli::plugin::{Plugin, SystemPlugin};
 //! use dynamic_cli::executor::{CommandHandler, ParsedArgs};
 //!
-//! // A minimal plugin supplying one handler
+//! // A minimal builtin supplying one handler
 //! struct GreetPlugin;
 //!
 //! impl Plugin for GreetPlugin {
@@ -52,9 +52,9 @@
 //! }
 //!
 //! // Verify the trait contract
-//! let plugin = GreetPlugin;
-//! assert_eq!(plugin.name(), "greet");
-//! let handlers = plugin.handlers();
+//! let builtin = GreetPlugin;
+//! assert_eq!(builtin.name(), "greet");
+//! let handlers = builtin.handlers();
 //! assert_eq!(handlers.len(), 1);
 //! assert_eq!(handlers[0].0, "greet_hello");
 //! ```
@@ -64,11 +64,17 @@ use crate::executor::CommandHandler;
 // Sub-modules
 pub mod system;
 
+// Standalone, single-command plugins split out of `SystemPlugin` (#44 / DD-025).
+// Each of `HelpPlugin`, `VersionPlugin`, `ExitPlugin` contributes exactly one
+// handler, reusing `system`'s handler logic internally — no duplication.
+pub mod builtin;
+
 // Sub-module for the WASM loader (feature-gated, added in #23)
 #[cfg(feature = "wasm-plugins")]
 pub mod wasm;
 
 // Re-exports for convenience
+pub use builtin::{ExitPlugin, HelpPlugin, VersionPlugin};
 pub use system::SystemPlugin;
 
 // ============================================================================
@@ -77,9 +83,9 @@ pub use system::SystemPlugin;
 
 /// Extension point for grouping related command handlers.
 ///
-/// A plugin declares its metadata and the handlers it provides. The framework
+/// A builtin declares its metadata and the handlers it provides. The framework
 /// validates and registers those handlers into the [`CommandRegistry`] during
-/// [`CliBuilder::build()`]. The plugin never has direct access to the registry.
+/// [`CliBuilder::build()`]. The builtin never has direct access to the registry.
 ///
 /// # Contract
 ///
@@ -88,7 +94,7 @@ pub use system::SystemPlugin;
 ///   command declared in the YAML config — exactly as with
 ///   [`CliBuilder::register_handler`].
 /// - The YAML config remains the sole source of truth for command definitions.
-///   A plugin cannot inject commands that are not declared in the config.
+///   A builtin cannot inject commands that are not declared in the config.
 ///
 /// # Object safety
 ///
@@ -109,9 +115,9 @@ pub use system::SystemPlugin;
 /// struct MyPlugin;
 ///
 /// impl Plugin for MyPlugin {
-///     fn name(&self) -> &str { "my-plugin" }
+///     fn name(&self) -> &str { "my-builtin" }
 ///     fn version(&self) -> &str { "1.0.0" }
-///     fn description(&self) -> &str { "My custom plugin" }
+///     fn description(&self) -> &str { "My custom builtin" }
 ///
 ///     fn handlers(&self) -> Vec<(String, Box<dyn CommandHandler>)> {
 ///         struct MyHandler;
@@ -130,22 +136,22 @@ pub use system::SystemPlugin;
 /// }
 ///
 /// // Trait object usage (object-safe)
-/// let plugin: Box<dyn Plugin> = Box::new(MyPlugin);
-/// assert_eq!(plugin.name(), "my-plugin");
-/// assert_eq!(plugin.version(), "1.0.0");
-/// assert_eq!(plugin.handlers().len(), 1);
+/// let builtin: Box<dyn Plugin> = Box::new(MyPlugin);
+/// assert_eq!(builtin.name(), "my-builtin");
+/// assert_eq!(builtin.version(), "1.0.0");
+/// assert_eq!(builtin.handlers().len(), 1);
 /// ```
 pub trait Plugin: Send + Sync {
-    /// Short identifier for this plugin (e.g. `"system"`, `"greet"`).
+    /// Short identifier for this builtin (e.g. `"system"`, `"greet"`).
     fn name(&self) -> &str;
 
     /// Semantic version string (e.g. `"1.0.0"`).
     fn version(&self) -> &str;
 
-    /// Human-readable description of what this plugin provides.
+    /// Human-readable description of what this builtin provides.
     fn description(&self) -> &str;
 
-    /// Returns the handlers this plugin contributes.
+    /// Returns the handlers this builtin contributes.
     ///
     /// Each element is `(implementation_name, handler)` where
     /// `implementation_name` matches the `implementation` field in the YAML
@@ -277,7 +283,7 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
-    // EchoPlugin — minimal single-handler plugin
+    // EchoPlugin — minimal single-handler builtin
     // -------------------------------------------------------------------------
 
     #[test]

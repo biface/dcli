@@ -1,6 +1,6 @@
-//! Built-in system plugin for `dynamic-cli`
+//! Built-in system builtin for `dynamic-cli`
 //!
-//! Provides [`SystemPlugin`], a ready-made plugin supplying the three handlers
+//! Provides [`SystemPlugin`], a ready-made builtin supplying the three handlers
 //! that every `dynamic-cli` application typically needs: `system_help`,
 //! `system_version`, and `system_exit`.
 //!
@@ -19,11 +19,11 @@ use std::sync::Arc;
 // SystemPlugin
 // ============================================================================
 
-/// Built-in plugin providing standard system commands.
+/// Built-in builtin providing standard system commands.
 ///
 /// Supplies ready-made handlers for the commands that every `dynamic-cli`
 /// application typically needs. Users declare the corresponding commands in
-/// their YAML config and register the plugin once — no manual handler wiring.
+/// their YAML config and register the builtin once — no manual handler wiring.
 ///
 /// # Provided handlers
 ///
@@ -45,7 +45,7 @@ use std::sync::Arc;
 /// ```no_run
 /// use dynamic_cli::plugin::SystemPlugin;
 ///
-/// let plugin = SystemPlugin::new()
+/// let builtin = SystemPlugin::new()
 ///     .with_exit_fn(|| {
 ///         // flush logs, close DB connections, save session…
 ///         eprintln!("Goodbye.");
@@ -88,10 +88,10 @@ use std::sync::Arc;
 /// ```
 /// use dynamic_cli::plugin::{Plugin, SystemPlugin};
 ///
-/// let plugin = SystemPlugin::new();
-/// assert_eq!(plugin.name(), "system");
+/// let builtin = SystemPlugin::new();
+/// assert_eq!(builtin.name(), "system");
 ///
-/// let handlers = plugin.handlers();
+/// let handlers = builtin.handlers();
 /// let names: Vec<&str> = handlers.iter().map(|(n, _)| n.as_str()).collect();
 /// assert!(names.contains(&"system_help"));
 /// assert!(names.contains(&"system_version"));
@@ -133,7 +133,7 @@ impl SystemPlugin {
 
     /// Attach a config so the system handlers can access app metadata.
     ///
-    /// Called automatically by [`CliBuilder::build()`] when the plugin is
+    /// Called automatically by [`CliBuilder::build()`] when the builtin is
     /// registered via [`CliBuilder::register_plugin`].
     ///
     /// # Example
@@ -152,8 +152,8 @@ impl SystemPlugin {
     ///     global_options: vec![],
     /// };
     ///
-    /// let plugin = SystemPlugin::new().with_config(config);
-    /// assert_eq!(plugin.name(), "system");
+    /// let builtin = SystemPlugin::new().with_config(config);
+    /// assert_eq!(builtin.name(), "system");
     /// ```
     pub fn with_config(mut self, config: CommandsConfig) -> Self {
         self.config = Some(config);
@@ -215,17 +215,15 @@ impl Plugin for SystemPlugin {
         vec![
             (
                 "system_help".to_string(),
-                Box::new(SystemHelpHandler {
-                    config: config.clone(),
-                }),
+                Box::new(SystemHelpHandler::new(config.clone())),
             ),
             (
                 "system_version".to_string(),
-                Box::new(SystemVersionHandler { config }),
+                Box::new(SystemVersionHandler::new(config)),
             ),
             (
                 "system_exit".to_string(),
-                Box::new(SystemExitHandler { exit_fn }),
+                Box::new(SystemExitHandler::new(exit_fn)),
             ),
         ]
     }
@@ -236,8 +234,18 @@ impl Plugin for SystemPlugin {
 // ============================================================================
 
 /// Handler for `system_help` — prints app-level or per-command help.
-struct SystemHelpHandler {
+///
+/// `pub(crate)` so [`crate::plugin::builtin::HelpPlugin`] can reuse the
+/// exact same logic without duplicating it (see #44 / DD-025).
+pub(crate) struct SystemHelpHandler {
     config: Option<CommandsConfig>,
+}
+
+impl SystemHelpHandler {
+    /// Build a new handler carrying the given (optional) config.
+    pub(crate) fn new(config: Option<CommandsConfig>) -> Self {
+        Self { config }
+    }
 }
 
 impl CommandHandler for SystemHelpHandler {
@@ -261,8 +269,18 @@ impl CommandHandler for SystemHelpHandler {
 }
 
 /// Handler for `system_version` — prints the app version from config metadata.
-struct SystemVersionHandler {
+///
+/// `pub(crate)` so [`crate::plugin::builtin::VersionPlugin`] can
+/// reuse the exact same logic without duplicating it (see #44 / DD-025).
+pub(crate) struct SystemVersionHandler {
     config: Option<CommandsConfig>,
+}
+
+impl SystemVersionHandler {
+    /// Build a new handler carrying the given (optional) config.
+    pub(crate) fn new(config: Option<CommandsConfig>) -> Self {
+        Self { config }
+    }
 }
 
 impl CommandHandler for SystemVersionHandler {
@@ -279,9 +297,19 @@ impl CommandHandler for SystemVersionHandler {
 ///
 /// The callback is set via [`SystemPlugin::with_exit_fn`]. The default
 /// callback calls `std::process::exit(0)`.
-struct SystemExitHandler {
+///
+/// `pub(crate)` so [`crate::plugin::builtin::ExitPlugin`] can reuse the
+/// exact same logic without duplicating it (see #44 / DD-025).
+pub(crate) struct SystemExitHandler {
     /// Shutdown callback — runs before the process exits.
     exit_fn: Arc<dyn Fn() + Send + Sync>,
+}
+
+impl SystemExitHandler {
+    /// Build a new handler carrying the given shutdown callback.
+    pub(crate) fn new(exit_fn: Arc<dyn Fn() + Send + Sync>) -> Self {
+        Self { exit_fn }
+    }
 }
 
 impl CommandHandler for SystemExitHandler {
@@ -443,7 +471,7 @@ mod tests {
     fn test_system_exit_default_callback_is_set() {
         // Verify that SystemPlugin::new() initialises exit_fn without panicking.
         // The default callback (process::exit) cannot be invoked in tests;
-        // we only check that the plugin builds and exposes the handler.
+        // we only check that the builtin builds and exposes the handler.
         let plugin = SystemPlugin::new();
         let handlers = plugin.handlers();
         assert!(handlers.iter().any(|(n, _)| n == "system_exit"));
