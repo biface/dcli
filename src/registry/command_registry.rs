@@ -705,20 +705,8 @@ impl Default for CommandRegistry {
 mod tests {
     use super::*;
     use crate::parser::ParsedArgs;
-    use std::any::Any;
 
     // Test fixtures
-    #[derive(Default)]
-    struct TestContext;
-
-    impl crate::context::ExecutionContext for TestContext {
-        fn as_any(&self) -> &dyn Any {
-            self
-        }
-        fn as_any_mut(&mut self) -> &mut dyn Any {
-            self
-        }
-    }
 
     struct TestHandler;
 

@@ -241,11 +241,7 @@ impl CommandHandler for SearchCommand {
         }
 
         // Simple pattern matching (just extension for now)
-        let extension = if pattern.starts_with("*.") {
-            Some(&pattern[2..])
-        } else {
-            None
-        };
+        let extension = pattern.strip_prefix("*.");
 
         // Search files
         let mut matches = Vec::new();

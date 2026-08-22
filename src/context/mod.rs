@@ -202,11 +202,11 @@ mod tests {
         }
     }
 
-    /// Another context type for testing type safety
-    #[derive(Default)]
-    struct AnotherContext {
-        value: i32,
-    }
+    /// Another context type for testing type safety.
+    ///
+    /// Unit struct: only its distinct *type* matters for this
+    /// wrong-context-type test, no payload is ever read.
+    struct AnotherContext;
 
     impl ExecutionContext for AnotherContext {
         fn as_any(&self) -> &dyn Any {
@@ -293,7 +293,7 @@ mod tests {
             Ok(())
         }
 
-        let mut wrong_ctx = AnotherContext::default();
+        let mut wrong_ctx = AnotherContext;
 
         // Should fail because we're passing the wrong context type
         let result = command_expecting_test_context(&mut wrong_ctx);
@@ -308,8 +308,10 @@ mod tests {
             Ok(app_ctx.command_count)
         }
 
-        let mut ctx = TestAppContext::default();
-        ctx.command_count = 42;
+        let ctx = TestAppContext {
+            command_count: 42,
+            ..Default::default()
+        };
 
         let count = read_command_count(&ctx).unwrap();
         assert_eq!(count, 42);
