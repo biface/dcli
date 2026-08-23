@@ -1,0 +1,269 @@
+# Advanced RPN Calculator configuration file
+#
+# Extends simple_rpn.yaml with HP-41CX-inspired scientific functions and
+# a 10-register memory bank (sto/rcl), plus the sysinfo/config commands
+# contributed by SysInfoPlugin and ConfigPlugin (feature-gated).
+#
+# In memory of the awesome Hewlett Packard 41 CX.
+
+metadata:
+  version: "0.2.0"
+  prompt: "arpn"
+  prompt_suffix: " > "
+
+commands:
+
+  # ── Stack manipulation ─────────────────────────────────────────────
+
+  - name: push
+    aliases: []
+    description: "Push a number onto the stack, and store it to last x register"
+    required: true
+    arguments:
+      - name: value
+        arg_type: float
+        required: true
+        description: "The number to push"
+        validation: []
+    options: []
+    implementation: "push_command"
+
+  - name: pop
+    aliases: []
+    description: "Pop and display the top value from the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "pop_command"
+
+  - name: lastx
+    aliases: []
+    description: "Display the last pushed value onto the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "lastx_command"
+
+  - name: swap
+    aliases: ["X<>Y"]
+    description: "Exchange top of the stack and the previous record"
+    required: false
+    arguments: []
+    options: []
+    implementation: "swap_command"
+
+  - name: peek
+    aliases: []
+    description: "Display the top value without remove it"
+    required: false
+    arguments: []
+    options: []
+    implementation: "peek_command"
+
+  - name: show
+    aliases: ["display", "stack"]
+    description: "Display the entire stack as a list"
+    required: false
+    arguments: []
+    options: []
+    implementation: "show_command"
+
+  - name: clear
+    aliases: []
+    description: "Clear the entire stack and last x register"
+    required: false
+    arguments: []
+    options: []
+    implementation: "clear_command"
+
+  # ── Arithmetic operations ──────────────────────────────────────────
+
+  - name: add
+    aliases: ["+"]
+    description: "Pop two values, push their sum"
+    required: true
+    arguments: []
+    options: []
+    implementation: "add_function"
+
+  - name: sub
+    aliases: ["-"]
+    description: "Pop two values, push their difference"
+    required: true
+    arguments: []
+    options: []
+    implementation: "sub_function"
+
+  - name: mul
+    aliases: ["*"]
+    description: "Pop two values, push their product"
+    required: true
+    arguments: []
+    options: []
+    implementation: "mul_function"
+
+  - name: div
+    aliases: ["/"]
+    description: "Pop two values, push their quotient"
+    required: false
+    arguments: []
+    options: []
+    implementation: "div_function"
+
+  # ── Scientific functions (HP-41CX-inspired) ────────────────────────
+
+  - name: ln
+    aliases: []
+    description: "Natural logarithm"
+    required: false
+    arguments: []
+    options: []
+    implementation: "ln_function"
+
+  - name: log10
+    aliases: ["log"]
+    description: "Base-10 logarithm"
+    required: false
+    arguments: []
+    options: []
+    implementation: "log10_function"
+
+  - name: exp
+    aliases: []
+    description: "Natural exponential (e^x)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "exp_function"
+
+  - name: sqrt
+    aliases: []
+    description: "Square root"
+    required: false
+    arguments: []
+    options: []
+    implementation: "sqrt_function"
+
+  - name: sq
+    aliases: ["x2"]
+    description: "Square (x^2)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "sq_function"
+
+  - name: inv
+    aliases: ["1/x"]
+    description: "Reciprocal (1/x)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "inv_function"
+
+  - name: pow
+    aliases: ["y^x"]
+    description: "Pop two values (y, x), push y raised to the power x"
+    required: false
+    arguments: []
+    options: []
+    implementation: "pow_function"
+
+  - name: chs
+    aliases: ["neg"]
+    description: "Change sign of the top of the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "chs_function"
+
+  - name: sin
+    aliases: []
+    description: "Sine (radians)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "sin_function"
+
+  - name: cos
+    aliases: []
+    description: "Cosine (radians)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "cos_function"
+
+  - name: tan
+    aliases: []
+    description: "Tangent (radians)"
+    required: false
+    arguments: []
+    options: []
+    implementation: "tan_function"
+
+  - name: pi
+    aliases: []
+    description: "Push the constant pi onto the stack"
+    required: false
+    arguments: []
+    options: []
+    implementation: "pi_function"
+
+  # ── Memory registers (sto/rcl, HP-41-style, simplified to 10 slots) ─
+
+  - name: sto
+    aliases: []
+    description: "Store the top of the stack into register 0-9 (does not pop)"
+    required: true
+    arguments:
+      - name: register
+        arg_type: integer
+        required: true
+        description: "Register index (0-9)"
+        validation:
+          - min: 0
+            max: 9
+    options: []
+    implementation: "sto_command"
+
+  - name: rcl
+    aliases: []
+    description: "Push the value stored in register 0-9 onto the stack"
+    required: true
+    arguments:
+      - name: register
+        arg_type: integer
+        required: true
+        description: "Register index (0-9)"
+        validation:
+          - min: 0
+            max: 9
+    options: []
+    implementation: "rcl_command"
+
+  # ── Contributed by SysInfoPlugin / ConfigPlugin (feature-gated) ────
+
+  - name: sysinfo
+    aliases: []
+    description: "Show runtime/OS information"
+    required: false
+    arguments: []
+    options: []
+    implementation: "sysinfo_show"
+
+  - name: config-show
+    aliases: []
+    description: "Show the loaded configuration as YAML"
+    required: false
+    arguments: []
+    options: []
+    implementation: "config_show"
+
+  - name: config-validate
+    aliases: []
+    description: "Re-validate the loaded configuration"
+    required: false
+    arguments: []
+    options: []
+    implementation: "config_validate"
+
+global_options: []

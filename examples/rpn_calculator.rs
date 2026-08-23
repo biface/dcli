@@ -126,7 +126,7 @@ impl SimpleRpnContext {
         let y = self.pop()?;
         let result = operation(x, y);
         self.push(result);
-        println!("  → {} {} {} = {}", x, y, operator_name, result);
+        println!("  → {} {} {} = {}", y, x, operator_name, result);
         Ok(())
     }
 
@@ -355,7 +355,7 @@ impl CommandHandler for SubCommand {
             })
         })?;
 
-        rpn_ctx.binary_op(|a, b| a - b, "-")?;
+        rpn_ctx.binary_op(|a, b| b - a, "-")?;
         Ok(())
     }
 }
@@ -392,7 +392,7 @@ impl CommandHandler for DivCommand {
             })
         })?;
 
-        rpn_ctx.binary_op(|a, b| a / b, "/")?;
+        rpn_ctx.binary_op(|a, b| b / a, "/")?;
         Ok(())
     }
 }
@@ -488,6 +488,23 @@ mod tests {
         ctx_test.push_x(25.0);
         ctx_test.binary_op(|a, b| a * b, "*").unwrap();
         assert_eq!(ctx_test.peek(), Some(125.0));
+    }
+
+    #[test]
+    fn test_rpn_context_sub_and_div_use_hp_convention() {
+        // HP RPN convention: "10 ENTER 3 -" = 10 - 3 = 7 (Y - X, not X - Y).
+        let mut ctx = SimpleRpnContext::default();
+        ctx.push_x(10.0);
+        ctx.push_x(3.0);
+        ctx.binary_op(|a, b| b - a, "-").unwrap();
+        assert_eq!(ctx.peek(), Some(7.0));
+
+        // "20 ENTER 4 /" = 20 / 4 = 5 (Y / X, not X / Y).
+        let mut ctx = SimpleRpnContext::default();
+        ctx.push_x(20.0);
+        ctx.push_x(4.0);
+        ctx.binary_op(|a, b| b / a, "/").unwrap();
+        assert_eq!(ctx.peek(), Some(5.0));
     }
 
     #[test]

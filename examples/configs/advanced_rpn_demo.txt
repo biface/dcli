@@ -1,0 +1,36 @@
+# Advanced RPN Calculator — demo script
+#
+# Usable both ways:
+#   cargo run --example advanced_rpn_calculator --features sysinfo-plugin,config-plugin -- --script examples/configs/advanced_rpn_demo.txt
+#   (inside the REPL)  :load examples/configs/advanced_rpn_demo.txt
+#
+# Blank lines and lines starting with '#' are ignored by both run_script()
+# and the REPL's :load.
+
+# (3 + 4) * 5  — classic RPN warm-up
+push 3
+push 4
+add
+push 5
+mul
+show
+
+# Quadratic-ish scratchpad using the memory bank: store the result above
+# into register 0, then keep going.
+sto 0
+clear
+rcl 0
+sq
+show
+
+# Scientific functions
+push 2
+sqrt
+show
+
+pi
+show
+
+# Introspection commands, contributed by SysInfoPlugin / ConfigPlugin
+sysinfo
+config-show
