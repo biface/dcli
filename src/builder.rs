@@ -763,6 +763,47 @@ impl CliApp {
         cli.run(args)
     }
 
+    /// Run a batch of command lines read from a file (#41).
+    ///
+    /// Convenience wrapper around
+    /// [`CliInterface::run_script`][crate::interface::CliInterface::run_script]
+    /// — see there for the line format, tokenization, and error-policy
+    /// details.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use dynamic_cli::prelude::*;
+    /// # #[derive(Default)]
+    /// # struct MyContext;
+    /// # impl ExecutionContext for MyContext {
+    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
+    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// # }
+    /// # struct MyHandler;
+    /// # impl CommandHandler for MyHandler {
+    /// #     fn execute(&self, _: &mut dyn ExecutionContext, _: &dynamic_cli::parser::ParsedArgs) -> dynamic_cli::Result<()> { Ok(()) }
+    /// # }
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// # let app = CliBuilder::new()
+    /// #     .config_file("commands.yaml")
+    /// #     .context(Box::new(MyContext::default()))
+    /// #     .register_sync_handler("handler", Box::new(MyHandler))
+    /// #     .build()?;
+    /// let outcome = app.run_script("commands.txt", ScriptErrorPolicy::Continue)?;
+    /// println!("{}/{} lines succeeded", outcome.lines_succeeded, outcome.lines_executed);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn run_script(
+        self,
+        path: impl AsRef<std::path::Path>,
+        policy: crate::interface::ScriptErrorPolicy,
+    ) -> Result<crate::interface::ScriptOutcome> {
+        let cli = CliInterface::new(self.registry, self.context);
+        cli.run_script(path, policy)
+    }
+
     /// Run in REPL mode
     ///
     /// Enters an interactive loop that continues until the user exits.
