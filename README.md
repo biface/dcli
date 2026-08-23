@@ -294,12 +294,10 @@ cargo clippy --all-features -- -D warnings
 ```
 
 **Current test statistics:**
-<!-- TODO (v0.7.0): re-count after `cargo test --all-features` — the
-     figures below predate this release's additions (#41, #44-#47) and
-     are known stale, not re-verified this sprint. -->
-- **400+ unit tests** ✅
-- **130+ documentation tests**
-- **9 integration tests** (static + WASM plugins, full public API chain)
+
+- **500+ unit tests** ✅
+- **230+ documentation tests**
+- **12 integration tests** (static + WASM plugins, full public API chain)
 - **80-90% code coverage** *(not re-measured for v0.7.0 — `cargo-llvm-cov` wasn't run this sprint)*
 - **Zero clippy warnings**, confirmed across `--all-features`
   (`wasm-plugins`, `sysinfo-plugin`, `env-plugin`, `config-plugin` combined)
