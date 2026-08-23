@@ -1,16 +1,16 @@
 //! Standalone, single-command plugins.
 //!
-//! `SystemPlugin` (in [`crate::builtin::system`]) bundles `help`, `version`,
-//! and `exit` into a single builtin. This module offers the same three
+//! `SystemPlugin` (in [`crate::plugin::system`]) bundles `help`, `version`,
+//! and `exit` into a single plugin. This module offers the same three
 //! commands as **independent** plugins — [`HelpPlugin`], [`VersionPlugin`],
 //! [`ExitPlugin`] — for applications that want to compose only the ones
 //! they need (e.g. `version` alone, without `help`/`exit`).
 //!
 //! # Relationship to `SystemPlugin`
 //!
-//! Each builtin here reuses the exact same handler logic as its
+//! Each plugin here reuses the exact same handler logic as its
 //! `SystemPlugin` counterpart (`SystemHelpHandler`, `SystemVersionHandler`,
-//! `SystemExitHandler` in [`crate::builtin::system`]) — this is a pure
+//! `SystemExitHandler` in [`crate::plugin::system`]) — this is a pure
 //! internal refactor (#44 / DD-025). `SystemPlugin`'s public API, its
 //! `handlers()` output, and its existing test suite are unaffected.
 //!
@@ -31,14 +31,32 @@
 //! use dynamic_cli::plugin::{Plugin, VersionPlugin};
 //!
 //! // Register only `version`, without `help` or `exit`.
-//! let builtin = VersionPlugin::new();
-//! assert_eq!(builtin.handlers().len(), 1);
+//! let plugin = VersionPlugin::new();
+//! assert_eq!(plugin.handlers().len(), 1);
 //! ```
 
 mod exit;
 mod help;
 mod version;
 
+#[cfg(feature = "sysinfo-plugin")]
+mod sysinfo;
+
+#[cfg(feature = "env-plugin")]
+mod env;
+
+#[cfg(feature = "config-plugin")]
+mod config;
+
 pub use exit::ExitPlugin;
 pub use help::HelpPlugin;
 pub use version::VersionPlugin;
+
+#[cfg(feature = "sysinfo-plugin")]
+pub use sysinfo::SysInfoPlugin;
+
+#[cfg(feature = "env-plugin")]
+pub use env::EnvPlugin;
+
+#[cfg(feature = "config-plugin")]
+pub use config::ConfigPlugin;

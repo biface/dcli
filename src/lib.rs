@@ -126,7 +126,7 @@ pub use parser::{CliParser, ParsedArgs, ParsedCommand, ReplParser};
 pub use validator::{validate_file_exists, validate_file_extension, validate_range};
 
 // Interface types
-pub use interface::{CliInterface, ReplInterface};
+pub use interface::{CliInterface, ReplInterface, ScriptErrorPolicy, ScriptOutcome};
 
 // Builder types
 pub use builder::{CliApp, CliBuilder};
@@ -137,6 +137,12 @@ pub use help::{DefaultHelpFormatter, HelpFormatter};
 // Plugin system
 #[cfg(feature = "wasm-plugins")]
 pub use plugin::wasm::{WasmPlugin, WasmSerializationFormat};
+#[cfg(feature = "config-plugin")]
+pub use plugin::ConfigPlugin;
+#[cfg(feature = "env-plugin")]
+pub use plugin::EnvPlugin;
+#[cfg(feature = "sysinfo-plugin")]
+pub use plugin::SysInfoPlugin;
 pub use plugin::{ExitPlugin, HelpPlugin, Plugin, SystemPlugin, VersionPlugin};
 
 // Utility functions
@@ -193,7 +199,7 @@ pub mod prelude {
     pub use crate::validator::{validate_file_exists, validate_file_extension, validate_range};
 
     // Interface
-    pub use crate::interface::{CliInterface, ReplInterface};
+    pub use crate::interface::{CliInterface, ReplInterface, ScriptErrorPolicy, ScriptOutcome};
 
     // Builder
     pub use crate::builder::{CliApp, CliBuilder};
@@ -204,6 +210,12 @@ pub mod prelude {
     // Plugin system
     #[cfg(feature = "wasm-plugins")]
     pub use crate::plugin::wasm::{WasmPlugin, WasmSerializationFormat};
+    #[cfg(feature = "config-plugin")]
+    pub use crate::plugin::ConfigPlugin;
+    #[cfg(feature = "env-plugin")]
+    pub use crate::plugin::EnvPlugin;
+    #[cfg(feature = "sysinfo-plugin")]
+    pub use crate::plugin::SysInfoPlugin;
     pub use crate::plugin::{ExitPlugin, HelpPlugin, Plugin, SystemPlugin, VersionPlugin};
 
     // Utilities (most commonly used)
