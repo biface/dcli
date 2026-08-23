@@ -219,7 +219,7 @@ pub mod cli;
 pub mod repl;
 
 // Re-export main types for convenience
-pub use cli::CliInterface;
+pub use cli::{CliInterface, ScriptErrorPolicy, ScriptOutcome};
 pub use repl::ReplInterface;
 
 #[cfg(test)]

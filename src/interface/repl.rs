@@ -40,7 +40,7 @@ use rustyline::{CompletionType, Config, Context, Editor, Helper};
 
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
-use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
+use crate::error::{display_error, DynamicCliError, ExecutionError, ParseError, Result};
 use crate::help::HelpFormatter;
 use crate::parser::{ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
@@ -426,6 +426,82 @@ impl ReplInterface {
         None
     }
 
+    /// Intercept a `:load <path>` line before normal command parsing (#41
+    /// scope extension).
+    ///
+    /// Returns `None` when `line` doesn't start with `:load ` — normal
+    /// dispatch proceeds. Returns `Some(result)` when it does, whether
+    /// the load itself succeeds or fails.
+    ///
+    /// Unlike [`CliInterface::run_script`][crate::interface::CliInterface::run_script],
+    /// there is no error-policy parameter here: a failing line is
+    /// reported inline (via [`display_error`]) and the load always
+    /// continues to the next line, printing a final `succeeded/attempted`
+    /// summary. This matches how the REPL already surfaces errors for
+    /// interactively-typed lines — one at a time, without halting the
+    /// session — rather than the batch abort/continue choice that makes
+    /// sense for a one-shot script run.
+    ///
+    /// Each loaded line is dispatched via [`execute_line`][Self::execute_line]
+    /// itself — the same scalar-only path (DD-024 addendum) as any other
+    /// REPL-typed line, **not**
+    /// [`crate::interface::CliInterface::run_script`]'s typed/repeatable-options
+    /// path. A loaded script is not added to `rustyline` history, and a
+    /// script that `:load`s itself (directly or via another file) will
+    /// recurse until the file handle limit or stack is exhausted — no
+    /// cycle detection is implemented.
+    fn try_handle_load(&mut self, line: &str) -> Option<Result<()>> {
+        let path = line.trim().strip_prefix(":load ").map(str::trim)?;
+
+        if path.is_empty() {
+            return Some(Err(DynamicCliError::Parse(ParseError::InvalidSyntax {
+                details: "`:load` requires a file path".to_string(),
+                hint: Some("Usage: :load <path/to/script.txt>".to_string()),
+            })));
+        }
+
+        Some(self.load_script(path))
+    }
+
+    /// Read `path` and dispatch each non-blank, non-comment (`#`-prefixed)
+    /// line through [`execute_line`][Self::execute_line], continuing past
+    /// any failure. See [`try_handle_load`][Self::try_handle_load] for the
+    /// full behaviour.
+    fn load_script(&mut self, path: &str) -> Result<()> {
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
+                "failed to read script file {}: {}",
+                path,
+                e
+            )))
+        })?;
+
+        let mut attempted = 0usize;
+        let mut succeeded = 0usize;
+
+        for (idx, raw_line) in content.lines().enumerate() {
+            let line_number = idx + 1;
+            let script_line = raw_line.trim();
+
+            if script_line.is_empty() || script_line.starts_with('#') {
+                continue;
+            }
+
+            attempted += 1;
+
+            match self.execute_line(script_line) {
+                Ok(()) => succeeded += 1,
+                Err(e) => {
+                    eprintln!("  :load {} — line {}:", path, line_number);
+                    display_error(&e);
+                }
+            }
+        }
+
+        println!(":load {path}: {succeeded}/{attempted} line(s) succeeded");
+        Ok(())
+    }
+
     /// Check whether a parsed command involves at least one secure argument.
     ///
     /// Looks up the command definition in `self.config` (if available) and
@@ -577,6 +653,10 @@ impl ReplInterface {
         if let Some(output) = self.try_handle_help(line) {
             print!("{}", output);
             return Ok(());
+        }
+
+        if let Some(result) = self.try_handle_load(line) {
+            return result;
         }
 
         let parser = ReplParser::new(&self.registry);
@@ -1258,6 +1338,116 @@ mod tests {
         assert!(
             in_history,
             "non-secure command line must be written to history"
+        );
+    }
+
+    // ── :load (#41 scope extension) ─────────────────────────────────────────
+
+    fn write_script(content: &str) -> tempfile::NamedTempFile {
+        use std::io::Write;
+        let mut file = tempfile::NamedTempFile::new().expect("failed to create temp script file");
+        file.write_all(content.as_bytes())
+            .expect("failed to write temp script file");
+        file
+    }
+
+    #[test]
+    fn test_load_executes_each_line_via_execute_line() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let script = write_script("test\nt\n");
+        let line = format!(":load {}", script.path().display());
+
+        assert!(repl.execute_line(&line).is_ok());
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
+        assert_eq!(ctx.executed_commands, vec!["test", "test"]);
+    }
+
+    #[test]
+    fn test_load_skips_blank_lines_and_comments() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let script = write_script("# a comment\n\ntest\n   \n# another\n");
+        let line = format!(":load {}", script.path().display());
+
+        assert!(repl.execute_line(&line).is_ok());
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
+        assert_eq!(ctx.executed_commands, vec!["test"]);
+    }
+
+    #[test]
+    fn test_load_continues_past_a_failing_line() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let script = write_script("test\nunknown_command\ntest\n");
+        let line = format!(":load {}", script.path().display());
+
+        // Unlike CliInterface::run_script(Abort), :load never returns Err
+        // just because a line inside it failed — the failure is displayed
+        // inline and the load proceeds to the next line.
+        let result = repl.execute_line(&line);
+        assert!(result.is_ok());
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
+        assert_eq!(ctx.executed_commands, vec!["test", "test"]);
+    }
+
+    #[test]
+    fn test_load_missing_path_argument_is_an_error() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let result = repl.execute_line(":load");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_missing_file_is_an_error() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let result = repl.execute_line(":load /nonexistent/path/to/script.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_line_itself_is_not_added_to_history() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let script = write_script("test\n");
+        let line = format!(":load {}", script.path().display());
+        assert!(repl.execute_line(&line).is_ok());
+
+        let history = repl.editor.history();
+        let load_in_history = (0..history.len()).any(|i| {
+            history
+                .get(i, rustyline::history::SearchDirection::Forward)
+                .ok()
+                .flatten()
+                .map(|e| e.entry.starts_with(":load"))
+                .unwrap_or(false)
+        });
+        assert!(
+            !load_in_history,
+            ":load line itself must not be written to history"
         );
     }
 }
