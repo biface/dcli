@@ -22,6 +22,9 @@ exclude = [
 
 [features]
 wasm-plugins = ["dep:wasmtime"]
+sysinfo-plugin = []
+env-plugin = []
+config-plugin = []
 
 [dependencies]
 # Asynchronus and I/O commands
@@ -92,10 +95,30 @@ path = "tests/integration/async_token_test.rs"
 # required-features = []
 
 # Example configuration (uncomment when examples are implemented)
-# [[example]]
-# name = "simple_calculator"
-# path = "examples/simple_calculator.rs"
-# required-features = []
+[[example]]
+name = "simple_calculator"
+path = "examples/simple_calculator.rs"
+required-features = []
+
+[[example]]
+name = "rpn_calculator"
+path = "examples/rpn_calculator.rs"
+required-features = []
+
+[[example]]
+name = "file_manager"
+path = "examples/file_manager.rs"
+required-features = []
+
+[[example]]
+name = "advanced_rpn_calculator"
+path = "examples/advanced_rpn_calculator.rs"
+required-features = ["sysinfo-plugin", "config-plugin"]
+
+[[example]]
+name = "task_runner"
+path = "examples/task_runner.rs"
+required-features = []
 
 # Configuration for documentation generation
 [package.metadata.docs.rs]
