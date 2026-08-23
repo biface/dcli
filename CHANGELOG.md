@@ -21,6 +21,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-08-23 *(date to confirm at tag/publish time)*
+
+**Theme**: Static Plugin Library — Granular Plugins & Batch Execution
+**Decision**: [DD-025](https://github.com/biface/dcli/issues/25)
+
+### Added
+
+#### Granular static plugins, split out of `SystemPlugin`
+- **`HelpPlugin`, `VersionPlugin`, `ExitPlugin`** (`src/plugin/builtin/`):
+  `SystemPlugin`'s three bundled commands (`help`/`version`/`exit`) are now
+  also available as independent, composable plugins — register only the
+  one(s) an application needs. Each reuses `SystemPlugin`'s exact handler
+  logic internally (the handlers moved to `pub(crate)` with a `::new()`
+  constructor) — zero duplicated logic, and `SystemPlugin`'s own public API,
+  `handlers()` output, and test suite are unchanged. Implementation names
+  (`system_help`/`system_version`/`system_exit`) are unchanged too, so
+  existing YAML configs work unmodified whichever way the commands are
+  wired in.
+- **`SysInfoPlugin`** (`src/plugin/builtin/sysinfo.rs`, feature
+  `sysinfo-plugin`): `sysinfo_show` reports OS, architecture, and available
+  parallelism — a deliberate `std`-only baseline, zero new dependency. A
+  richer `sysinfo`-crate-backed variant, if pursued later, stays under this
+  same feature flag rather than a second one.
+- **`EnvPlugin`** (`src/plugin/builtin/env.rs`, feature `env-plugin`):
+  `env_show` prints environment variables, hiding any whose name looks
+  sensitive under a case-insensitive deny-list (`SECRET`, `TOKEN`, `KEY`,
+  `PASS`, `CREDENTIAL`, `AUTH`, `PRIVATE`). A hidden variable's *name* is
+  still shown — only its value is withheld. An allow-list mechanism
+  (`ArgumentDefinition::secure`, DD-023) isn't viable here: unlike a
+  config-declared argument, environment variable names are arbitrary and
+  unknown ahead of time, so there is nothing to declare against.
+- **`ConfigPlugin`** (`src/plugin/builtin/config.rs`, feature
+  `config-plugin`): `config_show` (renders the loaded config as YAML via
+  `serde_yaml`, already a non-feature-gated dependency) and
+  `config_validate` (calls `crate::config::validate_config` directly — the
+  same function `CliBuilder::build()` already runs internally, no
+  duplicated validation logic).
+- All granular plugins re-exported from the crate root and `prelude`,
+  cfg-gated where feature-flagged.
+
+#### Batch command execution and `:load`
+- **`CliInterface::run_script()` / `CliApp::run_script()`**: dispatch a
+  file of command lines through the same resolve → parse → execute path as
+  `run()` — one non-blank, non-comment (`#`-prefixed) line per command,
+  tokenized quote-aware via the existing `ReplParser::tokenize()`, parsed
+  via `parse_typed()` so DD-024 repeatable options are fully preserved in
+  batch scripts. `ScriptErrorPolicy::{Abort, Continue}` controls what
+  happens when a line fails; `ScriptOutcome{lines_executed,
+  lines_succeeded, failures}` reports the outcome, with every failure
+  carrying its 1-based line number.
+- **`:load <path>` REPL meta-command**: loads a script from an
+  already-running REPL session, closing the gap where `run_script()` only
+  works as a one-shot replacement for `run_cli()`/`run_repl()`.
+  Deliberately stays on the REPL's existing scalar-only parse path
+  (DD-024 addendum) rather than `run_script()`'s typed path — REPL's
+  scalar-only scoping was a deliberate prior decision, not reopened here.
+  No error-policy parameter: a failing line is displayed inline (matching
+  how the REPL already surfaces errors for typed lines) and the load
+  always continues, ending with a `succeeded/attempted` summary.
+
+  This closes the scope originally filed as "ScriptLoaderPlugin": a
+  `Plugin`-shaped implementation turned out to be architecturally
+  impossible — `CommandHandler::execute` receives only
+  `&mut dyn ExecutionContext`, never the `CommandRegistry`, so a
+  plugin-contributed handler has no way to dispatch other registered
+  commands. Reframed as methods on `CliInterface`/`CliApp` instead, which
+  already own both — additive, no breaking change.
+
+#### New example
+- **`examples/advanced_rpn_calculator.rs`**: HP-41CX-flavored extension of
+  `rpn_calculator.rs` — scientific functions (`sqrt`, `sq`, `inv`, `pow`,
+  `exp`, `log10`, `sin`, `cos`, `tan`, `chs`, `pi`) and a 10-slot memory
+  register bank (`sto`/`rcl`). Demonstrates `SysInfoPlugin` and
+  `ConfigPlugin` registered together via `CliBuilder::register_plugin()`,
+  `CliApp::run_script()` (`--script <file>`), and `:load` from inside the
+  REPL. New `[[example]]` entry in `Cargo.toml` with
+  `required-features = ["sysinfo-plugin", "config-plugin"]`.
+
+### Fixed
+
+- **`examples/rpn_calculator.rs` and `examples/advanced_rpn_calculator.rs`
+  — `sub`/`div` operand order**: `binary_op()`'s subtraction and division
+  closures computed `X - Y` / `X / Y` (`X` = most-recently-popped, the
+  actual top of stack), not the standard HP RPN convention `Y - X` /
+  `Y / X`. `"10 ENTER 3 -"` returned `-7` instead of the correct `7`. The
+  bug was untested before now — only the commutative `mul` had a test,
+  which masked the ordering issue. Regression tests added to both
+  examples to lock in the corrected convention.
+
+### Maintenance
+
+- **Clippy lint drift** (43 pre-existing errors across `examples/`,
+  `tests/integration/`, and unrelated `src/` modules, unrelated to this
+  release's actual changes) traced to an unpinned CI toolchain: the
+  `fmt`/`clippy`/`test`/`doc` jobs ran on whatever `ubuntu-latest`
+  shipped, silently drifting to newer clippy lints as GitHub updated its
+  runner image. Fixed at the root: all four jobs in `ci.yml` now pin
+  `dtolnay/rust-toolchain@1.97.0` explicitly. `clippy` gained a combined
+  `cargo clippy --all-features -- -D warnings` step, alongside the
+  existing default-features and `--features wasm-plugins` runs.
+  `coverage.yml` still pins only `@stable` (floating) — left as a possible
+  follow-up.
+
+**Breaking Changes**: None — every addition above is additive; the three
+existing bugs fixed (`sub`/`div` operand order, clippy drift) are example-
+and tooling-only, not public API changes.
+
+**Roadmap follow-up**: `DD-027` ("Multi-line option accumulation in REPL
+mode") was extracted from the DD-025 triage as a separate, not-yet-
+scheduled design decision — the REPL's scalar-only scoping (DD-024
+addendum) that `:load` deliberately respects above is exactly the
+boundary DD-027 will revisit.
+
+---
+
 ## [0.6.0] - 2026-07-24 *(date to confirm at tag/publish time)*
 
 **Theme**: Advanced Options — Repeatable Options with Typed Sub-Parameters
@@ -670,6 +785,7 @@ dynamic-cli/
 | **0.4.0** | Plugin System            | Extensible handlers                 | 4-6 weeks | ✅ Released           |
 | **0.5.0** | Async Support            | Async handlers (optional)           | 4-6 weeks | ✅ Released           |
 | **0.6.0** | Advanced Options         | Repeatable options, typed sub-params| 4-6 weeks | ✅ Released           |
+| **0.7.0** | Static Plugin Library    | Granular plugins, batch execution   | —         | ✅ Released           |
 | **1.0.0** | Stable                   | Production-ready, locked API        | -         | 🔵 Planned            |
 
 ---
@@ -737,6 +853,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-05-30  
-**Current Version**: 0.3.0  
-**Next Release**: 0.4.0 (planned Q3 2026)
+**Last Updated**: 2026-08-23  
+**Current Version**: 0.7.0  
+**Next Release**: 1.0.0 (planned Q2 2027)
