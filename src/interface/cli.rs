@@ -26,9 +26,10 @@
 //! ```
 
 use crate::context::ExecutionContext;
-use crate::error::{display_error, DynamicCliError, Result};
-use crate::parser::{CliParser, ParsedArgs};
+use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
+use crate::parser::{CliParser, ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
+use std::path::Path;
 use std::process;
 
 /// CLI (Command-Line Interface) handler
@@ -145,6 +146,17 @@ impl CliInterface {
             ));
         }
 
+        self.dispatch(&args)
+    }
+
+    /// Resolve, parse, and execute a single already-tokenized command line.
+    ///
+    /// Shared by [`run`][Self::run] (one dispatch from CLI args) and
+    /// [`run_script`][Self::run_script] (one dispatch per script line) —
+    /// the actual resolution/parsing/execution logic lives here exactly
+    /// once, per DD-024's "reuse the existing `ParsedArgs` path, no
+    /// duplicate parsing logic" requirement (see #41).
+    fn dispatch(&mut self, args: &[String]) -> Result<()> {
         // First argument is the command name
         let command_name = &args[0];
 
@@ -175,8 +187,9 @@ impl CliInterface {
         // Get handler and execute command. Sync is tried first (unchanged
         // behaviour); if no sync handler matches, fall through to the async
         // path (DD-022) and drive it via `block_on`. Safe here because
-        // `run()` is a strictly sequential, one-shot dispatch — there is no
-        // other async task waiting behind it that `block_on` could starve.
+        // `run()`/`run_script()` are strictly sequential, one-shot dispatch —
+        // there is no other async task waiting behind it that `block_on`
+        // could starve.
         if let Some(handler) = self.registry.get_handler_sync(resolved_name) {
             handler.execute(&mut *self.context, &parsed_args)?;
         } else if let Some(handler) = self.registry.get_handler_async(resolved_name) {
@@ -245,6 +258,163 @@ impl CliInterface {
             }
         }
     }
+
+    /// Run a batch of command lines read from a file (#41).
+    ///
+    /// Each non-blank, non-comment (`#`-prefixed) line is tokenized the
+    /// same quote-aware way as a typed REPL line (via
+    /// [`ReplParser::tokenize`]), then dispatched through the exact same
+    /// resolve → parse → execute path as [`run`][Self::run] — no
+    /// duplicate parsing logic, and repeatable options (DD-024) are fully
+    /// preserved since dispatch goes through `parse_typed()` either way.
+    ///
+    /// # Error policy
+    ///
+    /// `policy` decides what happens when a line fails:
+    /// - [`ScriptErrorPolicy::Abort`]: stop immediately, returning `Err`
+    ///   for the failing line. Lines before it have already run.
+    /// - [`ScriptErrorPolicy::Continue`]: record the failure and proceed
+    ///   to the next line. The method still returns `Ok`, with every
+    ///   failure listed in the returned [`ScriptOutcome`].
+    ///
+    /// Every failure — whether it aborts the run or not — is reported
+    /// with its 1-based line number, wrapped in
+    /// [`ExecutionError::CommandFailed`][crate::error::ExecutionError::CommandFailed]
+    /// (reusing the existing error hierarchy; no new enum variant, so no
+    /// breaking change to `ExecutionError`'s non-`#[non_exhaustive]`
+    /// shape).
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use dynamic_cli::interface::{CliInterface, ScriptErrorPolicy};
+    /// use dynamic_cli::prelude::*;
+    ///
+    /// # #[derive(Default)]
+    /// # struct MyContext;
+    /// # impl ExecutionContext for MyContext {
+    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
+    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// # }
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// let registry = CommandRegistry::new();
+    /// let context = Box::new(MyContext::default());
+    /// let cli = CliInterface::new(registry, context);
+    ///
+    /// let outcome = cli.run_script("commands.txt", ScriptErrorPolicy::Continue)?;
+    /// println!("{}/{} lines succeeded", outcome.lines_succeeded, outcome.lines_executed);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn run_script(
+        mut self,
+        path: impl AsRef<Path>,
+        policy: ScriptErrorPolicy,
+    ) -> Result<ScriptOutcome> {
+        let path = path.as_ref();
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
+                "failed to read script file {}: {}",
+                path.display(),
+                e
+            )))
+        })?;
+
+        let mut outcome = ScriptOutcome {
+            lines_executed: 0,
+            lines_succeeded: 0,
+            failures: Vec::new(),
+        };
+
+        for (idx, raw_line) in content.lines().enumerate() {
+            let line_number = idx + 1;
+            let line = raw_line.trim();
+
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+
+            outcome.lines_executed += 1;
+
+            // Scoped so the borrow of `self.registry` ends before
+            // `self.dispatch(&mut self, ...)` needs exclusive access below.
+            // `tokenize` is a pure function of the line text — it doesn't
+            // read `self.registry` — but it lives on `ReplParser`, so a
+            // throwaway instance is the reuse path rather than duplicating
+            // the quote-handling logic here.
+            let tokens_result = {
+                let tokenizer = ReplParser::new(&self.registry);
+                tokenizer.tokenize(line)
+            };
+
+            let tokens = match tokens_result {
+                Ok(t) => t,
+                Err(e) => {
+                    let wrapped = wrap_line_error(line_number, e);
+                    if policy == ScriptErrorPolicy::Abort {
+                        return Err(wrapped);
+                    }
+                    outcome.failures.push((line_number, wrapped));
+                    continue;
+                }
+            };
+
+            if tokens.is_empty() {
+                continue;
+            }
+
+            match self.dispatch(&tokens) {
+                Ok(()) => outcome.lines_succeeded += 1,
+                Err(e) => {
+                    let wrapped = wrap_line_error(line_number, e);
+                    if policy == ScriptErrorPolicy::Abort {
+                        return Err(wrapped);
+                    }
+                    outcome.failures.push((line_number, wrapped));
+                }
+            }
+        }
+
+        Ok(outcome)
+    }
+}
+
+/// Wrap an error with its 1-based script line number, reusing the
+/// existing [`ExecutionError::CommandFailed`] variant so adding
+/// line-number context never requires a breaking change to the error
+/// hierarchy.
+fn wrap_line_error(line_number: usize, source: DynamicCliError) -> DynamicCliError {
+    DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
+        "line {}: {}",
+        line_number,
+        source
+    )))
+}
+
+/// What [`CliInterface::run_script`] does when a line fails.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptErrorPolicy {
+    /// Stop at the first failing line — [`run_script`][CliInterface::run_script]
+    /// returns `Err` immediately, with the lines before it already run.
+    Abort,
+    /// Record the failure and keep going —
+    /// [`run_script`][CliInterface::run_script] returns `Ok` with every
+    /// failure listed in [`ScriptOutcome::failures`].
+    Continue,
+}
+
+/// Result of a full [`CliInterface::run_script`] run.
+#[derive(Debug)]
+pub struct ScriptOutcome {
+    /// Number of non-blank, non-comment lines dispatched (attempted).
+    pub lines_executed: usize,
+    /// Number of those lines that succeeded.
+    pub lines_succeeded: usize,
+    /// `(1-based line number, wrapped error)` for every line that failed.
+    /// Always empty when `policy` was
+    /// [`ScriptErrorPolicy::Abort`][ScriptErrorPolicy::Abort] and the run
+    /// completed (an abort returns `Err` instead of populating this).
+    pub failures: Vec<(usize, DynamicCliError)>,
 }
 
 #[cfg(test)]
@@ -409,5 +579,142 @@ mod tests {
 
         let result = cli.run(vec!["greet".to_string(), "Alice".to_string()]);
         assert!(result.is_ok());
+    }
+
+    // ========================================================================
+    // run_script tests (#41)
+    // ========================================================================
+
+    fn write_script(content: &str) -> tempfile::NamedTempFile {
+        use std::io::Write;
+        let mut file = tempfile::NamedTempFile::new().expect("failed to create temp script file");
+        file.write_all(content.as_bytes())
+            .expect("failed to write temp script file");
+        file
+    }
+
+    #[test]
+    fn test_run_script_all_lines_succeed() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let script = write_script("test\nt\ntest\n");
+        let outcome = cli
+            .run_script(script.path(), ScriptErrorPolicy::Abort)
+            .expect("run_script should succeed when every line succeeds");
+
+        assert_eq!(outcome.lines_executed, 3);
+        assert_eq!(outcome.lines_succeeded, 3);
+        assert!(outcome.failures.is_empty());
+    }
+
+    #[test]
+    fn test_run_script_skips_blank_lines_and_comments() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let script = write_script("# a comment\n\ntest\n   \n# another\nt\n");
+        let outcome = cli
+            .run_script(script.path(), ScriptErrorPolicy::Abort)
+            .expect("run_script should succeed");
+
+        // Only the two real command lines count.
+        assert_eq!(outcome.lines_executed, 2);
+        assert_eq!(outcome.lines_succeeded, 2);
+    }
+
+    #[test]
+    fn test_run_script_continue_policy_records_failures_and_keeps_going() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let script = write_script("test\nunknown_command\ntest\n");
+        let outcome = cli
+            .run_script(script.path(), ScriptErrorPolicy::Continue)
+            .expect("Continue policy should return Ok even with a failing line");
+
+        assert_eq!(outcome.lines_executed, 3);
+        assert_eq!(outcome.lines_succeeded, 2);
+        assert_eq!(outcome.failures.len(), 1);
+        assert_eq!(outcome.failures[0].0, 2); // 1-based line number
+    }
+
+    #[test]
+    fn test_run_script_abort_policy_stops_at_first_failure() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        // A third "test" line would succeed if reached — it must not be.
+        let script = write_script("test\nunknown_command\ntest\n");
+        let result = cli.run_script(script.path(), ScriptErrorPolicy::Abort);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DynamicCliError::Execution(ExecutionError::CommandFailed(e)) => {
+                assert!(e.to_string().contains("line 2"));
+            }
+            other => panic!("Expected wrapped CommandFailed error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_run_script_respects_quoted_tokens() {
+        let mut registry = CommandRegistry::new();
+        let cmd_def = CommandDefinition {
+            name: "greet".to_string(),
+            aliases: vec![],
+            description: "Greet someone".to_string(),
+            required: false,
+            arguments: vec![ArgumentDefinition {
+                name: "name".to_string(),
+                arg_type: ArgumentType::String,
+                required: true,
+                description: "Name to greet".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+            options: vec![],
+            implementation: "greet_handler".to_string(),
+        };
+
+        struct GreetHandler;
+        impl crate::executor::CommandHandler for GreetHandler {
+            fn execute(
+                &self,
+                _context: &mut dyn ExecutionContext,
+                args: &ParsedArgs,
+            ) -> Result<()> {
+                assert_eq!(args.get_scalar("name"), Some("Alice Wonderland"));
+                Ok(())
+            }
+        }
+
+        registry
+            .register_sync(cmd_def, Box::new(GreetHandler))
+            .unwrap();
+
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let script = write_script(r#"greet "Alice Wonderland""#);
+        let outcome = cli
+            .run_script(script.path(), ScriptErrorPolicy::Abort)
+            .expect("quoted argument should tokenize as a single value");
+
+        assert_eq!(outcome.lines_succeeded, 1);
+    }
+
+    #[test]
+    fn test_run_script_missing_file() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let result = cli.run_script("/nonexistent/path/to/script.txt", ScriptErrorPolicy::Abort);
+        assert!(result.is_err());
     }
 }
