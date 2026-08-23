@@ -17,12 +17,13 @@ Un framework Rust puissant pour créer des applications CLI et REPL configurable
 ## 🎯 Fonctionnalités
 
 - **📝 Piloté par Configuration** : Définissez commandes, arguments et options en YAML/JSON
-- **🔄 Modes CLI & REPL** : Support des modes ligne de commande et interactif
+- **🔄 Modes CLI, REPL & Lots** : Ligne de commande, interactif, et exécution scriptée par lots
 - **✅ Validation Automatique** : Vérification de type et validation de contraintes intégrées
 - **🎨 Messages d'Erreur Riches** : Messages colorés et informatifs avec suggestions
-- **🔌 Système de Plugins** : Plugins statiques (compilés) et plugins WASM sandboxés (chargés à l'exécution)
+- **🔌 Système de Plugins** : Plugins statiques granulaires (help, version, exit, sysinfo, env,
+  config — composez seulement ce dont vous avez besoin) et plugins WASM sandboxés (chargés à l'exécution)
 - **📚 Bien Documenté** : Documentation API complète et exemples
-- **🧪 Testé Exhaustivement** : Couverture de tests >80% avec 345+ tests
+- **🧪 Testé Exhaustivement** : Couverture de tests étendue
 - **⚡ Performance** : Abstractions sans coût avec parsing efficace
 
 ---
@@ -35,10 +36,10 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.6.0"
+dynamic-cli = "0.7.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.6.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.7.0", features = ["wasm-plugins"] }
 ```
 
 ### Exemple Basique
@@ -144,6 +145,17 @@ Commandes disponibles :
 monapp > exit
 ```
 
+**Mode lot** — exécutez tout un fichier de commandes, une par ligne (les
+lignes vides et les commentaires préfixés par `#` sont ignorés) :
+
+```rust, ignore
+let resultat = app.run_script("commandes.txt", ScriptErrorPolicy::Continue)?;
+println!("{}/{} réussies", resultat.lines_succeeded, resultat.lines_executed);
+```
+
+Le même fichier peut aussi être chargé depuis une session REPL déjà en
+cours avec `:load commandes.txt`.
+
 ---
 
 ## 🔌 Système de Plugins
@@ -168,6 +180,28 @@ CliBuilder::new()
     .context(Box::new(MonContexte::default()))
     .register_plugin(Box::new(SystemPlugin::new()))
     .register_sync_handler("saluer_handler", Box::new(CommandeSaluer))
+    .build()?
+    .run()
+```
+
+Chacun de `help`/`version`/`exit` est aussi disponible comme plugin
+indépendant (`HelpPlugin`, `VersionPlugin`, `ExitPlugin`) — n'enregistrez
+que celui dont vous avez besoin plutôt que le lot complet. Trois autres,
+derrière des features, couvrent des besoins d'introspection courants :
+`SysInfoPlugin` (`sysinfo-plugin`, OS/architecture/parallélisme),
+`EnvPlugin` (`env-plugin`, variables d'environnement filtrées — celles
+qui semblent sensibles sont masquées par défaut), et `ConfigPlugin`
+(`config-plugin`, afficher/re-valider la config YAML chargée sans
+redémarrer) :
+
+```rust, ignore
+use dynamic_cli::plugin::{ConfigPlugin, SysInfoPlugin};
+
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MonContexte::default()))
+    .register_plugin(Box::new(SysInfoPlugin::new()))
+    .register_plugin(Box::new(ConfigPlugin::new().with_config(config)))
     .build()?
     .run()
 ```
@@ -212,12 +246,18 @@ concret, et la décision d'architecture associée
 Le [répertoire d'exemples](examples) contient des exemples complets :
 
 - **[simple_calculator.rs](examples/simple_calculator.rs)** - Calculatrice arithmétique basique
+- **[rpn_calculator.rs](examples/rpn_calculator.rs)** - Calculatrice en notation polonaise inversée
+- **[advanced_rpn_calculator.rs](examples/advanced_rpn_calculator.rs)** - Calculatrice RPN façon HP-41CX avec fonctions scientifiques, registres mémoire, `SysInfoPlugin`/`ConfigPlugin`, et exécution par lot/`:load`
 - **[file_manager.rs](examples/file_manager.rs)** - Opérations sur fichiers avec validation
 - **[task_runner.rs](examples/task_runner.rs)** - Application de gestion de tâches
+- **[async_token_demo.rs](examples/async_token_demo.rs)** - Démonstration de gestionnaire de commande asynchrone
 
 Exécutez n'importe quel exemple :
 ```bash
 cargo run --example simple_calculator
+
+# advanced_rpn_calculator nécessite ses deux features :
+cargo run --example advanced_rpn_calculator --features sysinfo-plugin,config-plugin
 ```
 
 ---
@@ -236,7 +276,7 @@ dynamic-cli est organisé en modules ciblés :
 - **error** - Types d'erreurs et affichage
 - **builder** - API fluide pour construire des applications
 - **help** - Génération dynamique de `--help`
-- **plugin** - Mécanismes d'extension statiques (trait `Plugin`) et WASM sandboxés (feature `wasm-plugins`)
+- **plugin** - Plugins statiques granulaires (`plugin::builtin` : help, version, exit, sysinfo, env, config) et mécanismes d'extension WASM sandboxés (feature `wasm-plugins`)
 
 ---
 
@@ -246,22 +286,26 @@ dynamic-cli est organisé en modules ciblés :
 # Exécuter tous les tests (features par défaut)
 cargo test
 
-# Exécuter tous les tests, incluant les plugins WASM
-cargo test --features wasm-plugins
+# Exécuter tous les tests, toutes features confondues
+cargo test --all-features
 
 # Exécuter avec couverture
-cargo llvm-cov --all-targets --workspace
+cargo llvm-cov --all-targets --all-features --workspace
 
 # Vérifier la qualité du code
 cargo clippy --all-features -- -D warnings
 ```
 
 **Statistiques de tests actuelles :**
+<!-- TODO (v0.7.0) : recompter après `cargo test --all-features` — les
+     chiffres ci-dessous datent d'avant les ajouts de cette version
+     (#41, #44-#47) et n'ont pas été revérifiés ce sprint. -->
 - **400+ tests unitaires** ✅
 - **130+ tests de documentation**
 - **9 tests d'intégration** (plugins statiques + WASM, chaîne complète de l'API publique)
-- **Couverture de code 80-90%**, incluant la feature `wasm-plugins`
-- **Zéro avertissement clippy** (par défaut et avec `wasm-plugins`)
+- **Couverture de code 80-90%** *(non re-mesurée pour la v0.7.0 — `cargo-llvm-cov` n'a pas été lancé ce sprint)*
+- **Zéro avertissement clippy**, confirmé sur `--all-features`
+  (`wasm-plugins`, `sysinfo-plugin`, `env-plugin`, `config-plugin` combinées)
 
 ---
 
@@ -368,4 +412,4 @@ Si vous trouvez dynamic-cli utile, veuillez :
 - 📢 **Partager** avec d'autres qui pourraient le trouver utile
 - 📝 **Écrire** un article de blog ou un tutoriel !
 
-**Dernière mise à jour** : 2026-07-24
+**Dernière mise à jour** : 2026-08-23

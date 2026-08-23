@@ -18,12 +18,13 @@ A powerful Rust framework for creating configurable CLI and REPL applications vi
 ## 🎯 Features
 
 - **📝 Configuration-Driven** : Define commands, arguments and options in YAML/JSON
-- **🔄 CLI & REPL Modes** : Support for both command-line and interactive modes
+- **🔄 CLI, REPL & Batch Modes** : Command-line, interactive, and scripted batch execution
 - **✅ Automatic Validation** : Built-in type checking and constraint validation
 - **🎨 Rich Error Messages** : Colorful and informative messages with suggestions
-- **🔌 Plugin System** : Static plugins (compiled in) and sandboxed WASM plugins (loaded at runtime)
+- **🔌 Plugin System** : Granular static plugins (help, version, exit, sysinfo, env, config —
+  compose only what you need) and sandboxed WASM plugins (loaded at runtime)
 - **📚 Well Documented** : Complete API documentation and examples
-- **🧪 Thoroughly Tested** : >80% test coverage with 345+ tests
+- **🧪 Thoroughly Tested** : Extensive test coverage
 - **⚡ Performance** : Zero-cost abstractions with efficient parsing
 
 ---
@@ -36,10 +37,10 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.6.0"
+dynamic-cli = "0.7.0"
 
 # Optional — sandboxed WASM plugins (see Plugin System below)
-# dynamic-cli = { version = "0.6.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.7.0", features = ["wasm-plugins"] }
 ```
 
 ### Basic Example
@@ -144,6 +145,17 @@ Available commands:
 myapp > exit
 ```
 
+**Batch mode** — run a whole file of commands, one per line (blank lines and
+`#`-prefixed comments are skipped):
+
+```rust, ignore
+let outcome = app.run_script("commands.txt", ScriptErrorPolicy::Continue)?;
+println!("{}/{} succeeded", outcome.lines_succeeded, outcome.lines_executed);
+```
+
+The same file can also be loaded from inside an already-running REPL
+session with `:load commands.txt`.
+
 ---
 
 ## 🔌 Plugin System
@@ -167,6 +179,27 @@ CliBuilder::new()
     .context(Box::new(MyContext::default()))
     .register_plugin(Box::new(SystemPlugin::new()))
     .register_sync_handler("greet_handler", Box::new(GreetCommand))
+    .build()?
+    .run()
+```
+
+Each of `help`/`version`/`exit` is also available as its own independent
+plugin (`HelpPlugin`, `VersionPlugin`, `ExitPlugin`) — register only the one
+you need instead of the bundle. Three more, feature-gated, cover common
+introspection needs: `SysInfoPlugin` (`sysinfo-plugin`, OS/architecture/
+parallelism), `EnvPlugin` (`env-plugin`, filtered environment variables —
+sensitive-looking ones hidden by default), and `ConfigPlugin`
+(`config-plugin`, show/re-validate the loaded YAML config without
+restarting):
+
+```rust, ignore
+use dynamic_cli::plugin::{ConfigPlugin, SysInfoPlugin};
+
+CliBuilder::new()
+    .config_file("commands.yaml")
+    .context(Box::new(MyContext::default()))
+    .register_plugin(Box::new(SysInfoPlugin::new()))
+    .register_plugin(Box::new(ConfigPlugin::new().with_config(config)))
     .build()?
     .run()
 ```
@@ -210,12 +243,18 @@ example, and the architecture decision behind it
 The [examples directory](examples) contains complete examples:
 
 - **[simple_calculator.rs](examples/simple_calculator.rs)** - Basic arithmetic calculator
+- **[rpn_calculator.rs](examples/rpn_calculator.rs)** - Reverse Polish Notation calculator
+- **[advanced_rpn_calculator.rs](examples/advanced_rpn_calculator.rs)** - HP-41CX-flavored RPN calculator with scientific functions, memory registers, `SysInfoPlugin`/`ConfigPlugin`, and batch/`:load` execution
 - **[file_manager.rs](examples/file_manager.rs)** - File operations with validation
 - **[task_runner.rs](examples/task_runner.rs)** - Task management application
+- **[async_token_demo.rs](examples/async_token_demo.rs)** - Async command handler demo
 
 Run any example:
 ```bash
 cargo run --example simple_calculator
+
+# advanced_rpn_calculator needs its two feature flags:
+cargo run --example advanced_rpn_calculator --features sysinfo-plugin,config-plugin
 ```
 
 ---
@@ -234,7 +273,7 @@ dynamic-cli is organized into focused modules:
 - **error** - Error types and display
 - **builder** - Fluent API for building applications
 - **help** - Dynamic `--help` generation
-- **plugin** - Static (`Plugin` trait) and sandboxed WASM (`wasm-plugins` feature) extension mechanisms
+- **plugin** - Granular static plugins (`plugin::builtin`: help, version, exit, sysinfo, env, config) and sandboxed WASM (`wasm-plugins` feature) extension mechanisms
 
 ---
 
@@ -244,22 +283,26 @@ dynamic-cli is organized into focused modules:
 # Run all tests (default features)
 cargo test
 
-# Run all tests, including WASM plugins
-cargo test --features wasm-plugins
+# Run all tests, across every feature flag
+cargo test --all-features
 
 # Run with coverage
-cargo llvm-cov --all-targets --workspace
+cargo llvm-cov --all-targets --all-features --workspace
 
 # Check code quality
 cargo clippy --all-features -- -D warnings
 ```
 
 **Current test statistics:**
+<!-- TODO (v0.7.0): re-count after `cargo test --all-features` — the
+     figures below predate this release's additions (#41, #44-#47) and
+     are known stale, not re-verified this sprint. -->
 - **400+ unit tests** ✅
 - **130+ documentation tests**
 - **9 integration tests** (static + WASM plugins, full public API chain)
-- **80-90% code coverage**, including the `wasm-plugins` feature
-- **Zero clippy warnings** (default and `wasm-plugins`)
+- **80-90% code coverage** *(not re-measured for v0.7.0 — `cargo-llvm-cov` wasn't run this sprint)*
+- **Zero clippy warnings**, confirmed across `--all-features`
+  (`wasm-plugins`, `sysinfo-plugin`, `env-plugin`, `config-plugin` combined)
 
 ---
 
@@ -366,4 +409,4 @@ If you find dynamic-cli useful, please:
 - 📢 **Share** it with others who might find it useful
 - 📝 **Write** a blog post or tutorial!
 
-**Last updated**: 2026-07-24
+**Last updated**: 2026-08-23
