@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["system"],"trait":["Plugin"]};
+window.SIDEBAR_ITEMS = {"mod":["builtin","system"],"trait":["Plugin"]};
