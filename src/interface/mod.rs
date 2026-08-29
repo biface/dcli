@@ -273,6 +273,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "test".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry
@@ -295,6 +297,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "test".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry

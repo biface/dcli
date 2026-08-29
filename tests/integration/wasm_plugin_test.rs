@@ -139,6 +139,8 @@ fn test_config(wasm_implementation: &str) -> CommandsConfig {
             arguments: vec![],
             options: vec![],
             implementation: wasm_implementation.to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         }],
         global_options: vec![],
     }
@@ -166,6 +168,8 @@ fn test_config_with_native(wasm_implementation: &str) -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: wasm_implementation.to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "native".to_string(),
@@ -175,6 +179,8 @@ fn test_config_with_native(wasm_implementation: &str) -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: "native_handler".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
         ],
         global_options: vec![],

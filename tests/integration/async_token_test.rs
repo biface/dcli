@@ -88,6 +88,8 @@ fn test_config() -> CommandsConfig {
             arguments: vec![],
             options: vec![],
             implementation: "token_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         }],
         global_options: vec![],
     }

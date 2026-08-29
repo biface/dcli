@@ -25,6 +25,8 @@
 //!     arguments: vec![],
 //!     options: vec![],
 //!     implementation: "handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! // Dummy handler for example
@@ -392,6 +394,8 @@ mod tests {
                 option_parameters: HashMap::new(),
             }],
             implementation: "hello_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry
@@ -435,6 +439,8 @@ mod tests {
                 option_parameters: HashMap::new(),
             }],
             implementation: "process_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry

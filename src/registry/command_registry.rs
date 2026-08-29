@@ -30,6 +30,8 @@
 //!     arguments: vec![],
 //!     options: vec![],
 //!     implementation: "hello_handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! // Create a handler
@@ -102,6 +104,8 @@ enum StoredHandler {
 /// #     arguments: vec![],
 /// #     options: vec![],
 /// #     implementation: "test_handler".to_string(),
+/// #     continue_on_failure: false,
+/// #     requires_success: false,
 /// # };
 /// # struct TestCommand;
 /// # impl CommandHandler for TestCommand {
@@ -235,6 +239,8 @@ impl CommandRegistry {
     ///     arguments: vec![],
     ///     options: vec![],
     ///     implementation: "sim_handler".to_string(),
+    ///     continue_on_failure: false,
+    ///     requires_success: false,
     /// };
     ///
     /// struct SimCommand;
@@ -321,6 +327,8 @@ impl CommandRegistry {
     ///     arguments: vec![],
     ///     options: vec![],
     ///     implementation: "fetch_handler".to_string(),
+    ///     continue_on_failure: false,
+    ///     requires_success: false,
     /// };
     ///
     /// struct FetchCommand;
@@ -389,6 +397,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
@@ -442,6 +452,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
@@ -501,6 +513,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct ExecCmd;
     /// # impl CommandHandler for ExecCmd {
@@ -562,6 +576,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct FetchCmd;
     /// # #[async_trait]
@@ -605,6 +621,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # let def2 = CommandDefinition {
     /// #     name: "cmd2".to_string(),
@@ -614,6 +632,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
@@ -679,6 +699,8 @@ impl CommandRegistry {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// # struct TestCmd;
     /// # impl CommandHandler for TestCmd {
@@ -742,6 +764,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: format!("{}_handler", name),
+            continue_on_failure: false,
+            requires_success: false,
         }
     }
 
