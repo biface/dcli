@@ -99,6 +99,8 @@
 //!     ],
 //!     options: vec![],
 //!     implementation: "handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! let parser = CliParser::new(&definition);
@@ -383,6 +385,8 @@ mod tests {
                 },
             ],
             implementation: "analyze_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         }
     }
 

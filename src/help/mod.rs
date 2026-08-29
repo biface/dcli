@@ -448,6 +448,8 @@ mod tests {
                         option_parameters: HashMap::new(),
                     }],
                     implementation: "hello_handler".to_string(),
+                    continue_on_failure: false,
+                    requires_success: false,
                 },
                 CommandDefinition {
                     name: "process".to_string(),
@@ -457,6 +459,8 @@ mod tests {
                     arguments: vec![],
                     options: vec![],
                     implementation: "process_handler".to_string(),
+                    continue_on_failure: false,
+                    requires_success: false,
                 },
             ],
             global_options: vec![],

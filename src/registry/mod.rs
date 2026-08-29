@@ -62,6 +62,8 @@
 //!     arguments: vec![],
 //!     options: vec![],
 //!     implementation: "hello_handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! // 3. Create a handler
@@ -112,6 +114,8 @@
 //! #     arguments: vec![],
 //! #     options: vec![],
 //! #     implementation: "".to_string(),
+//! #     continue_on_failure: false,
+//! #     requires_success: false,
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
@@ -140,6 +144,8 @@
 //!     arguments: vec![],
 //!     options: vec![],
 //!     implementation: "simulate_handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! # struct SimCmd;
@@ -171,6 +177,8 @@
 //! #     arguments: vec![],
 //! #     options: vec![],
 //! #     implementation: "".to_string(),
+//! #     continue_on_failure: false,
+//! #     requires_success: false,
 //! # };
 //! # let def2 = CommandDefinition {
 //! #     name: "cmd2".to_string(),
@@ -180,6 +188,8 @@
 //! #     arguments: vec![],
 //! #     options: vec![],
 //! #     implementation: "".to_string(),
+//! #     continue_on_failure: false,
+//! #     requires_success: false,
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
@@ -209,6 +219,8 @@
 //! #     arguments: vec![],
 //! #     options: vec![],
 //! #     implementation: "".to_string(),
+//! #     continue_on_failure: false,
+//! #     requires_success: false,
 //! # };
 //! # let def2 = CommandDefinition {
 //! #     name: "test".to_string(),
@@ -218,6 +230,8 @@
 //! #     arguments: vec![],
 //! #     options: vec![],
 //! #     implementation: "".to_string(),
+//! #     continue_on_failure: false,
+//! #     requires_success: false,
 //! # };
 //! # struct TestCmd;
 //! # impl CommandHandler for TestCmd {
@@ -358,6 +372,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "sim_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         let validate_def = CommandDefinition {
@@ -368,6 +384,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "val_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         // Register commands
@@ -418,6 +436,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "test_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry.register_sync(def, Box::new(TestHandler)).unwrap();
@@ -450,6 +470,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "help_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         let def2 = CommandDefinition {
@@ -460,6 +482,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "exit_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         registry.register_sync(def1, Box::new(TestHandler)).unwrap();
@@ -497,6 +521,8 @@ mod tests {
                     arguments: vec![],
                     options: vec![],
                     implementation: "".to_string(),
+                    continue_on_failure: false,
+                    requires_success: false,
                 },
                 Box::new(TestHandler),
             )
@@ -512,6 +538,8 @@ mod tests {
                     arguments: vec![],
                     options: vec![],
                     implementation: "".to_string(),
+                    continue_on_failure: false,
+                    requires_success: false,
                 },
                 Box::new(TestHandler),
             )
@@ -543,6 +571,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         // First registration succeeds

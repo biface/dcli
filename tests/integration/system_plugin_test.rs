@@ -75,6 +75,8 @@ fn test_config() -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: "system_version".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "help".to_string(),
@@ -84,6 +86,8 @@ fn test_config() -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: "system_help".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "exit".to_string(),
@@ -93,6 +97,8 @@ fn test_config() -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: "system_exit".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "greet".to_string(),
@@ -102,6 +108,8 @@ fn test_config() -> CommandsConfig {
                 arguments: vec![],
                 options: vec![],
                 implementation: "greet_handler".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
         ],
         global_options: vec![],

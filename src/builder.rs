@@ -967,6 +967,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "test_handler".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             }],
             global_options: vec![],
         }
