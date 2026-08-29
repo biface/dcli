@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ScriptErrorPolicy"],"fn":["wrap_line_error"],"struct":["CliInterface","ScriptOutcome"]};
+window.SIDEBAR_ITEMS = {"enum":["ScriptErrorPolicy"],"fn":["wrap_chain_error","wrap_line_error"],"struct":["CliInterface","ResolvedSegment","ScriptOutcome"]};
