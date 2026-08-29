@@ -1,7 +1,7 @@
 # Configuration File Syntax Reference - dynamic-cli
 
 **Version**: 1.0  
-**Last Updated**: 2026-01-11  
+**Last Updated**: 2026-08-29  
 **Format**: YAML or JSON
 
 ---
@@ -18,6 +18,7 @@
 - [Arguments](#arguments)
 - [Options](#options)
 - [Repeatable Options](#repeatable-options)
+- [Command Chaining](#command-chaining)
 - [Argument Types](#argument-types)
 - [Validation Rules](#validation-rules)
 - [Complete Example](#complete-example)
@@ -330,6 +331,8 @@ Detailed breakdown of a single command.
       choices: []
   
   implementation: "handler_name"
+  continue_on_failure: false
+  requires_success: false
 ```
 
 ### Field Details
@@ -371,6 +374,16 @@ Detailed breakdown of a single command.
 - Identifier used in Rust code to link to handler
 - Convention: snake_case
 - Example: `"load_config"` maps to `LoadConfigHandler`
+
+**`continue_on_failure`** (boolean, optional, default `false`):
+- Governs command chaining (v0.8.0, [DD-026](https://github.com/biface/dcli/issues/52)) — see the [Command Chaining](#command-chaining) section for the full picture
+- Has no effect when this command is not part of a chain
+
+**`requires_success`** (boolean, optional, default `false`):
+- Also part of command chaining ([DD-026](https://github.com/biface/dcli/issues/52)) — see [Command Chaining](#command-chaining)
+- **Not related to `required` above** — `required` is a startup-time
+  check ("a handler must be registered"), `requires_success` is a
+  per-invocation chain guard evaluated at dispatch time
 
 > **Sync vs. async is not a config concern (ref. #8).** This field is
 > agnostic to whether the handler behind it is sync or async — there is no
@@ -670,6 +683,128 @@ for occ in occurrences {
 
 See `CHANGELOG.md` (v0.6.0) for the full `HashMap<String, String>` →
 `ParsedArgs` migration path for existing handlers.
+
+---
+
+## Command Chaining
+
+*Since v0.8.0 ([DD-026](https://github.com/biface/dcli/issues/52)).*
+
+A single CLI invocation (or a [`run_script()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run_script)
+line) can chain more than one command: once a command's declared arity
+is exhausted, the next bare token is checked against the command
+registry — if it resolves to a command name (or alias), it starts the
+next command in the chain; if it doesn't, the line is rejected exactly
+as an over-long single command always was. There is no separator token
+(`;`, `&&`, `|`) — chaining is a consequence of exhausted arity alone,
+not a distinct syntax to opt into.
+
+### Segmentation Rule
+
+For each command in the sequence:
+
+1. Its options (including repeatable-option occurrences, DD-024) and
+   positional arguments are consumed up to its declared arity.
+2. The next token is looked up against the command registry.
+   - Resolves to a command name or alias → starts the next segment.
+   - Doesn't resolve → the same "too many arguments" error a single,
+     non-chained command would raise — no behaviour change for a
+     genuinely too-long single command.
+
+### Fields
+
+Two additive `boolean` fields on a command definition govern chain
+behaviour when *that specific* command fails. Both default to `false`,
+so existing configs are unaffected — see the [Field Details](#field-details)
+above for their place in the full schema.
+
+```yaml
+- name: "command-name"
+  # ... other fields ...
+  continue_on_failure: false   # optional, default false
+  requires_success: false      # optional, default false
+```
+
+**`continue_on_failure`**:
+- `false` (default): if this command fails, the chain stops
+  immediately — identical to today's single-command behaviour, applied
+  per segment.
+- `true`: if this command fails, the chain-position error is reported
+  and execution proceeds to the next segment. Intended for genuinely
+  optional steps (e.g. a non-critical secondary export).
+
+**`requires_success`**:
+- `false` (default): this command runs regardless of any earlier
+  failure in the chain (moot unless an earlier command's
+  `continue_on_failure` is `true`).
+- `true`: if any earlier command in the chain has already failed
+  (regardless of *that* failure's own `continue_on_failure` value),
+  this command is **skipped** — not executed, not counted as an
+  additional failure.
+
+### Error and Skip Reporting
+
+- A failing command is reported as `Error in command {n}/{total}
+  ('{name}'): <normal error output>` — the chain position is prefixed;
+  the rest of the message is unchanged from a single-command failure.
+- A skipped command (via `requires_success`) is reported as `Skipped:
+  command {n}/{total} ('{name}') — a preceding command failed`.
+- The process exit code always reflects the **first** failure
+  encountered in the chain — the "triggering" failure — even if a
+  later `continue_on_failure: true` command also fails, or a
+  downstream command is skipped as a result.
+
+### Known Limitation
+
+If a command line supplies one token more than that command's declared
+arity, and that leftover token happens to also be a registered command
+name, it is silently read as the start of the next segment instead of
+raising an error — segmentation cannot distinguish "a stray extra
+value" from "the next command" once arity is exhausted. There is no
+`--`-style escape to force a value to be treated as positional rather
+than a command boundary. Not scheduled for a fix; revisit only if a
+concrete need appears.
+
+### Scope
+
+- [`CliInterface::run()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run)
+  (CLI one-shot) and `run_script()` inherit chaining automatically —
+  both dispatch through the same internal resolution path.
+- The REPL's `:load` meta-command does **not** chain: each loaded line
+  still goes through the REPL's own single-command path, unchanged.
+
+### Example
+
+```yaml
+commands:
+  - name: "configure"
+    description: "Register an input source"
+    aliases: []
+    required: false
+    arguments:
+      - name: "path"
+        type: "path"
+        required: true
+        description: "Source file"
+        validation: []
+    options: []
+    implementation: "configure_handler"
+
+  - name: "solve"
+    description: "Run once all sources are configured"
+    aliases: []
+    required: false
+    arguments: []
+    options: []
+    implementation: "solve_handler"
+    requires_success: true
+```
+
+**Usage**:
+```bash
+myapp configure model.yml configure scenario.yml solve
+# "configure" runs twice, then "solve" — only if both configure steps succeeded
+```
 
 ---
 
