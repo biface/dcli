@@ -19,6 +19,7 @@ A powerful Rust framework for creating configurable CLI and REPL applications vi
 
 - **📝 Configuration-Driven** : Define commands, arguments and options in YAML/JSON
 - **🔄 CLI, REPL & Batch Modes** : Command-line, interactive, and scripted batch execution
+- **🔗 Command Chaining** : Chain multiple commands in one invocation, with per-command `continue_on_failure` / `requires_success` policy
 - **✅ Automatic Validation** : Built-in type checking and constraint validation
 - **🎨 Rich Error Messages** : Colorful and informative messages with suggestions
 - **🔌 Plugin System** : Granular static plugins (help, version, exit, sysinfo, env, config —
@@ -37,11 +38,17 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.7.0"
+dynamic-cli = "0.8.0"
 
 # Optional — sandboxed WASM plugins (see Plugin System below)
-# dynamic-cli = { version = "0.7.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.8.0", features = ["wasm-plugins"] }
 ```
+
+> **Upgrading from 0.7.x?** Cargo treats a `0.x` minor bump as a
+> semver-incompatible change, so `cargo update` alone won't pull `0.8.0`
+> in — bump the version requirement explicitly. This release is fully
+> additive (see [`CHANGELOG.md`](CHANGELOG.md)); no code changes are
+> required on your side.
 
 ### Basic Example
 
@@ -145,6 +152,16 @@ Available commands:
 myapp > exit
 ```
 
+**Command chaining** (v0.8.0+) — chain more than one command in a single
+invocation, no separator needed: once a command's arguments are
+exhausted, the next recognized command name starts the next one.
+
+```bash
+$ myapp configure model.yml configure scenario.yml solve
+# "configure" runs twice, then "solve" — see CONFIG_SYNTAX_REFERENCE.md
+# for the continue_on_failure / requires_success failure policy
+```
+
 **Batch mode** — run a whole file of commands, one per line (blank lines and
 `#`-prefixed comments are skipped):
 
@@ -154,7 +171,10 @@ println!("{}/{} succeeded", outcome.lines_succeeded, outcome.lines_executed);
 ```
 
 The same file can also be loaded from inside an already-running REPL
-session with `:load commands.txt`.
+session with `:load commands.txt`. `run_script()` inherits command
+chaining automatically (it shares its dispatch path with `run()`); `:load`
+does **not** — each loaded line still runs as a single command, exactly
+as before v0.8.0.
 
 ---
 
@@ -298,7 +318,7 @@ cargo clippy --all-features -- -D warnings
 - **500+ unit tests** ✅
 - **230+ documentation tests**
 - **12 integration tests** (static + WASM plugins, full public API chain)
-- **80-90% code coverage** *(not re-measured for v0.7.0 — `cargo-llvm-cov` wasn't run this sprint)*
+- **80-90% code coverage** *(not re-measured for v0.8.0 — `cargo-llvm-cov` wasn't run this sprint either)*
 - **Zero clippy warnings**, confirmed across `--all-features`
   (`wasm-plugins`, `sysinfo-plugin`, `env-plugin`, `config-plugin` combined)
 

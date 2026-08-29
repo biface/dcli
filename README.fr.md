@@ -18,6 +18,7 @@ Un framework Rust puissant pour créer des applications CLI et REPL configurable
 
 - **📝 Piloté par Configuration** : Définissez commandes, arguments et options en YAML/JSON
 - **🔄 Modes CLI, REPL & Lots** : Ligne de commande, interactif, et exécution scriptée par lots
+- **🔗 Chaînage de commandes** : Chaînez plusieurs commandes en une seule invocation, avec une politique `continue_on_failure` / `requires_success` par commande
 - **✅ Validation Automatique** : Vérification de type et validation de contraintes intégrées
 - **🎨 Messages d'Erreur Riches** : Messages colorés et informatifs avec suggestions
 - **🔌 Système de Plugins** : Plugins statiques granulaires (help, version, exit, sysinfo, env,
@@ -36,11 +37,18 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.7.0"
+dynamic-cli = "0.8.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.7.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.8.0", features = ["wasm-plugins"] }
 ```
+
+> **Mise à jour depuis 0.7.x ?** Cargo considère un bump mineur en `0.x`
+> comme un changement incompatible au sens du semver, donc `cargo update`
+> seul ne récupérera pas `0.8.0` — augmentez explicitement la contrainte
+> de version. Cette release est entièrement additive (voir
+> [`CHANGELOG.md`](CHANGELOG.md)) ; aucune modification de code n'est
+> nécessaire de votre côté.
 
 ### Exemple Basique
 
@@ -145,6 +153,18 @@ Commandes disponibles :
 monapp > exit
 ```
 
+**Chaînage de commandes** (v0.8.0+) — chaînez plusieurs commandes en une
+seule invocation, sans séparateur : une fois les arguments d'une commande
+épuisés, le prochain nom de commande reconnu démarre la commande
+suivante.
+
+```bash
+$ monapp configurer modele.yml configurer scenario.yml resoudre
+# "configurer" s'exécute deux fois, puis "resoudre" — voir
+# CONFIG_SYNTAX_REFERENCE.fr.md pour la politique d'échec
+# continue_on_failure / requires_success
+```
+
 **Mode lot** — exécutez tout un fichier de commandes, une par ligne (les
 lignes vides et les commentaires préfixés par `#` sont ignorés) :
 
@@ -154,7 +174,10 @@ println!("{}/{} réussies", resultat.lines_succeeded, resultat.lines_executed);
 ```
 
 Le même fichier peut aussi être chargé depuis une session REPL déjà en
-cours avec `:load commandes.txt`.
+cours avec `:load commandes.txt`. `run_script()` hérite automatiquement
+du chaînage de commandes (il partage son chemin de dispatch avec
+`run()`) ; `:load` **non** — chaque ligne chargée s'exécute toujours
+comme une commande unique, exactement comme avant la v0.8.0.
 
 ---
 
@@ -301,7 +324,7 @@ cargo clippy --all-features -- -D warnings
 - **500+ tests unitaires** ✅
 - **230+ tests de documentation**
 - **12 tests d'intégration** (plugins statiques + WASM, chaîne complète de l'API publique)
-- **Couverture de code 80-90%** *(non re-mesurée pour la v0.7.0 — `cargo-llvm-cov` n'a pas été lancé ce sprint)*
+- **Couverture de code 80-90%** *(non re-mesurée pour la v0.8.0 — `cargo-llvm-cov` n'a pas non plus été lancé ce sprint)*
 - **Zéro avertissement clippy**, confirmé sur `--all-features`
   (`wasm-plugins`, `sysinfo-plugin`, `env-plugin`, `config-plugin` combinées)
 
