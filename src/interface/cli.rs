@@ -32,6 +32,23 @@ use crate::registry::CommandRegistry;
 use std::path::Path;
 use std::process;
 
+/// One resolved, fully-parsed command within a (possibly single-command)
+/// chain (DD-026, #52) — the unit [`CliInterface::segment`] produces and
+/// [`CliInterface::execute_segment`] consumes.
+///
+/// `name` is owned rather than borrowed from the registry: `resolve_name`
+/// / `get_definition` are cheap, stateless lookups (no per-name state to
+/// track across a chain — the same name may legitimately appear more
+/// than once), so re-resolving by owned `String` at execution time avoids
+/// tying this struct to the registry's borrow for the whole dispatch.
+#[derive(Debug)]
+struct ResolvedSegment {
+    /// Canonical (alias-resolved) command name.
+    name: String,
+    /// Already-typed, already-validated arguments for this command.
+    parsed: ParsedArgs,
+}
+
 /// CLI (Command-Line Interface) handler
 ///
 /// Provides a simple interface for executing commands from command-line arguments.
@@ -149,57 +166,143 @@ impl CliInterface {
         self.dispatch(&args)
     }
 
-    /// Resolve, parse, and execute a single already-tokenized command line.
+    /// Resolve, parse, and execute an already-tokenized command line — one
+    /// or more chained commands (DD-026, #52).
     ///
     /// Shared by [`run`][Self::run] (one dispatch from CLI args) and
     /// [`run_script`][Self::run_script] (one dispatch per script line) —
     /// the actual resolution/parsing/execution logic lives here exactly
     /// once, per DD-024's "reuse the existing `ParsedArgs` path, no
-    /// duplicate parsing logic" requirement (see #41).
+    /// duplicate parsing logic" requirement (see #41). `run_script()`
+    /// gains chaining for free through this shared method, with no code
+    /// change of its own.
+    ///
+    /// Two phases: [`Self::segment`] resolves and parses every command in
+    /// the line up front (so a genuinely too-long single command still
+    /// errors exactly as before chaining existed), then each
+    /// [`ResolvedSegment`] is executed in order via
+    /// [`Self::execute_segment`]. This method itself still stops at the
+    /// first failing segment (today's single-command behaviour, applied
+    /// per segment) — `continue_on_failure`/`requires_success` chain
+    /// policy is #56's addition, not this one's.
     fn dispatch(&mut self, args: &[String]) -> Result<()> {
-        // First argument is the command name
-        let command_name = &args[0];
+        let segments = self.segment(args)?;
 
-        // Resolve command name (handles aliases)
-        let resolved_name = self.registry.resolve_name(command_name).ok_or_else(|| {
-            crate::error::ParseError::unknown_command_with_suggestions(
-                command_name,
-                &self
-                    .registry
-                    .list_commands()
-                    .iter()
-                    .map(|cmd| cmd.name.clone())
-                    .collect::<Vec<_>>(),
-            )
-        })?;
+        for segment in &segments {
+            self.execute_segment(segment)?;
+        }
 
-        // Get command definition
-        let definition = self.registry.get_definition(resolved_name).ok_or_else(|| {
-            DynamicCliError::Registry(crate::error::RegistryError::missing_handler(resolved_name))
-        })?;
+        Ok(())
+    }
 
-        // Parse arguments using CLI parser (DD-024/#39: typed to preserve
-        // repeatable-option occurrences; ParsedArgs is the shape every
-        // handler now receives).
-        let parser = CliParser::new(definition);
-        let parsed_args = ParsedArgs::new(parser.parse_typed(&args[1..])?);
+    /// Resolve and parse a full, already-tokenized command line into one
+    /// or more [`ResolvedSegment`]s, without executing any of them
+    /// (DD-026, #52 / #55).
+    ///
+    /// For the current segment, the parser consumes its options and
+    /// positional arguments up to the command's declared arity
+    /// ([`CliParser::parse_typed_segment`], #54). Once arity is
+    /// exhausted, the next bare token is looked up against
+    /// [`CommandRegistry::resolve_name`] (aliases included): a match
+    /// starts the next segment; no match raises the same
+    /// [`crate::error::ParseError::too_many_arguments`] a single,
+    /// non-chained command would raise today — no observable behaviour
+    /// change for existing callers. A genuinely unknown command name is
+    /// reported via
+    /// [`crate::error::ParseError::unknown_command_with_suggestions`],
+    /// exactly as before chaining existed.
+    ///
+    /// `resolve_name`/`get_definition` are stateless lookups, so the same
+    /// command name (or one of its aliases) may legitimately resolve more
+    /// than once within a single chain — nothing here tracks "already
+    /// consumed" names, nor should it (DD-026's explicit acceptance
+    /// criterion for #55/#56).
+    ///
+    /// **Known, accepted limitation (DD-026):** if a command line supplies
+    /// one token more than that command's declared arity, and that
+    /// leftover token happens to also be a registered command name, it is
+    /// silently absorbed as the start of the next segment instead of
+    /// raising `too_many_arguments` — segmentation cannot distinguish "a
+    /// stray extra value" from "the next command" once arity is
+    /// exhausted. No `--`-style local escape is implemented; documented
+    /// as an accepted constraint, not scheduled for a fix.
+    fn segment(&self, args: &[String]) -> Result<Vec<ResolvedSegment>> {
+        let mut segments = Vec::new();
+        let mut offset = 0;
 
-        // Get handler and execute command. Sync is tried first (unchanged
-        // behaviour); if no sync handler matches, fall through to the async
-        // path (DD-022) and drive it via `block_on`. Safe here because
-        // `run()`/`run_script()` are strictly sequential, one-shot dispatch —
-        // there is no other async task waiting behind it that `block_on`
-        // could starve.
-        if let Some(handler) = self.registry.get_handler_sync(resolved_name) {
-            handler.execute(&mut *self.context, &parsed_args)?;
-        } else if let Some(handler) = self.registry.get_handler_async(resolved_name) {
-            futures::executor::block_on(handler.execute(&mut *self.context, &parsed_args))?;
-        } else {
-            return Err(DynamicCliError::Execution(
-                crate::error::ExecutionError::handler_not_found(
+        loop {
+            let command_name = &args[offset];
+
+            let resolved_name = self.registry.resolve_name(command_name).ok_or_else(|| {
+                crate::error::ParseError::unknown_command_with_suggestions(
+                    command_name,
+                    &self
+                        .registry
+                        .list_commands()
+                        .iter()
+                        .map(|cmd| cmd.name.clone())
+                        .collect::<Vec<_>>(),
+                )
+            })?;
+
+            let definition = self.registry.get_definition(resolved_name).ok_or_else(|| {
+                DynamicCliError::Registry(crate::error::RegistryError::missing_handler(
                     resolved_name,
-                    &definition.implementation,
-                ),
+                ))
+            })?;
+
+            let parser = CliParser::new(definition);
+            let (parsed_map, consumed) = parser.parse_typed_segment(&args[offset + 1..])?;
+
+            segments.push(ResolvedSegment {
+                name: resolved_name.to_string(),
+                parsed: ParsedArgs::new(parsed_map),
+            });
+
+            let next = offset + 1 + consumed;
+            if next == args.len() {
+                break;
+            }
+
+            if self.registry.resolve_name(&args[next]).is_none() {
+                return Err(crate::error::ParseError::too_many_arguments(
+                    &definition.name,
+                    definition.arguments.len(),
+                    definition.arguments.len() + 1,
+                )
+                .into());
+            }
+
+            offset = next;
+        }
+
+        Ok(segments)
+    }
+
+    /// Execute one already-resolved, already-parsed segment.
+    ///
+    /// Sync handler tried first (unchanged behaviour); if absent, the
+    /// async path (DD-022) is driven via `block_on` — safe here because
+    /// `run()`/`run_script()` are strictly sequential, one-shot dispatch,
+    /// per segment exactly as for a single command before chaining
+    /// existed.
+    fn execute_segment(&mut self, segment: &ResolvedSegment) -> Result<()> {
+        if let Some(handler) = self.registry.get_handler_sync(&segment.name) {
+            handler.execute(&mut *self.context, &segment.parsed)?;
+        } else if let Some(handler) = self.registry.get_handler_async(&segment.name) {
+            futures::executor::block_on(handler.execute(&mut *self.context, &segment.parsed))?;
+        } else {
+            // segment() already resolved this name to a definition, so
+            // this branch means a command is registered (schema-wise)
+            // without either a sync or async handler — re-fetched here
+            // only for the implementation name in the error message.
+            let implementation = self
+                .registry
+                .get_definition(&segment.name)
+                .map(|d| d.implementation.as_str())
+                .unwrap_or("");
+            return Err(DynamicCliError::Execution(
+                crate::error::ExecutionError::handler_not_found(&segment.name, implementation),
             ));
         }
 
@@ -426,6 +529,11 @@ mod tests {
     #[derive(Default)]
     struct TestContext {
         executed_command: Option<String>,
+        // Ordered record of every handler executed so far — additive,
+        // needed to assert chain execution order (DD-026, #52 / #55)
+        // without disturbing `executed_command` (kept for any existing
+        // single-dispatch assertions).
+        executed_commands: Vec<String>,
     }
 
     impl ExecutionContext for TestContext {
@@ -448,6 +556,7 @@ mod tests {
             let ctx = crate::context::downcast_mut::<TestContext>(context)
                 .expect("Failed to downcast context");
             ctx.executed_command = Some(self.name.clone());
+            ctx.executed_commands.push(self.name.clone());
             Ok(())
         }
     }
@@ -722,5 +831,240 @@ mod tests {
 
         let result = cli.run_script("/nonexistent/path/to/script.txt", ScriptErrorPolicy::Abort);
         assert!(result.is_err());
+    }
+
+    // ========================================================================
+    // segment() / dispatch() chaining tests (DD-026, #52 / #55)
+    // ========================================================================
+
+    /// Register a command taking exactly `arity` required `String`
+    /// positional arguments (`arg0`, `arg1`, ...) and no options, backed
+    /// by a [`TestHandler`] that records its name (and, in order, into
+    /// [`TestContext::executed_commands`]).
+    fn register_arity_command(registry: &mut CommandRegistry, name: &str, arity: usize) {
+        let arguments = (0..arity)
+            .map(|i| ArgumentDefinition {
+                name: format!("arg{}", i),
+                arg_type: ArgumentType::String,
+                required: true,
+                description: format!("Argument {}", i),
+                validation: vec![],
+                secure: false,
+            })
+            .collect();
+
+        let cmd_def = CommandDefinition {
+            name: name.to_string(),
+            aliases: vec![],
+            description: format!("Test command {}", name),
+            required: false,
+            arguments,
+            options: vec![],
+            implementation: format!("{}_handler", name),
+            continue_on_failure: false,
+            requires_success: false,
+        };
+
+        registry
+            .register_sync(
+                cmd_def,
+                Box::new(TestHandler {
+                    name: name.to_string(),
+                }),
+            )
+            .expect("Failed to register command");
+    }
+
+    #[test]
+    fn test_segment_single_command_produces_one_segment() {
+        // Single-command case (today's behaviour): exactly one segment,
+        // correctly parsed.
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "greet", 1);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let args = vec!["greet".to_string(), "Alice".to_string()];
+        let segments = cli.segment(&args).unwrap();
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].name, "greet");
+        assert_eq!(segments[0].parsed.get_scalar("arg0"), Some("Alice"));
+    }
+
+    #[test]
+    fn test_segment_single_command_overflow_still_raises_too_many_arguments() {
+        // A genuinely too-long single command (no chain intended, the
+        // leftover token isn't a registered command) must raise the
+        // identical error dispatch() raised before chaining existed.
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "greet", 1);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let args = vec![
+            "greet".to_string(),
+            "Alice".to_string(),
+            "extra".to_string(),
+        ];
+        let result = cli.segment(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DynamicCliError::Parse(crate::error::ParseError::TooManyArguments {
+                command,
+                expected,
+                got,
+                ..
+            }) => {
+                assert_eq!(command, "greet");
+                assert_eq!(expected, 1);
+                assert_eq!(got, 2);
+            }
+            other => panic!("Expected TooManyArguments error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_segment_multi_command_chain_produces_three_segments() {
+        // Generic three-command chain (structurally the same shape as
+        // DD-026's chrom-rs-motivated example — a couple of
+        // argument-taking commands followed by a zero-arity terminal
+        // command — but with arbitrary names, since chrom-rs is only ever
+        // an illustration, never the justification).
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "first", 1);
+        register_arity_command(&mut registry, "second", 1);
+        register_arity_command(&mut registry, "third", 0);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let args = vec![
+            "first".to_string(),
+            "1".to_string(),
+            "second".to_string(),
+            "2".to_string(),
+            "third".to_string(),
+        ];
+        let segments = cli.segment(&args).unwrap();
+
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].name, "first");
+        assert_eq!(segments[0].parsed.get_scalar("arg0"), Some("1"));
+        assert_eq!(segments[1].name, "second");
+        assert_eq!(segments[1].parsed.get_scalar("arg0"), Some("2"));
+        assert_eq!(segments[2].name, "third");
+    }
+
+    #[test]
+    fn test_segment_unknown_command_produces_unknown_command_error() {
+        // Unchanged behaviour: a name that resolves to nothing at the
+        // start of a segment (first position here — the only position
+        // structurally reachable, since a later boundary token that
+        // fails to resolve is by construction reported as
+        // too_many_arguments against the preceding segment instead, not
+        // as unknown_command) still raises the existing suggestion-aware
+        // error.
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let args = vec!["nope".to_string()];
+        let result = cli.segment(&args);
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DynamicCliError::Parse(crate::error::ParseError::UnknownCommand { .. }) => {}
+            other => panic!("Expected UnknownCommand error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_segment_repeated_command_name_resolves_each_occurrence_independently() {
+        // resolve_name()/get_definition() are stateless lookups: the same
+        // command name may legitimately appear more than once in a
+        // single chain, each occurrence carrying its own arguments.
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "source", 1);
+        register_arity_command(&mut registry, "run", 0);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let args = vec![
+            "source".to_string(),
+            "modelfile".to_string(),
+            "source".to_string(),
+            "solverfile".to_string(),
+            "run".to_string(),
+        ];
+        let segments = cli.segment(&args).unwrap();
+
+        assert_eq!(segments.len(), 3);
+        assert_eq!(segments[0].name, "source");
+        assert_eq!(segments[0].parsed.get_scalar("arg0"), Some("modelfile"));
+        assert_eq!(segments[1].name, "source");
+        assert_eq!(segments[1].parsed.get_scalar("arg0"), Some("solverfile"));
+        assert_eq!(segments[2].name, "run");
+    }
+
+    #[test]
+    fn test_dispatch_executes_chain_in_order() {
+        // End-to-end: segmentation feeding execute_segment() actually
+        // runs every resolved segment, in order — not just parses them.
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "first", 1);
+        register_arity_command(&mut registry, "second", 1);
+        register_arity_command(&mut registry, "third", 0);
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        let args = vec![
+            "first".to_string(),
+            "1".to_string(),
+            "second".to_string(),
+            "2".to_string(),
+            "third".to_string(),
+        ];
+        cli.dispatch(&args).expect("chain should execute fully");
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*cli.context)
+            .expect("Failed to downcast context");
+        assert_eq!(
+            ctx.executed_commands,
+            vec![
+                "first".to_string(),
+                "second".to_string(),
+                "third".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_segment_known_limitation_extra_token_matching_command_name_is_silently_absorbed() {
+        // DD-026's documented, accepted limitation: one token more than a
+        // command's declared arity, which happens to also be a
+        // registered command name, is silently read as the start of the
+        // next segment instead of raising too_many_arguments.
+        // Deliberately reproduced and pinned down here as *expected*
+        // (not a bug to fix) — see DD-026's "Known limitation" note.
+        let mut registry = CommandRegistry::new();
+        register_arity_command(&mut registry, "greet", 1);
+        register_arity_command(&mut registry, "run", 0);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        // Intent could plausibly have been "greet Alice" with a stray
+        // trailing "run" (typo, or a genuinely too-long command) — but
+        // because "run" is also a registered zero-arity command, it is
+        // read as the next segment rather than reported as an error.
+        let args = vec!["greet".to_string(), "Alice".to_string(), "run".to_string()];
+        let segments = cli
+            .segment(&args)
+            .expect("known limitation: no error is raised here, by design");
+
+        assert_eq!(segments.len(), 2);
+        assert_eq!(segments[0].name, "greet");
+        assert_eq!(segments[0].parsed.get_scalar("arg0"), Some("Alice"));
+        assert_eq!(segments[1].name, "run");
     }
 }
