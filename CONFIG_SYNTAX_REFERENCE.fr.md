@@ -1,7 +1,7 @@
 # Référence de Syntaxe - Fichier de Configuration dynamic-cli
 
 **Version** : 1.0  
-**Dernière mise à jour** : 2026-01-11  
+**Dernière mise à jour** : 2026-08-29  
 **Format** : YAML ou JSON
 
 ---
@@ -18,6 +18,7 @@
 - [Arguments](#arguments)
 - [Options](#options)
 - [Options répétables](#options-répétables)
+- [Chaînage de commandes](#chaînage-de-commandes)
 - [Types d'arguments](#types-darguments)
 - [Règles de validation](#règles-de-validation)
 - [Exemple complet](#exemple-complet)
@@ -330,6 +331,8 @@ Détail complet d'une commande individuelle.
       choices: []
   
   implementation: "nom_handler"
+  continue_on_failure: false
+  requires_success: false
 ```
 
 ### Détails des champs
@@ -371,6 +374,17 @@ Détail complet d'une commande individuelle.
 - Identifiant utilisé dans le code Rust pour lier au handler
 - Convention : snake_case
 - Exemple : `"load_config"` correspond à `LoadConfigHandler`
+
+**`continue_on_failure`** (booléen, optionnel, défaut `false`) :
+- Gouverne le chaînage de commandes (v0.8.0, [DD-026](https://github.com/biface/dcli/issues/52)) — voir la section [Chaînage de commandes](#chaînage-de-commandes) pour la vue d'ensemble
+- Sans effet quand cette commande n'appartient pas à une chaîne
+
+**`requires_success`** (booléen, optionnel, défaut `false`) :
+- Fait aussi partie du chaînage de commandes ([DD-026](https://github.com/biface/dcli/issues/52)) — voir [Chaînage de commandes](#chaînage-de-commandes)
+- **Sans rapport avec `required` ci-dessus** — `required` est un
+  contrôle au démarrage (« un handler doit être enregistré »),
+  `requires_success` est une garde de chaîne évaluée à chaque
+  invocation, au moment du dispatch
 
 > **Sync vs async n'est pas une question de configuration (ref. #8).** Ce
 > champ est agnostique quant à la nature sync ou async du handler qui s'y
@@ -677,6 +691,139 @@ for occ in occurrences {
 
 Voir `CHANGELOG.md` (v0.6.0) pour le chemin de migration complet
 `HashMap<String, String>` → `ParsedArgs` des handlers existants.
+
+---
+
+## Chaînage de commandes
+
+*Depuis la v0.8.0 ([DD-026](https://github.com/biface/dcli/issues/52)).*
+
+Une seule invocation CLI (ou une ligne de
+[`run_script()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run_script))
+peut chaîner plusieurs commandes : une fois l'arité déclarée d'une
+commande épuisée, le jeton nu suivant est vérifié auprès du registre
+des commandes — s'il correspond à un nom de commande (ou un alias), il
+démarre la commande suivante de la chaîne ; sinon, la ligne est rejetée
+exactement comme une commande seule trop longue l'a toujours été. Il
+n'existe aucun jeton séparateur (`;`, `&&`, `|`) — le chaînage résulte
+uniquement de l'épuisement de l'arité, ce n'est pas une syntaxe
+distincte à activer.
+
+### Règle de segmentation
+
+Pour chaque commande de la séquence :
+
+1. Ses options (y compris les occurrences d'options répétables, DD-024)
+   et ses arguments positionnels sont consommés jusqu'à son arité
+   déclarée.
+2. Le jeton suivant est recherché dans le registre des commandes.
+   - S'il correspond à un nom de commande ou un alias → démarre le
+     segment suivant.
+   - Sinon → la même erreur « trop d'arguments » qu'une commande seule
+     non chaînée aurait levée — aucun changement de comportement pour
+     une commande seule réellement trop longue.
+
+### Champs
+
+Deux champs `boolean` additifs sur une définition de commande
+gouvernent le comportement de la chaîne quand *cette* commande précise
+échoue. Les deux valent `false` par défaut, donc les configurations
+existantes ne sont pas affectées — voir [Détails des champs](#détails-des-champs)
+ci-dessus pour leur place dans le schéma complet.
+
+```yaml
+- name: "nom-commande"
+  # ... autres champs ...
+  continue_on_failure: false   # optionnel, défaut false
+  requires_success: false      # optionnel, défaut false
+```
+
+**`continue_on_failure`** :
+- `false` (défaut) : si cette commande échoue, la chaîne s'arrête
+  immédiatement — identique au comportement actuel d'une commande
+  seule, appliqué par segment.
+- `true` : si cette commande échoue, l'erreur avec position dans la
+  chaîne est signalée et l'exécution se poursuit au segment suivant.
+  Destiné aux étapes réellement optionnelles (ex : un export secondaire
+  non critique).
+
+**`requires_success`** :
+- `false` (défaut) : cette commande s'exécute indépendamment d'un échec
+  antérieur dans la chaîne (sans effet sauf si une commande antérieure
+  a `continue_on_failure: true`).
+- `true` : si une commande antérieure de la chaîne a déjà échoué
+  (quelle que soit la valeur de `continue_on_failure` de *cet* échec),
+  cette commande est **ignorée** — non exécutée, non comptée comme un
+  échec supplémentaire.
+
+### Rapport d'erreur et d'omission
+
+- Une commande en échec est signalée ainsi : `Error in command
+  {n}/{total} ('{name}'): <sortie d'erreur habituelle>` — la position
+  dans la chaîne est ajoutée en préfixe ; le reste du message est
+  inchangé par rapport à l'échec d'une commande seule.
+- Une commande ignorée (via `requires_success`) est signalée ainsi :
+  `Skipped: command {n}/{total} ('{name}') — a preceding command
+  failed`.
+- Le code de sortie du processus reflète toujours le **premier** échec
+  rencontré dans la chaîne — l'échec « déclencheur » — même si une
+  commande ultérieure avec `continue_on_failure: true` échoue aussi, ou
+  qu'une commande en aval est ignorée en conséquence.
+
+### Limitation connue
+
+Si la ligne de commande fournit un jeton de plus que l'arité déclarée
+d'une commande, et que ce jeton excédentaire correspond par ailleurs à
+un nom de commande enregistré, il est silencieusement lu comme le
+début du segment suivant plutôt que de lever une erreur — la
+segmentation ne peut pas distinguer « une valeur excédentaire isolée »
+de « la commande suivante » une fois l'arité épuisée. Aucun
+échappement de type `--` n'existe pour forcer une valeur à être
+traitée comme positionnelle plutôt que comme une frontière de
+commande. Non planifié pour correction ; à revoir seulement si un
+besoin concret se présente.
+
+### Portée
+
+- [`CliInterface::run()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run)
+  (CLI en une fois) et `run_script()` héritent automatiquement du
+  chaînage — les deux passent par le même chemin de résolution interne.
+- La méta-commande `:load` du REPL ne chaîne **pas** : chaque ligne
+  chargée passe toujours par le chemin mono-commande propre au REPL,
+  inchangé.
+
+### Exemple
+
+```yaml
+commands:
+  - name: "configure"
+    description: "Enregistre une source d'entrée"
+    aliases: []
+    required: false
+    arguments:
+      - name: "path"
+        type: "path"
+        required: true
+        description: "Fichier source"
+        validation: []
+    options: []
+    implementation: "configure_handler"
+
+  - name: "solve"
+    description: "Exécute une fois toutes les sources configurées"
+    aliases: []
+    required: false
+    arguments: []
+    options: []
+    implementation: "solve_handler"
+    requires_success: true
+```
+
+**Utilisation** :
+```bash
+monapp configure model.yml configure scenario.yml solve
+# "configure" s'exécute deux fois, puis "solve" — seulement si les deux configure ont réussi
+```
 
 ---
 
