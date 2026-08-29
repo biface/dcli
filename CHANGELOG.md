@@ -105,7 +105,91 @@ implemented; revisit only if a concrete need appears.
 
 ---
 
-## [0.7.0] - 2026-08-23 *(date to confirm at tag/publish time)*
+## [0.8.0] "Chain Reaction" - 2026-08-29
+
+**Theme**: CLI: repeatable commands — Multi-Command Chaining
+**Decision**: [DD-026](https://github.com/biface/dcli/issues/52)
+
+### Added
+
+#### CLI-mode multi-command chaining
+- **Multi-command chaining** (#52–#56): a single CLI invocation (or
+  `run_script()` line) can now chain more than one command with no
+  separator token (`;`, `&&`, `|`) — the boundary between commands is
+  detected purely from arity exhaustion: once a command's declared
+  positional arguments and options are consumed, the next bare token is
+  looked up against the command registry; a match starts the next
+  command, no match raises the same "too many arguments" error a single,
+  over-long command always raised.
+- **`CommandDefinition::continue_on_failure` / `requires_success`** (#53,
+  both additive `bool`, `#[serde(default)]`, default `false`): per-command
+  chain failure policy. `continue_on_failure` governs whether the chain
+  stops when *this* command fails; `requires_success` governs whether
+  *this* command should even run given an earlier failure elsewhere in
+  the chain. Unrelated to the pre-existing `required` field on the same
+  struct (startup-time handler-registration check).
+- **`CliParser::parse_typed_segment()`** (#54, additive): stops cleanly at
+  a segment boundary instead of erroring on positional-arity overflow,
+  returning `(parsed, consumed)`. `parse_typed()` itself is untouched —
+  every existing caller keeps today's exact behaviour.
+- **`CliInterface` segmentation and chain execution** (#55, #56,
+  internal — `dispatch()` is private, no public API impact): the full
+  argument list is resolved and parsed into segments up front, then
+  executed in order applying `continue_on_failure`/`requires_success`. A
+  failing command is reported as `Error in command {n}/{total}
+  ('{name}'): <normal error output>`; a skipped one as `Skipped: command
+  {n}/{total} ('{name}') — a preceding command failed`. The process exit
+  code always reflects the first ("triggering") failure in the chain,
+  even when later commands also fail or are skipped.
+- `CliInterface::run_script()` inherits chaining automatically (shared
+  `dispatch()`, no code change of its own). The REPL's `:load`
+  meta-command does **not** chain — it stays on its own pre-existing
+  scalar-only path, unchanged and regression-tested.
+- **`CONFIG_SYNTAX_REFERENCE.md` / `.fr.md`** (#57): new "Command
+  Chaining" section — field reference, the segmentation rule, exact
+  error/skip message formats, and the documented known limitation below.
+
+### Fixed
+
+- **`CliParser::parse_repeatable_occurrence()` — bare token after a
+  repeatable option's `key=value` span** (#54): a plain token with
+  neither a leading `-` nor a `=` immediately following a repeatable
+  option's occurrence used to raise `InvalidSyntax` ("Expected
+  key=value..."), instead of cleanly ending that occurrence's span. Left
+  uncaught, this would have broken chaining's own motivating case (a
+  repeatable-option command immediately followed by the next chained
+  command's name). No prior test exercised this path, so
+  `parse_typed()`/`parse()` behaviour for every previously-valid input is
+  unaffected.
+
+### Maintenance
+
+- **`SysInfoPlugin`/`EnvPlugin` — `clippy::default_constructed_unit_structs`**:
+  both are unit structs whose `Default` impl exists solely to satisfy
+  `clippy::new_without_default`; a newer clippy version's own suggestion
+  (drop `::default()` for the bare unit literal) would have stopped their
+  dedicated tests from exercising that impl at all. Targeted
+  `#[allow(clippy::default_constructed_unit_structs)]` added on those two
+  tests instead, with justification — unrelated to this release's actual
+  scope, surfaced only because `--all-features --all-targets` clippy was
+  run in full for the first time during this sprint's validation.
+
+**Breaking Changes**: None — every schema addition is additive
+(`#[serde(default)]`), `parse_typed()`/`parse()` and `dispatch()`'s public
+callers (`run()`, `run_script()`) are all unaffected in shape and
+single-command behaviour.
+
+**Known limitation (documented, not scheduled for a fix)**: if a command
+line supplies one token more than that command's declared arity, and
+that leftover token happens to also be a registered command name, it is
+silently read as the start of the next segment instead of raising an
+error — segmentation cannot distinguish "a stray extra value" from "the
+next command" once arity is exhausted. No `--`-style escape is
+implemented; revisit only if a concrete need appears.
+
+---
+
+## [0.7.0] "Divide and Conquer" - 2026-08-23
 
 **Theme**: Static Plugin Library — Granular Plugins & Batch Execution
 **Decision**: [DD-025](https://github.com/biface/dcli/issues/25)
@@ -220,7 +304,7 @@ boundary DD-027 will revisit.
 
 ---
 
-## [0.6.0] - 2026-07-24 *(date to confirm at tag/publish time)*
+## [0.6.0] "Déjà Vu" - 2026-07-25
 
 **Theme**: Advanced Options — Repeatable Options with Typed Sub-Parameters
 **Decision**: [DD-024](https://github.com/biface/dcli/issues/21)
@@ -349,7 +433,7 @@ scheduled for removal at **v1.0.0**, unaffected by this release.
 
 ---
 
-## [0.5.0] - 2026-07-11
+## [0.5.0] "Beyond Blocking" - 2026-07-11
 
 **Theme**: Async Command Handlers
 **Decision**: [DD-022](https://github.com/biface/dcli/issues/8)
@@ -448,7 +532,7 @@ ever confirmed as a need.
 
 ---
 
-## [0.4.0] - 2026-06-19
+## [0.4.0] "Plugin System" - 2026-06-19
 
 **Theme**: Plugin System
 **Decision**: [DD-021](https://github.com/biface/dcli/issues/10)
@@ -532,7 +616,7 @@ optional feature flag)
 
 ---
 
-## [0.3.0] - 2026-05-30
+## [0.3.0] "Shell Completions and Advanced History" - 2026-05-30
 
 **Theme**: Shell Completions & Advanced History  
 **Dependencies**: v0.2.0
@@ -603,7 +687,7 @@ changed — direct callers must update to the 5-argument form.
 
 ---
 
-## [0.2.0] - 2026-04-05
+## [0.2.0] "Help & Errors" - 2026-04-05
 
 **Theme**: Built-in Help & Error Improvements  
 **Dependencies**: v0.1.1
