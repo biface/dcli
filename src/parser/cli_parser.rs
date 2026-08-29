@@ -31,6 +31,8 @@
 //!     ],
 //!     options: vec![],
 //!     implementation: "handler".to_string(),
+//!     continue_on_failure: false,
+//!     requires_success: false,
 //! };
 //!
 //! let parser = CliParser::new(&definition);
@@ -87,6 +89,8 @@ use std::collections::HashMap;
 ///         }
 ///     ],
 ///     implementation: "handler".to_string(),
+///     continue_on_failure: false,
+///     requires_success: false,
 /// };
 ///
 /// let parser = CliParser::new(&definition);
@@ -155,6 +159,8 @@ impl<'a> CliParser<'a> {
     /// #     arguments: vec![],
     /// #     options: vec![],
     /// #     implementation: "".to_string(),
+    /// #     continue_on_failure: false,
+    /// #     requires_success: false,
     /// # };
     /// let parser = CliParser::new(&definition);
     /// ```
@@ -216,6 +222,8 @@ impl<'a> CliParser<'a> {
     ///     ],
     ///     options: vec![],
     ///     implementation: "handler".to_string(),
+    ///     continue_on_failure: false,
+    ///     requires_success: false,
     /// };
     ///
     /// let parser = CliParser::new(&definition);
@@ -751,6 +759,8 @@ mod tests {
                 },
             ],
             implementation: "handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         }
     }
 
@@ -1084,6 +1094,8 @@ mod tests {
                 option_parameters,
             }],
             implementation: "export_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         }
     }
 

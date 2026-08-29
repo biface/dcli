@@ -452,6 +452,8 @@ pub mod test_helpers {
             arguments: vec![],
             options: vec![],
             implementation: format!("{}_handler", name),
+            continue_on_failure: false,
+            requires_success: false,
         }
     }
 

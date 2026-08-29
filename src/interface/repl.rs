@@ -751,6 +751,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "test_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
         registry
             .register_sync(
@@ -790,6 +792,8 @@ mod tests {
                     option_parameters: HashMap::new(),
                 }],
                 implementation: "hello_handler".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             }],
             global_options: vec![],
         }
@@ -878,6 +882,8 @@ mod tests {
             }],
             options: vec![],
             implementation: "greet_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         struct GreetHandler;
@@ -1193,6 +1199,8 @@ mod tests {
             ],
             options: vec![],
             implementation: "login_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         struct LoginHandler;

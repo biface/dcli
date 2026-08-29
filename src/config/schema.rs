@@ -96,6 +96,8 @@ fn default_prompt_suffix() -> String {
 ///       - extensions: [yaml, json]
 /// options: []
 /// implementation: "simulate_handler"
+/// continue_on_failure: false
+/// requires_success: false
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CommandDefinition {
@@ -128,6 +130,44 @@ pub struct CommandDefinition {
     /// This string is used to match the command with its
     /// registered handler in the CommandRegistry.
     pub implementation: String,
+
+    /// Whether the chain continues when *this* command fails (DD-026).
+    ///
+    /// Governs the chain's behaviour when this command is one segment of a
+    /// multi-command CLI invocation (or a chained `run_script()` line) and
+    /// its handler returns an error:
+    ///
+    /// - `false` (default): stop-on-first-error — identical to today's
+    ///   single-command exit behaviour, just applied per segment.
+    /// - `true`: the chain-position error is reported but execution
+    ///   proceeds to the next segment. Intended for genuinely optional
+    ///   steps (e.g. a non-critical secondary export).
+    ///
+    /// Has no effect outside a chain (a single, non-chained command
+    /// behaves exactly as it does today regardless of this value).
+    #[serde(default)]
+    pub continue_on_failure: bool,
+
+    /// Whether *this* command requires every earlier command in the chain
+    /// to have succeeded before it is allowed to run (DD-026).
+    ///
+    /// Not to be confused with [`Self::required`], which is an unrelated,
+    /// startup-time check ("a handler must be registered for this
+    /// command") — `requires_success` is a per-invocation, chain-position
+    /// concern evaluated at dispatch time, and only observable downstream
+    /// of an earlier command whose own `continue_on_failure` is `true`
+    /// (otherwise the chain has already stopped by the time this command
+    /// would run).
+    ///
+    /// - `false` (default): runs regardless of any earlier failure in the
+    ///   chain (moot under the default stop-on-first policy).
+    /// - `true`: if any earlier command in the chain has already failed
+    ///   (tracked via a running `chain_has_failure` flag, regardless of
+    ///   that failure's own `continue_on_failure` value), this command is
+    ///   skipped — not executed, not counted as an additional failure —
+    ///   and reported distinctly from a chain-position error.
+    #[serde(default)]
+    pub requires_success: bool,
 }
 
 /// Definition of a positional argument
@@ -485,6 +525,66 @@ mod tests {
         assert_eq!(cmd.description, "A test command");
         assert!(cmd.required);
         assert_eq!(cmd.implementation, "test_handler");
+        // continue_on_failure / requires_success absent from YAML: both
+        // must default to false (DD-026, #53).
+        assert!(!cmd.continue_on_failure);
+        assert!(!cmd.requires_success);
+    }
+
+    #[test]
+    fn test_deserialize_command_definition_continue_on_failure_and_requires_success_default_false()
+    {
+        // Explicit companion to test_deserialize_command_definition,
+        // mirroring the secure-field default test below: confirms serde's
+        // #[serde(default)] applies even when the fields are wholly absent
+        // from an otherwise-complete config, not just incidentally true in
+        // the general fixture above.
+        let yaml = r#"
+            name: solve
+            description: "Run the solver"
+            implementation: "solve_handler"
+        "#;
+
+        let cmd: CommandDefinition = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(!cmd.continue_on_failure);
+        assert!(!cmd.requires_success);
+    }
+
+    #[test]
+    fn test_deserialize_command_definition_continue_on_failure_and_requires_success_explicit() {
+        let yaml = r#"
+            name: export
+            description: "Optional secondary export"
+            implementation: "export_handler"
+            continue_on_failure: true
+            requires_success: true
+        "#;
+
+        let cmd: CommandDefinition = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(cmd.continue_on_failure);
+        assert!(cmd.requires_success);
+    }
+
+    #[test]
+    fn test_command_definition_requires_success_distinct_from_required() {
+        // Guards against the two fields being confused with one another
+        // (DD-026): `required` is the pre-existing "handler must be
+        // registered at startup" check; `requires_success` is the new,
+        // unrelated per-invocation chain guard.
+        let yaml = r#"
+            name: cleanup
+            description: "Cleanup step"
+            required: true
+            implementation: "cleanup_handler"
+            requires_success: false
+        "#;
+
+        let cmd: CommandDefinition = serde_yaml::from_str(yaml).unwrap();
+
+        assert!(cmd.required);
+        assert!(!cmd.requires_success);
     }
 
     #[test]
@@ -681,6 +781,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "handler1".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             }],
             global_options: vec![],
         };

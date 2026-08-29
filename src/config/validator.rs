@@ -162,6 +162,8 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
 ///     arguments: vec![],
 ///     options: vec![],
 ///     implementation: "test_handler".to_string(),
+///     continue_on_failure: false,
+///     requires_success: false,
 /// };
 ///
 /// validate_command(&cmd)?;
@@ -621,6 +623,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "handler1".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "test".to_string(), // Duplicate!
@@ -630,6 +634,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "handler2".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
         ];
 
@@ -657,6 +663,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "handler1".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
             CommandDefinition {
                 name: "cmd2".to_string(),
@@ -666,6 +674,8 @@ mod tests {
                 arguments: vec![],
                 options: vec![],
                 implementation: "handler2".to_string(),
+                continue_on_failure: false,
+                requires_success: false,
             },
         ];
 
@@ -683,6 +693,8 @@ mod tests {
             arguments: vec![],
             options: vec![],
             implementation: "handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         let mut config = CommandsConfig::minimal();
@@ -928,6 +940,8 @@ mod tests {
                 option_parameters: HashMap::new(),
             }],
             implementation: "process_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
         };
 
         assert!(validate_command(&cmd).is_ok());
