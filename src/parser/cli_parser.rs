@@ -309,6 +309,142 @@ impl<'a> CliParser<'a> {
         Ok(result)
     }
 
+    /// Parse command-line arguments, stopping cleanly at a segment boundary
+    /// instead of erroring on positional-arity overflow (DD-026, #52).
+    ///
+    /// Shares [`Self::parse_typed`]'s token loop and every option-parsing
+    /// helper it calls ([`Self::parse_long_option`], [`Self::parse_short_option`],
+    /// [`Self::parse_repeatable_occurrence`]) unchanged. The only
+    /// difference is what happens when a bare (non-flag) token is reached
+    /// once `positional_index` has already reached
+    /// `self.definition.arguments.len()`: where [`Self::parse_typed`]
+    /// calls [`Self::parse_positional_argument`] and gets back
+    /// [`crate::error::ParseError::too_many_arguments`], this method stops
+    /// the loop immediately instead — without consuming that token,
+    /// without erroring — then runs the same finishing steps
+    /// (`apply_defaults` / `validate_required_arguments` /
+    /// `validate_required_options`) on whatever was accumulated so far.
+    ///
+    /// [`Self::parse_typed`] itself is not modified by this method's
+    /// existence: it keeps calling [`Self::parse_positional_argument`]
+    /// directly and erroring immediately on overflow, so [`Self::parse`]
+    /// and any existing caller keep today's exact behaviour.
+    ///
+    /// # Returns
+    ///
+    /// `(parsed, consumed)`, where `consumed` is the number of tokens of
+    /// `args` that belong to this command. When the loop reaches the end
+    /// of `args` with no leftover boundary token (the single-command,
+    /// non-chained case), `consumed == args.len()` and `parsed` is
+    /// identical to what [`Self::parse_typed`] would return for the same
+    /// input.
+    ///
+    /// # Errors
+    ///
+    /// Same as [`Self::parse_typed`] for every case *other* than
+    /// positional-arity overflow, which this method never raises — an
+    /// overflowing bare token is reported to the caller via `consumed`
+    /// instead, for [`crate::registry::CommandRegistry::resolve_name`] to
+    /// resolve as the next chain segment.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::parser::cli_parser::{CliParser, ParsedValue};
+    /// use dynamic_cli::config::schema::{
+    ///     CommandDefinition, ArgumentDefinition, ArgumentType
+    /// };
+    ///
+    /// let definition = CommandDefinition {
+    ///     name: "config".to_string(),
+    ///     aliases: vec![],
+    ///     description: "Configure a source".to_string(),
+    ///     required: false,
+    ///     arguments: vec![
+    ///         ArgumentDefinition {
+    ///             name: "source".to_string(),
+    ///             arg_type: ArgumentType::Path,
+    ///             required: true,
+    ///             description: "Source file".to_string(),
+    ///             validation: vec![],
+    ///             secure: false,
+    ///         }
+    ///     ],
+    ///     options: vec![],
+    ///     implementation: "config_handler".to_string(),
+    ///     continue_on_failure: false,
+    ///     requires_success: false,
+    /// };
+    ///
+    /// let parser = CliParser::new(&definition);
+    /// // "solve" is the next chained command's name — arity for "config"
+    /// // (one positional) is already satisfied by "model.yml".
+    /// let args = vec!["model.yml".to_string(), "solve".to_string()];
+    /// let (parsed, consumed) = parser.parse_typed_segment(&args).unwrap();
+    ///
+    /// assert_eq!(consumed, 1);
+    /// assert_eq!(
+    ///     parsed.get("source"),
+    ///     Some(&ParsedValue::Scalar("model.yml".to_string()))
+    /// );
+    /// ```
+    pub fn parse_typed_segment(
+        &self,
+        args: &[String],
+    ) -> Result<(HashMap<String, ParsedValue>, usize)> {
+        let mut result = HashMap::new();
+        let mut positional_index = 0;
+        let mut i = 0;
+
+        while i < args.len() {
+            let arg = &args[i];
+
+            if arg.starts_with("--") {
+                // Long option
+                self.parse_long_option(arg, args, &mut i, &mut result)?;
+            } else if arg.starts_with('-') && arg.len() > 1 {
+                // Short option (ensure it's not just a negative number)
+                if arg
+                    .chars()
+                    .nth(1)
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
+                    // This is a negative number, treat as positional —
+                    // subject to the same arity-boundary check below.
+                    if positional_index >= self.definition.arguments.len() {
+                        break;
+                    }
+                    self.parse_positional_argument(arg, positional_index, &mut result)?;
+                    positional_index += 1;
+                } else {
+                    self.parse_short_option(arg, args, &mut i, &mut result)?;
+                }
+            } else {
+                // Positional argument, or (arity already exhausted) the
+                // segment boundary: stop here, without consuming or
+                // erroring, and let the caller resolve it as the next
+                // chain segment.
+                if positional_index >= self.definition.arguments.len() {
+                    break;
+                }
+                self.parse_positional_argument(arg, positional_index, &mut result)?;
+                positional_index += 1;
+            }
+
+            i += 1;
+        }
+
+        // Apply defaults for missing optional options
+        self.apply_defaults(&mut result)?;
+
+        // Validate all required arguments are present
+        self.validate_required_arguments(&result)?;
+        self.validate_required_options(&result)?;
+
+        Ok((result, i))
+    }
+
     /// Parse a long option (--option or --option=value)
     fn parse_long_option(
         &self,
@@ -471,9 +607,14 @@ impl<'a> CliParser<'a> {
     /// On entry, `index` points at the option's flag token. Reads the
     /// discriminant token immediately following it, validates it against
     /// `option.choices`, then consumes `key=value` tokens until the next
-    /// flag (any token starting with `-`) or the end of input — a
-    /// `key=value` pair can never start with `-` itself, so this is
-    /// unambiguous, unlike the top-level positional/negative-number case.
+    /// flag (any token starting with `-`), a bare token that isn't a
+    /// `key=value` pair, or the end of input. A `key=value` pair can never
+    /// start with `-` itself, so the flag check is unambiguous; a bare
+    /// non-`key=value` token ends the occurrence's span without error,
+    /// leaving it for the caller (`parse_typed` / `parse_typed_segment`,
+    /// #54) to treat as whatever it actually is — this command's next
+    /// positional argument, or, in a chained invocation (DD-026, #52),
+    /// the next segment's boundary token.
     ///
     /// On return, `index` points at the last token consumed (the
     /// discriminant if no parameters followed, or the last `key=value`
@@ -523,7 +664,8 @@ impl<'a> CliParser<'a> {
             .get(&discriminant)
             .unwrap_or(&empty);
 
-        // Consume key=value tokens until the next flag or end of input.
+        // Consume key=value tokens until the next flag, a non-key=value
+        // bare token, or end of input.
         let mut params: HashMap<String, String> = HashMap::new();
         while *index + 1 < args.len() {
             let next = &args[*index + 1];
@@ -533,16 +675,9 @@ impl<'a> CliParser<'a> {
 
             let eq_pos = match next.find('=') {
                 Some(pos) => pos,
-                None => {
-                    return Err(ParseError::InvalidSyntax {
-                        details: format!(
-                            "Expected key=value for --{} {}, got: '{}'",
-                            option.name, discriminant, next
-                        ),
-                        hint: Some("Sub-parameters must use the key=value form.".to_string()),
-                    }
-                    .into());
-                }
+                // Not a key=value pair: the occurrence's span ends here
+                // (see doc comment above) rather than erroring.
+                None => break,
             };
             let key = &next[..eq_pos];
             let value = &next[eq_pos + 1..];
@@ -1330,5 +1465,222 @@ mod tests {
         let result = parser.parse(&args).unwrap();
 
         assert_eq!(result.get("output"), None);
+    }
+
+    // ========================================================================
+    // parse_typed_segment() tests (DD-026, #52 / #54)
+    // ========================================================================
+
+    /// Helper: one positional argument (still open arity) *and* a
+    /// repeatable option, so a repeatable occurrence's key=value span can
+    /// be followed by this same command's own remaining positional value —
+    /// the scenario #54's boundary-case acceptance criterion targets.
+    fn create_repeatable_and_positional_test_definition() -> CommandDefinition {
+        let mut option_parameters = HashMap::new();
+        option_parameters.insert(
+            "csv".to_string(),
+            vec![ArgumentDefinition {
+                name: "file".to_string(),
+                arg_type: ArgumentType::Path,
+                required: true,
+                description: "Destination CSV file".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+        );
+
+        CommandDefinition {
+            name: "output".to_string(),
+            aliases: vec![],
+            description: "Configure output and a target label".to_string(),
+            required: false,
+            arguments: vec![ArgumentDefinition {
+                name: "target".to_string(),
+                arg_type: ArgumentType::String,
+                required: false,
+                description: "Target label".to_string(),
+                validation: vec![],
+                secure: false,
+            }],
+            options: vec![OptionDefinition {
+                name: "format".to_string(),
+                short: None,
+                long: Some("format".to_string()),
+                option_type: ArgumentType::String,
+                required: false,
+                default: None,
+                description: "Output format".to_string(),
+                choices: vec!["csv".to_string()],
+                repeatable: true,
+                option_parameters,
+            }],
+            implementation: "output_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
+        }
+    }
+
+    #[test]
+    fn test_parse_typed_segment_stops_at_boundary_with_zero_arity() {
+        // create_repeatable_test_definition()'s "export" command has zero
+        // positional arguments: the very first bare token is already past
+        // arity and must stop the segment without being consumed or
+        // erroring.
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec!["solve".to_string()];
+        let (result, consumed) = parser.parse_typed_segment(&args).unwrap();
+
+        assert_eq!(consumed, 0);
+        assert!(!result.contains_key("output"));
+    }
+
+    #[test]
+    fn test_parse_typed_segment_stops_after_repeatable_occurrence_with_zero_arity() {
+        // Combines the zero-arity boundary with a completed repeatable
+        // occurrence beforehand — mirrors DD-026's own chrom-rs-motivated
+        // example (an "output"-shaped command whose last occurrence is
+        // immediately followed by the next chained command's name).
+        let definition = create_repeatable_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--output".to_string(),
+            "csv".to_string(),
+            "file=result.csv".to_string(),
+            "solve".to_string(),
+        ];
+        let (result, consumed) = parser.parse_typed_segment(&args).unwrap();
+
+        assert_eq!(consumed, 3, "'solve' at index 3 must not be consumed");
+        match result.get("output") {
+            Some(ParsedValue::Repeated(occurrences)) => {
+                assert_eq!(occurrences.len(), 1);
+                assert_eq!(occurrences[0].discriminant, "csv");
+            }
+            other => panic!("Expected Repeated([csv]), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_parse_typed_segment_resumes_positional_counting_after_repeatable_occurrence() {
+        // "target" is this command's own positional argument (arity still
+        // open) — it must be read as such, not mistaken for a continuing
+        // param of the "csv" occurrence that precedes it.
+        let definition = create_repeatable_and_positional_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--format".to_string(),
+            "csv".to_string(),
+            "file=out.csv".to_string(),
+            "primary".to_string(),
+        ];
+        let (result, consumed) = parser.parse_typed_segment(&args).unwrap();
+
+        assert_eq!(consumed, args.len());
+        assert_eq!(
+            result.get("target"),
+            Some(&ParsedValue::Scalar("primary".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_repeatable_occurrence_bare_token_no_longer_errors() {
+        // Companion to the segment test above, exercised directly through
+        // parse_typed(): the fix to parse_repeatable_occurrence (needed for
+        // parse_typed_segment's boundary detection to work at all) is
+        // shared code, so parse_typed benefits from it too. No existing
+        // test asserted the old error behaviour for this input, so this is
+        // additive, not a break of "byte-for-byte unchanged".
+        let definition = create_repeatable_and_positional_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "--format".to_string(),
+            "csv".to_string(),
+            "file=out.csv".to_string(),
+            "primary".to_string(),
+        ];
+        let result = parser.parse_typed(&args).unwrap();
+
+        assert_eq!(
+            result.get("target"),
+            Some(&ParsedValue::Scalar("primary".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_typed_segment_negative_number_heuristic_preserved_at_boundary() {
+        // create_test_definition() has exactly two positional arguments
+        // (input, output). Two negative-number tokens fill both; a third
+        // bare token is past arity and must stop the segment, exactly as
+        // for any other kind of token.
+        let definition = create_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec!["-3".to_string(), "-5".to_string(), "solve".to_string()];
+        let (result, consumed) = parser.parse_typed_segment(&args).unwrap();
+
+        assert_eq!(consumed, 2, "'solve' at index 2 must not be consumed");
+        assert_eq!(
+            result.get("input"),
+            Some(&ParsedValue::Scalar("-3".to_string()))
+        );
+        assert_eq!(
+            result.get("output"),
+            Some(&ParsedValue::Scalar("-5".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_parse_typed_segment_end_of_input_matches_parse_typed() {
+        // Single-command, non-chained case: no leftover boundary token.
+        // consumed must equal args.len(), and the result must be
+        // identical to what parse_typed() returns for the same input.
+        let definition = create_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "input.txt".to_string(),
+            "output.txt".to_string(),
+            "--verbose".to_string(),
+        ];
+
+        let (segment_result, consumed) = parser.parse_typed_segment(&args).unwrap();
+        let typed_result = parser.parse_typed(&args).unwrap();
+
+        assert_eq!(consumed, args.len());
+        assert_eq!(segment_result, typed_result);
+    }
+
+    #[test]
+    fn test_parse_typed_segment_too_many_arguments_still_reported_by_dispatch_path() {
+        // parse_typed_segment() itself never raises too_many_arguments —
+        // it stops cleanly instead (DD-026's segmentation phase is
+        // responsible for turning a non-resolving leftover token back into
+        // that same error). This test only pins down the "never errors on
+        // overflow" half: the segment boundary is reported via `consumed`,
+        // not via Err(..).
+        let definition = create_test_definition();
+        let parser = CliParser::new(&definition);
+
+        let args = vec![
+            "input.txt".to_string(),
+            "output.txt".to_string(),
+            "unexpected_extra".to_string(),
+        ];
+        let (result, consumed) = parser.parse_typed_segment(&args).unwrap();
+
+        assert_eq!(consumed, 2, "'unexpected_extra' must not be consumed");
+        assert_eq!(
+            result.get("input"),
+            Some(&ParsedValue::Scalar("input.txt".to_string()))
+        );
+        assert_eq!(
+            result.get("output"),
+            Some(&ParsedValue::Scalar("output.txt".to_string()))
+        );
     }
 }
