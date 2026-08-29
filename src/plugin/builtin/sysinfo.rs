@@ -136,6 +136,11 @@ mod tests {
     }
 
     #[test]
+    // SysInfoPlugin::default() is what's under test here (the Default impl
+    // itself, kept for clippy::new_without_default compliance); rewriting
+    // it to the bare unit-struct literal per clippy's own suggestion would
+    // stop exercising that impl and defeat the test's purpose.
+    #[allow(clippy::default_constructed_unit_structs)]
     fn test_sysinfo_plugin_default() {
         let p = SysInfoPlugin::default();
         assert_eq!(p.name(), "sysinfo");
