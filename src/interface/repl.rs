@@ -1458,4 +1458,69 @@ mod tests {
             ":load line itself must not be written to history"
         );
     }
+
+    // ========================================================================
+    // No accidental scope leak from CLI chaining (DD-026, #52 / #56)
+    // ========================================================================
+
+    #[test]
+    fn test_repl_line_is_never_chained_across_multiple_commands() {
+        // execute_line() (and, through it, :load) goes through
+        // ReplParser::parse_line() -> CliParser::parse() (the scalar,
+        // pre-DD-026 method) — never CliInterface::dispatch()'s
+        // segmentation. A line naming two registered commands back to
+        // back must therefore still be read as ONE command whose arity
+        // is exceeded by the second name, exactly as before chaining
+        // existed for the CLI — not as two chained commands.
+        let mut registry = CommandRegistry::new();
+        for name in ["first", "second"] {
+            let cmd_def = CommandDefinition {
+                name: name.to_string(),
+                aliases: vec![],
+                description: format!("Test command {}", name),
+                required: false,
+                arguments: vec![ArgumentDefinition {
+                    name: "value".to_string(),
+                    arg_type: ArgumentType::String,
+                    required: true,
+                    description: "Value".to_string(),
+                    validation: vec![],
+                    secure: false,
+                }],
+                options: vec![],
+                implementation: format!("{}_handler", name),
+                continue_on_failure: false,
+                requires_success: false,
+            };
+            registry
+                .register_sync(
+                    cmd_def,
+                    Box::new(TestHandler {
+                        name: name.to_string(),
+                    }),
+                )
+                .unwrap();
+        }
+
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        // "first" has arity 1; "1" fills it, leaving "second" as a
+        // genuine overflow — never a second, chained command.
+        let result = repl.execute_line("first 1 second");
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            DynamicCliError::Parse(ParseError::TooManyArguments { command, .. }) => {
+                assert_eq!(command, "first");
+            }
+            other => panic!("Expected TooManyArguments error, got: {:?}", other),
+        }
+
+        // Neither command actually ran — in particular, "second" was
+        // never silently executed as a chained segment.
+        let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
+        assert!(ctx.executed_commands.is_empty());
+    }
 }

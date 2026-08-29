@@ -26,7 +26,7 @@
 //! ```
 
 use crate::context::ExecutionContext;
-use crate::error::{display_error, DynamicCliError, ExecutionError, Result};
+use crate::error::{display_error, format_error, DynamicCliError, ExecutionError, Result};
 use crate::parser::{CliParser, ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
 use std::path::Path;
@@ -177,22 +177,94 @@ impl CliInterface {
     /// gains chaining for free through this shared method, with no code
     /// change of its own.
     ///
-    /// Two phases: [`Self::segment`] resolves and parses every command in
-    /// the line up front (so a genuinely too-long single command still
-    /// errors exactly as before chaining existed), then each
-    /// [`ResolvedSegment`] is executed in order via
-    /// [`Self::execute_segment`]. This method itself still stops at the
-    /// first failing segment (today's single-command behaviour, applied
-    /// per segment) — `continue_on_failure`/`requires_success` chain
-    /// policy is #56's addition, not this one's.
+    /// [`Self::segment`] resolves and parses every command in the line up
+    /// front (so a genuinely too-long single command still errors exactly
+    /// as before chaining existed). A single, non-chained command
+    /// (`total == 1`) then executes through the exact pre-#55/#56 path —
+    /// no chain-position wrapping, no skip bookkeeping, identical error
+    /// variants for existing callers to match on. Two or more segments go
+    /// through [`Self::execute_chain`], which applies DD-026's
+    /// `continue_on_failure`/`requires_success` policy.
     fn dispatch(&mut self, args: &[String]) -> Result<()> {
         let segments = self.segment(args)?;
 
-        for segment in &segments {
-            self.execute_segment(segment)?;
+        if segments.len() == 1 {
+            return self.execute_segment(&segments[0]);
         }
 
-        Ok(())
+        self.execute_chain(&segments)
+    }
+
+    /// Execute two or more already-resolved segments applying DD-026's
+    /// chain failure policy (#56).
+    ///
+    /// A running `chain_has_failure` flag, set on the first segment that
+    /// fails (regardless of that segment's own `continue_on_failure`),
+    /// drives two things for every later segment:
+    ///
+    /// - If the segment's `requires_success` is `true` and a failure has
+    ///   already occurred anywhere earlier in the chain, it is **skipped**
+    ///   — not executed, not counted as an additional failure — and
+    ///   reported with `Skipped: command {n}/{total} ('{name}') — a
+    ///   preceding command failed`, printed immediately (there is no
+    ///   other way to surface a skip, since it never produces an `Err`).
+    /// - Otherwise the segment executes as usual
+    ///   ([`Self::execute_segment`]). On failure, the error is wrapped
+    ///   with its chain position (`Error in command {n}/{total}
+    ///   ('{name}'): {existing format_error output}`, reusing
+    ///   `format_error`/`display_error` — no change to
+    ///   `error/display.rs`). If this segment's own `continue_on_failure`
+    ///   is `false`, the chain stops here. Either way, only the *first*
+    ///   failure's wrapped error is kept as the chain's outcome — a later
+    ///   failure (whether it stops the chain or is itself absorbed) never
+    ///   overwrites it, matching DD-026's "the exit code reflects the
+    ///   triggering failure" rule.
+    ///
+    /// Deliberately not printed as it happens: unlike a skip, a failure's
+    /// wrapped message reaches the user exactly once, through the normal
+    /// `Err` return path (either immediately here, or from the caller
+    /// once this method returns it at the end of the loop) — printing it
+    /// again here would double it up.
+    fn execute_chain(&mut self, segments: &[ResolvedSegment]) -> Result<()> {
+        let total = segments.len();
+        let mut chain_has_failure = false;
+        let mut triggering_failure: Option<DynamicCliError> = None;
+
+        for (idx, segment) in segments.iter().enumerate() {
+            let position = idx + 1;
+
+            let (requires_success, continue_on_failure) = self
+                .registry
+                .get_definition(&segment.name)
+                .map(|d| (d.requires_success, d.continue_on_failure))
+                .unwrap_or((false, false));
+
+            if chain_has_failure && requires_success {
+                eprintln!(
+                    "Skipped: command {}/{} ('{}') — a preceding command failed",
+                    position, total, segment.name
+                );
+                continue;
+            }
+
+            if let Err(e) = self.execute_segment(segment) {
+                let wrapped = wrap_chain_error(position, total, &segment.name, e);
+
+                if !chain_has_failure {
+                    triggering_failure = Some(wrapped);
+                }
+                chain_has_failure = true;
+
+                if !continue_on_failure {
+                    break;
+                }
+            }
+        }
+
+        match triggering_failure {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     /// Resolve and parse a full, already-tokenized command line into one
@@ -494,6 +566,28 @@ fn wrap_line_error(line_number: usize, source: DynamicCliError) -> DynamicCliErr
     )))
 }
 
+/// Wrap a chain segment's failure with its 1-based position (DD-026,
+/// #52 / #56), reusing the existing [`ExecutionError::CommandFailed`]
+/// variant — same idiom as [`wrap_line_error`] — and the existing
+/// [`format_error`] for the inner message, so no change to
+/// `error/display.rs` is needed. Position (not name) is what
+/// distinguishes two failures of the same repeated command at different
+/// points in a chain.
+fn wrap_chain_error(
+    position: usize,
+    total: usize,
+    name: &str,
+    source: DynamicCliError,
+) -> DynamicCliError {
+    DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
+        "Error in command {}/{} ('{}'): {}",
+        position,
+        total,
+        name,
+        format_error(&source)
+    )))
+}
+
 /// What [`CliInterface::run_script`] does when a line fails.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptErrorPolicy {
@@ -558,6 +652,24 @@ mod tests {
             ctx.executed_command = Some(self.name.clone());
             ctx.executed_commands.push(self.name.clone());
             Ok(())
+        }
+    }
+
+    /// A handler that always fails, recording the attempt first — needed
+    /// to exercise `continue_on_failure`/`requires_success` (DD-026,
+    /// #52 / #56), which only ever activate downstream of a failure.
+    struct FailingHandler {
+        name: String,
+    }
+
+    impl crate::executor::CommandHandler for FailingHandler {
+        fn execute(&self, context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
+            let ctx = crate::context::downcast_mut::<TestContext>(context)
+                .expect("Failed to downcast context");
+            ctx.executed_commands.push(self.name.clone());
+            Err(DynamicCliError::Execution(ExecutionError::CommandFailed(
+                anyhow::anyhow!("{} deliberately failed", self.name),
+            )))
         }
     }
 
@@ -1066,5 +1178,215 @@ mod tests {
         assert_eq!(segments[0].name, "greet");
         assert_eq!(segments[0].parsed.get_scalar("arg0"), Some("Alice"));
         assert_eq!(segments[1].name, "run");
+    }
+
+    // ========================================================================
+    // execute_chain() — continue_on_failure / requires_success (DD-026, #52 / #56)
+    // ========================================================================
+
+    /// Register a zero-arity command with the given chain-policy fields,
+    /// backed by [`FailingHandler`] when `fails` is `true` or
+    /// [`TestHandler`] otherwise.
+    fn register_chain_command(
+        registry: &mut CommandRegistry,
+        name: &str,
+        continue_on_failure: bool,
+        requires_success: bool,
+        fails: bool,
+    ) {
+        let cmd_def = CommandDefinition {
+            name: name.to_string(),
+            aliases: vec![],
+            description: format!("Test command {}", name),
+            required: false,
+            arguments: vec![],
+            options: vec![],
+            implementation: format!("{}_handler", name),
+            continue_on_failure,
+            requires_success,
+        };
+
+        let handler: Box<dyn crate::executor::CommandHandler> = if fails {
+            Box::new(FailingHandler {
+                name: name.to_string(),
+            })
+        } else {
+            Box::new(TestHandler {
+                name: name.to_string(),
+            })
+        };
+
+        registry
+            .register_sync(cmd_def, handler)
+            .expect("Failed to register command");
+    }
+
+    #[test]
+    fn test_execute_chain_continue_on_failure_false_stops_chain() {
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "a", false, false, true); // fails, does not absorb
+        register_chain_command(&mut registry, "b", false, false, false);
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        let args = vec!["a".to_string(), "b".to_string()];
+        let result = cli.dispatch(&args);
+
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Error in command 1/2 ('a')"));
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*cli.context).unwrap();
+        assert_eq!(
+            ctx.executed_commands,
+            vec!["a".to_string()],
+            "'b' must never run once 'a' stops the chain"
+        );
+    }
+
+    #[test]
+    fn test_execute_chain_continue_on_failure_true_proceeds_and_still_errors() {
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "a", true, false, true); // fails, absorbed
+        register_chain_command(&mut registry, "b", false, false, false);
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        let args = vec!["a".to_string(), "b".to_string()];
+        let result = cli.dispatch(&args);
+
+        // The chain still reports Err overall (exit code must not be 0
+        // just because every segment was *attempted*), but it's the
+        // triggering ('a') failure that's reported.
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Error in command 1/2 ('a')"));
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*cli.context).unwrap();
+        assert_eq!(
+            ctx.executed_commands,
+            vec!["a".to_string(), "b".to_string()],
+            "'b' must still run: 'a''s failure was absorbed"
+        );
+    }
+
+    #[test]
+    fn test_execute_chain_requires_success_skips_after_earlier_failure() {
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "a", true, false, true); // fails, absorbed
+        register_chain_command(&mut registry, "b", false, true, false); // requires_success
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        let args = vec!["a".to_string(), "b".to_string()];
+        let result = cli.dispatch(&args);
+
+        assert!(result.is_err());
+        let ctx = crate::context::downcast_ref::<TestContext>(&*cli.context).unwrap();
+        assert_eq!(
+            ctx.executed_commands,
+            vec!["a".to_string()],
+            "'b' must be skipped, not executed, once 'a' has failed"
+        );
+    }
+
+    #[test]
+    fn test_execute_chain_requires_success_runs_normally_without_a_preceding_failure() {
+        // requires_success is moot when nothing earlier in the chain has
+        // failed — the segment runs exactly as if the flag were absent.
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "a", false, false, false); // succeeds
+        register_chain_command(&mut registry, "b", false, true, false); // requires_success, succeeds
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        let args = vec!["a".to_string(), "b".to_string()];
+        cli.dispatch(&args)
+            .expect("no failure anywhere in the chain");
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*cli.context).unwrap();
+        assert_eq!(
+            ctx.executed_commands,
+            vec!["a".to_string(), "b".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_execute_chain_reports_repeated_command_name_by_position_not_name_early() {
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "ok", false, false, false);
+        register_chain_command(&mut registry, "source", true, false, true); // fails, absorbed
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        // "source" fails at position 2 of 4.
+        let args = vec![
+            "ok".to_string(),
+            "source".to_string(),
+            "ok".to_string(),
+            "ok".to_string(),
+        ];
+        let result = cli.dispatch(&args);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("Error in command 2/4 ('source')"));
+        assert!(!message.contains("4/4"));
+    }
+
+    #[test]
+    fn test_execute_chain_reports_repeated_command_name_by_position_not_name_late() {
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "ok", false, false, false);
+        register_chain_command(&mut registry, "source", true, false, true); // fails, absorbed
+        let context = Box::new(TestContext::default());
+        let mut cli = CliInterface::new(registry, context);
+
+        // Same two command names as the previous test, but "source" fails
+        // at position 4 of 4 this time — the message must reflect *this*
+        // position, not collide with or get deduplicated against the
+        // other test's "2/4" message.
+        let args = vec![
+            "ok".to_string(),
+            "ok".to_string(),
+            "ok".to_string(),
+            "source".to_string(),
+        ];
+        let result = cli.dispatch(&args);
+
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(message.contains("Error in command 4/4 ('source')"));
+        assert!(!message.contains("2/4"));
+    }
+
+    #[test]
+    fn test_run_script_chain_failure_reports_chain_position_and_line_number() {
+        // Integration: run_script() itself needs no code change (#56) —
+        // a chain inside a single script line is dispatched through the
+        // same dispatch()/execute_chain() path, and wrap_line_error()
+        // (unchanged) wraps whatever dispatch() returns, so the final
+        // message carries both the line number and the chain position.
+        let mut registry = CommandRegistry::new();
+        register_chain_command(&mut registry, "a", false, false, true); // fails
+        register_chain_command(&mut registry, "b", false, false, false);
+        let context = Box::new(TestContext::default());
+        let cli = CliInterface::new(registry, context);
+
+        let script = write_script("a b\n");
+        let outcome = cli
+            .run_script(script.path(), ScriptErrorPolicy::Continue)
+            .expect("Continue policy should return Ok even with a failing line");
+
+        assert_eq!(outcome.failures.len(), 1);
+        let (line_number, error) = &outcome.failures[0];
+        assert_eq!(*line_number, 1);
+        let message = error.to_string();
+        assert!(message.contains("line 1"));
+        assert!(message.contains("Error in command 1/2 ('a')"));
     }
 }
