@@ -276,8 +276,19 @@ pub struct ReplInterface {
     /// Execution context passed to every command handler.
     context: Box<dyn ExecutionContext>,
 
-    /// Prompt string (e.g., "myapp > ").
+    /// Fully rendered prompt string (e.g., "myapp > "), built at construction
+    /// time from the `prompt` argument and `prompt_suffix` below.
     prompt: String,
+
+    /// Suffix appended after the app-name segment to build both `prompt`
+    /// and the default multi-line continuation prompt (DD-027, #67).
+    ///
+    /// Sourced from `config.metadata.prompt_suffix` when a config is
+    /// supplied, falling back to [`crate::config::schema::default_prompt_suffix`] otherwise —
+    /// stored separately (rather than re-parsed out of `prompt`) so the
+    /// multi-line default stays correct regardless of what the configured
+    /// suffix actually is.
+    prompt_suffix: String,
 
     /// Rustyline editor with tab-completion support.
     editor: Editor<DcliHelper, rustyline::history::DefaultHistory>,
@@ -292,6 +303,16 @@ pub struct ReplInterface {
     /// Help formatter — renders `--help` output.
     /// `None` when the application was built without a formatter.
     help_formatter: Option<Box<dyn HelpFormatter>>,
+
+    /// Base (app-name-equivalent) segment of the continuation prompt shown
+    /// while a `\`-continued command is being accumulated (DD-027, #67).
+    ///
+    /// `None` (the default) means the base falls back to `"..."`. Either
+    /// way, `prompt_suffix` is always appended — this field overrides only
+    /// the segment that replaces the app name, exactly like `prompt`
+    /// (the constructor argument) only ever supplied the app-name segment
+    /// of the main prompt.
+    prompt_multiline: Option<String>,
 }
 
 impl ReplInterface {
@@ -305,9 +326,13 @@ impl ReplInterface {
     ///
     /// * `registry`       — Command registry with all registered commands.
     /// * `context`        — Execution context passed to handlers.
-    /// * `prompt`         — Prompt prefix (e.g., `"myapp"` displays as `"myapp > "`).
-    /// * `config`         — Application configuration for completion and help.
-    ///   Pass `None` to disable both features.
+    /// * `prompt`         — Prompt prefix (e.g., `"myapp"`). The displayed
+    ///   prompt is `prompt` followed by `config.metadata.prompt_suffix`
+    ///   (e.g., `"myapp > "`) when `config` is supplied, or by
+    ///   [`crate::config::schema::default_prompt_suffix`] (`"myapp > "`) otherwise — the suffix is
+    ///   never hardcoded independently of the config.
+    /// * `config`         — Application configuration for completion, help,
+    ///   and the prompt suffix. Pass `None` to disable all three.
     /// * `help_formatter` — Help formatter implementation.
     ///   Pass `None` to use [`DefaultHelpFormatter`] lazily,
     ///   or supply a custom implementation.
@@ -347,6 +372,15 @@ impl ReplInterface {
         // Wrap registry in Arc — shared with the completer.
         let registry = Arc::new(registry);
 
+        // Determine the prompt suffix *before* config is moved into the Arc
+        // below — sourced from the live config when present (config-first,
+        // principle 7), falling back to the same default the schema itself
+        // uses when no config was supplied.
+        let prompt_suffix = config
+            .as_ref()
+            .map(|c| c.metadata.prompt_suffix.clone())
+            .unwrap_or_else(crate::config::schema::default_prompt_suffix);
+
         // Wrap config in Arc if present — shared with the completer.
         let config: Option<Arc<CommandsConfig>> = config.map(Arc::new);
 
@@ -368,16 +402,80 @@ impl ReplInterface {
         let mut repl = Self {
             registry,
             context,
-            prompt: format!("{} > ", prompt),
+            prompt: format!("{}{}", prompt, prompt_suffix),
+            prompt_suffix,
             editor,
             history_path,
             config,
             help_formatter,
+            prompt_multiline: None,
         };
 
         repl.load_history();
 
         Ok(repl)
+    }
+
+    /// Override the base segment of the continuation prompt shown while a
+    /// `\`-continued command is being accumulated (DD-027, #67).
+    ///
+    /// `prompt` here plays the same role as the app-name segment passed to
+    /// [`ReplInterface::new`] for the main prompt: only the base is
+    /// supplied, `prompt_suffix` (from the config, or the default) is
+    /// always appended after it by [`effective_prompt_multiline`][Self::effective_prompt_multiline].
+    /// When this setter is never called, the base defaults to `"..."`.
+    ///
+    /// Purely additive — consuming `self` and returning `Self` like every
+    /// other fluent setter in this crate; no existing `ReplInterface::new()`
+    /// call site changes.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use dynamic_cli::interface::ReplInterface;
+    /// use dynamic_cli::prelude::*;
+    ///
+    /// # #[derive(Default)]
+    /// # struct MyContext;
+    /// # impl ExecutionContext for MyContext {
+    /// #     fn as_any(&self) -> &dyn std::any::Any { self }
+    /// #     fn as_any_mut(&mut self) -> &mut dyn std::any::Any { self }
+    /// # }
+    /// # fn main() -> dynamic_cli::Result<()> {
+    /// let registry = CommandRegistry::new();
+    /// let context = Box::new(MyContext::default());
+    ///
+    /// let repl = ReplInterface::new(registry, context, "rpn".to_string(), None, None)?
+    ///     .with_prompt_multiline("_ _ _".to_string());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn with_prompt_multiline(mut self, prompt: String) -> Self {
+        self.prompt_multiline = Some(prompt);
+        self
+    }
+
+    /// The prompt actually displayed while accumulating a `\`-continued
+    /// command (DD-027, #67).
+    ///
+    /// With an override set via
+    /// [`with_prompt_multiline`][Self::with_prompt_multiline], the base is
+    /// used as-is, followed by `prompt_suffix` unchanged (e.g. base
+    /// `"_ _ _"` + suffix `" $ "` → `"_ _ _ $ "`).
+    ///
+    /// Without an override, the default base `"..."` is followed by
+    /// `prompt_suffix` **with its leading whitespace stripped** — matching
+    /// DD-027's literal example (`"rpn > "` → `"...> "`): `"..."` takes the
+    /// app name's *and* its immediately following space's place, rather
+    /// than merely the app name's, so it reads as one continuous mark
+    /// against the separator glyph instead of leaving a stray gap
+    /// (`"... > "`). This asymmetry is deliberate — an explicit override is
+    /// the caller's own spacing choice and is never second-guessed.
+    fn effective_prompt_multiline(&self) -> String {
+        match &self.prompt_multiline {
+            Some(base) => format!("{}{}", base, self.prompt_suffix),
+            None => format!("...{}", self.prompt_suffix.trim_start()),
+        }
     }
 
     /// Try to handle a `--help` / `-h` request.
@@ -561,11 +659,34 @@ impl ReplInterface {
     /// Run the REPL loop.
     ///
     /// Enters an interactive loop that:
-    /// 1. Displays the prompt
+    /// 1. Displays the prompt (or the continuation prompt while
+    ///    accumulating a `\`-continued command, DD-027/#69)
     /// 2. Reads user input (with tab completion)
     /// 3. Parses and executes the command
     /// 4. Displays results or errors
     /// 5. Repeats until the user exits
+    ///
+    /// # Multi-line option accumulation (DD-027, #69)
+    ///
+    /// A line ending in a trailing `\` is not dispatched: the marker is
+    /// stripped and the fragment is buffered, the prompt switches to
+    /// [`effective_prompt_multiline`][Self::effective_prompt_multiline],
+    /// and another line is read. The first line that does *not* end in `\`
+    /// completes the buffer — every fragment plus this final one are
+    /// joined with a single space and dispatched through
+    /// [`execute_line`][Self::execute_line] exactly once, with the normal
+    /// prompt restored. Only this fully reconstructed line (no `\`
+    /// markers) can ever reach REPL history — `execute_line()` never sees
+    /// a raw partial fragment.
+    ///
+    /// A `Ctrl+C` while accumulating discards the buffer and returns to
+    /// the normal prompt, mirroring the familiar shell convention of
+    /// abandoning a continued line on interrupt.
+    ///
+    /// This mechanism is entirely local to this loop: [`Self::execute_line`],
+    /// [`ReplParser`], and `CliParser` are untouched, and non-interactive
+    /// paths (`run_script()`, `:load`) never go through it — see DD-027's
+    /// abort-by-construction rule for contexts without a live operator.
     ///
     /// # Returns
     ///
@@ -594,12 +715,26 @@ impl ReplInterface {
     /// # }
     /// ```
     pub fn run(mut self) -> Result<()> {
+        let mut continuation_buffer: Vec<String> = Vec::new();
+
         loop {
-            let readline = self.editor.readline(&self.prompt);
+            let prompt = if continuation_buffer.is_empty() {
+                self.prompt.clone()
+            } else {
+                self.effective_prompt_multiline()
+            };
+
+            let readline = self.editor.readline(&prompt);
 
             match readline {
-                Ok(line) => {
-                    let line = line.trim();
+                Ok(raw_line) => {
+                    let line = match Self::accumulate_line(&mut continuation_buffer, &raw_line) {
+                        Some(line) => line,
+                        // Still accumulating: read another line under the
+                        // continuation prompt instead of dispatching.
+                        None => continue,
+                    };
+
                     if line.is_empty() {
                         continue;
                     }
@@ -612,7 +747,7 @@ impl ReplInterface {
                     // Parse and execute command.
                     // History is written inside execute_line(), after successful
                     // parsing and only when no secure argument is present.
-                    match self.execute_line(line) {
+                    match self.execute_line(&line) {
                         Ok(()) => {}
                         Err(e) => {
                             display_error(&e);
@@ -622,6 +757,9 @@ impl ReplInterface {
 
                 Err(ReadlineError::Interrupted) => {
                     println!("^C");
+                    // A continued command doesn't survive an interrupt —
+                    // same as a shell discarding a `\`-continued line.
+                    continuation_buffer.clear();
                     continue;
                 }
 
@@ -639,6 +777,41 @@ impl ReplInterface {
 
         self.save_history();
         Ok(())
+    }
+
+    /// Feed one raw input line into the `\`-continuation buffer (DD-027,
+    /// #69).
+    ///
+    /// Pure and I/O-free by design: [`run`][Self::run] is the only caller,
+    /// but keeping this separate from the `rustyline`-driven loop makes the
+    /// accumulation semantics themselves unit-testable without an
+    /// interactive terminal.
+    ///
+    /// # Returns
+    ///
+    /// - `None` — `raw_line` ended in `\`; the marker was stripped and the
+    ///   fragment pushed onto `buffer`. The caller should read another line
+    ///   under the continuation prompt.
+    /// - `Some(line)` — `raw_line` did not end in `\`, completing the
+    ///   buffer. `buffer` is drained and every fragment (in order) plus
+    ///   `raw_line` are joined with a single space; this is the
+    ///   reconstructed line the caller should dispatch. When `buffer` was
+    ///   already empty, `line` is simply `raw_line.trim()` — the ordinary,
+    ///   non-continued case.
+    fn accumulate_line(buffer: &mut Vec<String>, raw_line: &str) -> Option<String> {
+        let trimmed = raw_line.trim();
+
+        if let Some(fragment) = trimmed.strip_suffix('\\') {
+            buffer.push(fragment.trim_end().to_string());
+            return None;
+        }
+
+        if buffer.is_empty() {
+            return Some(trimmed.to_string());
+        }
+
+        buffer.push(trimmed.to_string());
+        Some(std::mem::take(buffer).join(" "))
     }
 
     /// Execute a single line of input.
@@ -1522,5 +1695,184 @@ mod tests {
         // never silently executed as a chained segment.
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         assert!(ctx.executed_commands.is_empty());
+    }
+
+    // ========================================================================
+    // Prompt suffix bugfix + multi-line continuation prompt (DD-027, #67)
+    // ========================================================================
+
+    #[test]
+    fn test_prompt_uses_default_suffix_without_config() {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let repl = ReplInterface::new(registry, context, "myapp".to_string(), None, None).unwrap();
+
+        // No config supplied: falls back to the schema's own default,
+        // not an independently hardcoded literal.
+        assert_eq!(repl.prompt, "myapp > ");
+    }
+
+    #[test]
+    fn test_prompt_honours_configured_suffix() {
+        // Regression test for the bug where `config.metadata.prompt_suffix`
+        // was silently ignored in favour of a hardcoded " > ".
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut config = make_help_config();
+        config.metadata.prompt_suffix = " $ ".to_string();
+
+        let repl =
+            ReplInterface::new(registry, context, "rpn".to_string(), Some(config), None).unwrap();
+
+        assert_eq!(repl.prompt, "rpn $ ");
+    }
+
+    #[test]
+    fn test_effective_prompt_multiline_default_derivation() {
+        // The exact example from DD-027's closing checklist: default
+        // suffix " > " -> multi-line default "...> ".
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let repl = ReplInterface::new(registry, context, "rpn".to_string(), None, None).unwrap();
+
+        assert_eq!(repl.prompt, "rpn > ");
+        assert_eq!(repl.effective_prompt_multiline(), "...> ");
+    }
+
+    #[test]
+    fn test_effective_prompt_multiline_uses_configured_suffix() {
+        // The multi-line default must track a *custom* suffix too, not just
+        // the " > " default — same bug class as the main prompt. Leading
+        // whitespace of the suffix is still stripped for the default "..."
+        // base, same as the " > " case.
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut config = make_help_config();
+        config.metadata.prompt_suffix = " $ ".to_string();
+
+        let repl =
+            ReplInterface::new(registry, context, "rpn".to_string(), Some(config), None).unwrap();
+
+        assert_eq!(repl.effective_prompt_multiline(), "...$ ");
+    }
+
+    #[test]
+    fn test_with_prompt_multiline_overrides_base_only() {
+        // Overriding only replaces the "..." base — the configured suffix
+        // is still appended automatically.
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut config = make_help_config();
+        config.metadata.prompt_suffix = " $ ".to_string();
+
+        let repl = ReplInterface::new(registry, context, "rpn".to_string(), Some(config), None)
+            .unwrap()
+            .with_prompt_multiline("_ _ _".to_string());
+
+        assert_eq!(repl.effective_prompt_multiline(), "_ _ _ $ ");
+    }
+
+    // ========================================================================
+    // `\`-continuation accumulation logic (DD-027, #69)
+    // ========================================================================
+
+    #[test]
+    fn test_accumulate_line_single_line_no_continuation() {
+        let mut buffer: Vec<String> = Vec::new();
+        let result = ReplInterface::accumulate_line(&mut buffer, "test");
+
+        assert_eq!(result, Some("test".to_string()));
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn test_accumulate_line_trailing_backslash_buffers_and_returns_none() {
+        let mut buffer: Vec<String> = Vec::new();
+        let result = ReplInterface::accumulate_line(&mut buffer, "push \\");
+
+        assert_eq!(result, None);
+        assert_eq!(buffer, vec!["push".to_string()]);
+    }
+
+    #[test]
+    fn test_accumulate_line_multi_fragment_reconstruction() {
+        // Three lines: two continued, one final — mirrors the DD-027
+        // example of a command whose options span several REPL lines.
+        let mut buffer: Vec<String> = Vec::new();
+
+        assert_eq!(
+            ReplInterface::accumulate_line(&mut buffer, "config \\"),
+            None
+        );
+        assert_eq!(
+            ReplInterface::accumulate_line(&mut buffer, "--format model \\"),
+            None
+        );
+        let result = ReplInterface::accumulate_line(&mut buffer, "source=model.yml");
+
+        assert_eq!(
+            result,
+            Some("config --format model source=model.yml".to_string())
+        );
+        // The buffer is drained once the command completes.
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn test_accumulate_line_strips_marker_and_surrounding_whitespace() {
+        // The `\` marker and the whitespace immediately before it are never
+        // part of the reconstructed line — fragments are joined by exactly
+        // one space, not whatever spacing the user typed.
+        let mut buffer: Vec<String> = Vec::new();
+        ReplInterface::accumulate_line(&mut buffer, "test   \\");
+        let result = ReplInterface::accumulate_line(&mut buffer, "  arg");
+
+        assert_eq!(result, Some("test arg".to_string()));
+    }
+
+    #[test]
+    fn test_run_multiline_reconstruction_reaches_execute_line_once() {
+        // Simulates what `run()` does with each `readline()` result,
+        // without needing a real terminal: feed the same raw lines a real
+        // session would produce, dispatch only once the buffer completes,
+        // exactly as `run()` itself does.
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let mut buffer: Vec<String> = Vec::new();
+        assert_eq!(ReplInterface::accumulate_line(&mut buffer, "te \\"), None);
+        let line = ReplInterface::accumulate_line(&mut buffer, "st").unwrap();
+        assert_eq!(line, "te st");
+
+        // "te st" isn't a registered command name — proves the reconstructed
+        // line, not raw fragments, is what actually gets dispatched.
+        let result = repl.execute_line(&line);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_load_line_ending_in_backslash_is_not_continued() {
+        // :load bypasses run()'s accumulation buffer entirely — each script
+        // line goes straight to execute_line(), one at a time. A trailing
+        // `\` in a script has no special meaning there (DD-027 scopes
+        // continuation to the interactive `run()` loop only).
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        let script = write_script("test \\\ntest\n");
+        let line = format!(":load {}", script.path().display());
+
+        // The first line ("test \") is dispatched as-is — "\" is an
+        // unexpected extra positional argument for the zero-arity "test"
+        // command, not silently joined with the next line.
+        assert!(repl.execute_line(&line).is_ok());
+
+        let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
+        // Only the second, unadorned "test" line actually executed.
+        assert_eq!(ctx.executed_commands, vec!["test"]);
     }
 }
