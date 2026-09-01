@@ -70,7 +70,11 @@ pub struct Metadata {
 }
 
 /// Default prompt suffix
-fn default_prompt_suffix() -> String {
+///
+/// `pub(crate)` (not private) so [`crate::interface::ReplInterface::new`] can
+/// reuse the exact same default when constructed without a config — a single
+/// source of truth for the `" > "` literal, rather than duplicating it.
+pub(crate) fn default_prompt_suffix() -> String {
     " > ".to_string()
 }
 
