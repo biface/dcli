@@ -1,7 +1,7 @@
 # Référence de Syntaxe - Fichier de Configuration dynamic-cli
 
 **Version** : 1.0  
-**Dernière mise à jour** : 2026-08-29  
+**Dernière mise à jour** : 2026-09-01  
 **Format** : YAML ou JSON
 
 ---
@@ -12,6 +12,7 @@
 - [Format de fichier](#format-de-fichier)
 - [Structure racine](#structure-racine)
 - [Section metadata](#section-metadata)
+  - [Continuation multi-lignes (REPL)](#continuation-multi-lignes-repl)
 - [Options globales](#options-globales)
 - [Section commands](#section-commands)
 - [Définition de commande](#définition-de-commande)
@@ -116,7 +117,7 @@ Informations au niveau de l'application.
 metadata:
   version: string        # Obligatoire - Version de la configuration
   prompt: string         # Obligatoire - Texte du prompt REPL
-  prompt_suffix: string  # Obligatoire - Suffixe après le prompt (ex : " > ")
+  prompt_suffix: string  # Facultatif - Suffixe après le prompt (défaut : " > ")
 ```
 
 ### Champs
@@ -125,7 +126,7 @@ metadata:
 |-----------------|--------|--------------|------------------------------------------------------------------------|
 | `version`       | string | ✅ Oui        | Version du fichier de configuration (versioning sémantique recommandé) |
 | `prompt`        | string | ✅ Oui        | Texte affiché en mode REPL (ex : "monapp", "rpn")                      |
-| `prompt_suffix` | string | ✅ Oui        | Texte après le prompt (typiquement `" > "` ou `"$ "`)                  |
+| `prompt_suffix` | string | ❌ Non        | Texte après le prompt (défaut : `" > "` ; typiquement `" > "` ou `"$ "`). Depuis la v0.9.0 ([#67](https://github.com/biface/dcli/issues/67)), c'est bien cette valeur que `ReplInterface` affiche réellement — une version antérieure ignorait ce champ et affichait toujours `" > "`. |
 
 ### Exemple
 
@@ -140,6 +141,84 @@ metadata:
 ```
 rpn > _
 ```
+
+### Continuation multi-lignes (REPL)
+
+*Depuis la v0.9.0 ([DD-027](https://github.com/biface/dcli/issues/48)).*
+
+En mode REPL interactif, une ligne se terminant par un `\` n'est pas
+exécutée immédiatement : le marqueur est retiré, la ligne est mise en
+tampon, le prompt bascule sur un prompt de continuation dérivé de
+`prompt`/`prompt_suffix` ci-dessus, et une nouvelle ligne est lue. La
+première ligne qui ne se termine **pas** par `\` complète la commande
+— chaque fragment mis en tampon et cette dernière ligne sont joints
+par un unique espace puis exécutés une seule fois, à l'image de la
+convention Unix classique du shell.
+
+Ceci est indépendant du [Chaînage de commandes](#chaînage-de-commandes)
+(DD-026) : le chaînage enchaîne plusieurs commandes *complètes* en une
+seule invocation ; cette fonctionnalité permet aux *options* d'une
+seule commande de s'étaler sur plusieurs lignes du REPL. Les deux se
+combinent sans se gêner mutuellement.
+
+```
+rpn > push \
+...> 0
+```
+
+- Seul un `\` en fin de ligne déclenche l'accumulation — aucun autre
+  terminateur explicite (ex : `;`) n'est reconnu.
+- La ligne reconstruite (fragments joints par un unique espace,
+  marqueurs `\` retirés) est ce qui atteint l'historique du REPL —
+  jamais un fragment brut partiel.
+- Un `Ctrl+C` pendant l'accumulation vide le tampon et revient au
+  prompt normal, comme l'abandon d'une ligne continuée dans un shell.
+
+**Dérivation du prompt de continuation** : le segment correspondant au
+nom de l'application dans `prompt` est remplacé par `...`, et
+`prompt_suffix` est ajouté après avoir retiré ses espaces de tête —
+pour se lire comme une marque continue accolée au séparateur plutôt
+que de laisser un espace parasite :
+
+| `prompt` | `prompt_suffix` | Prompt principal | Prompt de continuation (défaut) |
+|---|---|---|---|
+| `rpn` | `" > "` (défaut) | `rpn > ` | `...> ` |
+| `rpn` | `" $ "` | `rpn $ ` | `...$ ` |
+
+Le segment de base (`...` ci-dessus) peut être remplacé côté Rust via
+[`CliBuilder::prompt_multiline()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/struct.CliBuilder.html#method.prompt_multiline)
+— il n'existe aucun champ YAML pour cela, car c'est un détail
+d'affichage du REPL interactif, pas une partie du schéma de commandes.
+Une surcharge ne remplace que la base ; `prompt_suffix` reste ajouté,
+mais **sans** retirer ses espaces de tête cette fois — la surcharge
+est le choix d'espacement de l'appelant :
+
+```rust
+CliBuilder::new()
+    .prompt("rpn")
+    .prompt_multiline("_ _ _")
+    // prompt_suffix == " $ " → prompt de continuation : "_ _ _ $ "
+```
+
+**Limitation connue — pas de politique abandon/continuation
+configurable** : une commande signalée comme complète (pas de `\`
+final) mais à qui il manque encore un argument ou une option
+obligatoire échoue immédiatement avec l'erreur exacte
+`MissingArgument`/`MissingOption` d'aujourd'hui — il n'y a pas de
+boucle de re-sollicitation. Délibéré, pas un oubli : le mode CLI en
+une fois (`CliInterface::run()`), `run_script()` et `:load` n'ont
+aucun opérateur en direct à qui redemander, donc ils abandonnent
+toujours sur une commande incomplète ; le REPL garde le même
+comportement d'abandon, pour une parité CLI/REPL. Non planifié pour
+évoluer ; à revoir seulement si un besoin concret se présente.
+
+**Portée** : s'applique uniquement à `ReplInterface::run()` (REPL
+interactif). En mode CLI en une fois, le shell appelant a déjà fusionné
+toute ligne continuée par `\` avant que `dynamic-cli` ne voie son
+`argv` — rien à implémenter dans ce cas. `run_script()` et la
+méta-commande `:load` du REPL ne sont **pas** concernés : chaque ligne
+est exécutée indépendamment, et un `\` en fin de ligne de script est
+lu comme n'importe quel autre jeton.
 
 ---
 
