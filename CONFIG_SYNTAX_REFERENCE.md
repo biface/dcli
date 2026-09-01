@@ -1,7 +1,7 @@
 # Configuration File Syntax Reference - dynamic-cli
 
 **Version**: 1.0  
-**Last Updated**: 2026-08-29  
+**Last Updated**: 2026-09-01  
 **Format**: YAML or JSON
 
 ---
@@ -12,6 +12,7 @@
 - [File Format](#file-format)
 - [Root Structure](#root-structure)
 - [Metadata Section](#metadata-section)
+  - [Multi-line Continuation (REPL)](#multi-line-continuation-repl)
 - [Global Options](#global-options)
 - [Commands Section](#commands-section)
 - [Command Definition](#command-definition)
@@ -116,7 +117,7 @@ Application-level information.
 metadata:
   version: string        # Required - Configuration version
   prompt: string         # Required - REPL prompt text
-  prompt_suffix: string  # Required - Suffix after prompt (e.g., " > ")
+  prompt_suffix: string  # Optional - Suffix after prompt (default: " > ")
 ```
 
 ### Fields
@@ -125,7 +126,7 @@ metadata:
 |-----------------|--------|-----------|--------------------------------------------------------------|
 | `version`       | string | ✅ Yes     | Configuration file version (semantic versioning recommended) |
 | `prompt`        | string | ✅ Yes     | Text displayed in REPL mode (e.g., "myapp", "rpn")           |
-| `prompt_suffix` | string | ✅ Yes     | Text after prompt (typically `" > "` or `"$ "`)              |
+| `prompt_suffix` | string | ❌ No      | Text after prompt (default: `" > "`; typically `" > "` or `"$ "`). Since v0.9.0 ([#67](https://github.com/biface/dcli/issues/67)), this value is what `ReplInterface` actually renders — an earlier version hardcoded `" > "` regardless of this field. |
 
 ### Example
 
@@ -140,6 +141,80 @@ metadata:
 ```
 rpn > _
 ```
+
+### Multi-line Continuation (REPL)
+
+*Since v0.9.0 ([DD-027](https://github.com/biface/dcli/issues/48)).*
+
+In interactive REPL mode, a line ending in a trailing `\` is not
+dispatched immediately: the marker is stripped, the line is buffered,
+the prompt switches to a distinct continuation prompt derived from
+`prompt`/`prompt_suffix` above, and another line is read. The first
+line that does **not** end in `\` completes the command — every
+buffered fragment plus this final line are joined with a single space
+and dispatched exactly once, mirroring the familiar Unix shell
+convention.
+
+This is independent of [Command Chaining](#command-chaining) (DD-026):
+chaining sequences several *complete* commands in one invocation; this
+feature lets a single command's *options* span several REPL input
+lines. The two compose without special-casing each other.
+
+```
+rpn > push \
+...> 0
+```
+
+- Only a trailing `\` triggers accumulation — no alternative explicit
+  terminator (e.g. `;`) is recognized.
+- The reconstructed line (fragments joined by a single space, `\`
+  markers removed) is what reaches REPL history — never a raw partial
+  fragment.
+- `Ctrl+C` while accumulating discards the buffer and returns to the
+  normal prompt, the same as abandoning a continued line in a shell.
+
+**Continuation prompt derivation**: the app-name segment of `prompt`
+is replaced with `...`, and `prompt_suffix` is appended with its
+leading whitespace stripped — so it reads as one continuous mark
+against the separator rather than leaving a stray gap:
+
+| `prompt` | `prompt_suffix` | Main prompt | Continuation prompt (default) |
+|---|---|---|---|
+| `rpn` | `" > "` (default) | `rpn > ` | `...> ` |
+| `rpn` | `" $ "` | `rpn $ ` | `...$ ` |
+
+The base segment (`...` above) can be overridden from Rust via
+[`CliBuilder::prompt_multiline()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/struct.CliBuilder.html#method.prompt_multiline)
+— there is no YAML field for it, since it is a display detail of the
+interactive REPL rather than part of the command schema. An override
+replaces only the base; `prompt_suffix` is still appended, **without**
+stripping its leading whitespace this time — the override is the
+caller's own spacing choice:
+
+```rust
+CliBuilder::new()
+    .prompt("rpn")
+    .prompt_multiline("_ _ _")
+    // prompt_suffix == " $ " → continuation prompt: "_ _ _ $ "
+```
+
+**Known constraint — no configurable abort/continue policy**: a
+command signalled complete (no trailing `\`) but still missing a
+required argument or option fails immediately with today's exact
+`MissingArgument`/`MissingOption` error — there is no re-prompt loop.
+Deliberate, not an oversight: CLI one-shot mode
+(`CliInterface::run()`), `run_script()`, and `:load` have no live
+operator to re-prompt, so they always abort on an incomplete command;
+the REPL keeps the same abort behaviour for CLI/REPL parity. Not
+scheduled to change; revisit only if a concrete need appears.
+
+**Scope**: applies only to `ReplInterface::run()` (interactive REPL).
+In CLI one-shot mode, the invoking shell has already collapsed any
+`\`-continued line before `dynamic-cli` ever sees its `argv` — nothing
+to implement there. `run_script()` and the REPL's `:load`
+meta-command are **not** affected: each line is dispatched
+independently, and a trailing `\` in a script line is read like any
+other token.
 
 ---
 
