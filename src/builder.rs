@@ -113,6 +113,11 @@ pub struct CliBuilder {
     /// REPL prompt (if None, will use config default or "cli")
     prompt: Option<String>,
 
+    /// Base override for the REPL's `\`-continuation prompt (DD-027, #68).
+    /// Forwarded verbatim to [`ReplInterface::with_prompt_multiline`] when
+    /// set; `None` keeps the "..." default. No effect in CLI one-shot mode.
+    prompt_multiline: Option<String>,
+
     /// Custom help formatter. None = DefaultHelpFormatter used lazily.
     help_formatter: Option<Box<dyn HelpFormatter>>,
 }
@@ -136,6 +141,7 @@ impl CliBuilder {
             async_handlers: HashMap::new(),
             plugins: Vec::new(),
             prompt: None,
+            prompt_multiline: None,
             help_formatter: None,
         }
     }
@@ -430,6 +436,37 @@ impl CliBuilder {
         self
     }
 
+    /// Override the base segment of the REPL's `\`-continuation prompt
+    /// (DD-027, #68).
+    ///
+    /// Only used in REPL mode — no effect on `CliInterface::run()` (CLI
+    /// one-shot) or `run_script()`/`:load`, which never accumulate
+    /// `\`-continued input (DD-027's abort-by-construction rule for
+    /// contexts without a live operator). Mirrors
+    /// [`ReplInterface::with_prompt_multiline`], to which the value is
+    /// forwarded verbatim at `build()`/`run()` time — see that method for
+    /// exactly how the suffix is appended. If not called, the base defaults
+    /// to `"..."`.
+    ///
+    /// # Arguments
+    ///
+    /// * `prompt` - Base segment (e.g., `"_ _ _"`), not the full prompt —
+    ///   the configured `prompt_suffix` is always appended after it.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::CliBuilder;
+    ///
+    /// let builder = CliBuilder::new()
+    ///     .prompt("rpn")
+    ///     .prompt_multiline("_ _ _");
+    /// ```
+    pub fn prompt_multiline(mut self, prompt: impl Into<String>) -> Self {
+        self.prompt_multiline = Some(prompt.into());
+        self
+    }
+
     /// Set a custom help formatter.
     ///
     /// By default, [`DefaultHelpFormatter`] is used lazily when `--help` is
@@ -626,6 +663,7 @@ impl CliBuilder {
             registry,
             context,
             prompt,
+            prompt_multiline: self.prompt_multiline,
             config,
             help_formatter: self.help_formatter,
         })
@@ -682,6 +720,11 @@ pub struct CliApp {
     /// REPL prompt
     prompt: String,
 
+    /// Base override for the REPL's `\`-continuation prompt (DD-027, #68).
+    /// Forwarded to `ReplInterface::with_prompt_multiline` in `run_repl()`
+    /// when set. Unused outside REPL mode.
+    prompt_multiline: Option<String>,
+
     /// Full configuration - needed by the help formatter
     config: CommandsConfig,
 
@@ -693,6 +736,7 @@ impl std::fmt::Debug for CliApp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CliApp")
             .field("prompt", &self.prompt)
+            .field("prompt_multiline", &self.prompt_multiline)
             .field("registry", &"<CommandRegistry>")
             .field("context", &"<ExecutionContext>")
             .field("help_formatter", &"<Option<Box<dyn HelpFormatter>>>")
@@ -838,14 +882,19 @@ impl CliApp {
     /// # }
     /// ```
     pub fn run_repl(self) -> Result<()> {
-        ReplInterface::new(
+        let mut repl = ReplInterface::new(
             self.registry,
             self.context,
             self.prompt,
             Some(self.config),
             self.help_formatter,
-        )?
-        .run()
+        )?;
+
+        if let Some(prompt_multiline) = self.prompt_multiline {
+            repl = repl.with_prompt_multiline(prompt_multiline);
+        }
+
+        repl.run()
     }
 
     /// Run with automatic mode detection
@@ -1033,6 +1082,23 @@ mod tests {
     }
 
     #[test]
+    fn test_builder_with_prompt_multiline() {
+        let builder = CliBuilder::new().prompt("rpn").prompt_multiline("_ _ _");
+
+        assert_eq!(builder.prompt_multiline, Some("_ _ _".to_string()));
+    }
+
+    #[test]
+    fn test_builder_without_prompt_multiline_defaults_to_none() {
+        // No-op when never called — CliApp/ReplInterface fall back to the
+        // "..." default (DD-027, #67), no breaking change for existing
+        // callers of CliBuilder that never set this.
+        let builder = CliBuilder::new().prompt("myapp");
+
+        assert_eq!(builder.prompt_multiline, None);
+    }
+
+    #[test]
     fn test_builder_build_success() {
         let config = create_test_config();
         let context = Box::new(TestContext::default());
@@ -1172,6 +1238,45 @@ mod tests {
 
         // Prompt should be overridden
         assert_eq!(app.prompt, "custom");
+    }
+
+    #[test]
+    fn test_builder_build_forwards_prompt_multiline_to_app() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_sync_handler("test_handler", handler)
+            .prompt("custom")
+            .prompt_multiline("_ _ _")
+            .build()
+            .unwrap();
+
+        assert_eq!(app.prompt_multiline, Some("_ _ _".to_string()));
+    }
+
+    #[test]
+    fn test_builder_build_without_prompt_multiline_leaves_app_none() {
+        let config = create_test_config();
+        let context = Box::new(TestContext::default());
+        let handler = Box::new(TestHandler {
+            name: "test".to_string(),
+        });
+
+        let app = CliBuilder::new()
+            .config(config)
+            .context(context)
+            .register_sync_handler("test_handler", handler)
+            .prompt("custom")
+            .build()
+            .unwrap();
+
+        assert_eq!(app.prompt_multiline, None);
     }
 
     // ============================================================================
