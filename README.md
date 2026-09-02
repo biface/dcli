@@ -20,6 +20,8 @@ A powerful Rust framework for creating configurable CLI and REPL applications vi
 - **📝 Configuration-Driven** : Define commands, arguments and options in YAML/JSON
 - **🔄 CLI, REPL & Batch Modes** : Command-line, interactive, and scripted batch execution
 - **🔗 Command Chaining** : Chain multiple commands in one invocation, with per-command `continue_on_failure` / `requires_success` policy
+- **⌨️ Multi-line REPL Input** : End a line with `\` to continue a command across several REPL lines, shell-style
+- **🛡️ Handler/Config Consistency Checks** : Handlers can declare their `continue_on_failure` expectation, checked at registration time
 - **✅ Automatic Validation** : Built-in type checking and constraint validation
 - **🎨 Rich Error Messages** : Colorful and informative messages with suggestions
 - **🔌 Plugin System** : Granular static plugins (help, version, exit, sysinfo, env, config —
@@ -38,14 +40,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.8.0"
+dynamic-cli = "0.9.0"
 
 # Optional — sandboxed WASM plugins (see Plugin System below)
-# dynamic-cli = { version = "0.8.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.9.0", features = ["wasm-plugins"] }
 ```
 
-> **Upgrading from 0.7.x?** Cargo treats a `0.x` minor bump as a
-> semver-incompatible change, so `cargo update` alone won't pull `0.8.0`
+> **Upgrading from 0.8.x?** Cargo treats a `0.x` minor bump as a
+> semver-incompatible change, so `cargo update` alone won't pull `0.9.0`
 > in — bump the version requirement explicitly. This release is fully
 > additive (see [`CHANGELOG.md`](CHANGELOG.md)); no code changes are
 > required on your side.
@@ -152,6 +154,16 @@ Available commands:
 myapp > exit
 ```
 
+**Multi-line commands in REPL** (v0.9.0+) — end a line with `\` to
+continue a command onto the next line, shell-style; the continuation
+prompt (`...` by default) is derived from your app's own prompt:
+
+```bash
+myapp > greet Bob \
+...> --loud
+HELLO, BOB!
+```
+
 **Command chaining** (v0.8.0+) — chain more than one command in a single
 invocation, no separator needed: once a command's arguments are
 exhausted, the next recognized command name starts the next one.
@@ -161,6 +173,10 @@ $ myapp configure model.yml configure scenario.yml solve
 # "configure" runs twice, then "solve" — see CONFIG_SYNTAX_REFERENCE.md
 # for the continue_on_failure / requires_success failure policy
 ```
+
+Handlers can declare their own expectation about `continue_on_failure`
+via `expected_fault_tolerance()` (v0.9.0+) — a mismatch with the YAML
+config is caught at startup, not at first use in a chain.
 
 **Batch mode** — run a whole file of commands, one per line (blank lines and
 `#`-prefixed comments are skipped):

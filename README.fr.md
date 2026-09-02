@@ -19,6 +19,8 @@ Un framework Rust puissant pour créer des applications CLI et REPL configurable
 - **📝 Piloté par Configuration** : Définissez commandes, arguments et options en YAML/JSON
 - **🔄 Modes CLI, REPL & Lots** : Ligne de commande, interactif, et exécution scriptée par lots
 - **🔗 Chaînage de commandes** : Chaînez plusieurs commandes en une seule invocation, avec une politique `continue_on_failure` / `requires_success` par commande
+- **⌨️ Saisie multi-lignes en REPL** : Terminez une ligne par `\` pour continuer une commande sur plusieurs lignes REPL, à la manière d'un shell
+- **🛡️ Contrôles de cohérence handler/config** : Les handlers peuvent déclarer leur attente sur `continue_on_failure`, vérifiée à l'enregistrement
 - **✅ Validation Automatique** : Vérification de type et validation de contraintes intégrées
 - **🎨 Messages d'Erreur Riches** : Messages colorés et informatifs avec suggestions
 - **🔌 Système de Plugins** : Plugins statiques granulaires (help, version, exit, sysinfo, env,
@@ -37,15 +39,15 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.8.0"
+dynamic-cli = "0.9.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.8.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.9.0", features = ["wasm-plugins"] }
 ```
 
-> **Mise à jour depuis 0.7.x ?** Cargo considère un bump mineur en `0.x`
+> **Mise à jour depuis 0.8.x ?** Cargo considère un bump mineur en `0.x`
 > comme un changement incompatible au sens du semver, donc `cargo update`
-> seul ne récupérera pas `0.8.0` — augmentez explicitement la contrainte
+> seul ne récupérera pas `0.9.0` — augmentez explicitement la contrainte
 > de version. Cette release est entièrement additive (voir
 > [`CHANGELOG.md`](CHANGELOG.md)) ; aucune modification de code n'est
 > nécessaire de votre côté.
@@ -153,6 +155,17 @@ Commandes disponibles :
 monapp > exit
 ```
 
+**Commandes multi-lignes en REPL** (v0.9.0+) — terminez une ligne par
+`\` pour continuer une commande sur la ligne suivante, à la manière
+d'un shell ; le prompt de continuation (`...` par défaut) dérive du
+prompt de votre application :
+
+```bash
+monapp > saluer Bob \
+...> --fort
+BONJOUR, BOB !
+```
+
 **Chaînage de commandes** (v0.8.0+) — chaînez plusieurs commandes en une
 seule invocation, sans séparateur : une fois les arguments d'une commande
 épuisés, le prochain nom de commande reconnu démarre la commande
@@ -164,6 +177,11 @@ $ monapp configurer modele.yml configurer scenario.yml resoudre
 # CONFIG_SYNTAX_REFERENCE.fr.md pour la politique d'échec
 # continue_on_failure / requires_success
 ```
+
+Un handler peut déclarer sa propre attente sur `continue_on_failure`
+via `expected_fault_tolerance()` (v0.9.0+) — une contradiction avec la
+configuration YAML est détectée au démarrage, pas au premier usage
+dans une chaîne.
 
 **Mode lot** — exécutez tout un fichier de commandes, une par ligne (les
 lignes vides et les commentaires préfixés par `#` sont ignorés) :

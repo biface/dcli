@@ -21,6 +21,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.0] "Checks and Balances" - 2026-09-02
+
+**Theme**: Framework Hardening — REPL multi-line continuation & handler/config consistency
+**Decisions**: [DD-027](https://github.com/biface/dcli/issues/48), [DD-028](https://github.com/biface/dcli/issues/64)
+
+### Added
+
+#### REPL multi-line option accumulation (DD-027)
+- **Trailing-`\` continuation in `ReplInterface::run()`** (#69): a line
+  ending in `\` is buffered instead of dispatched; the first line
+  without a trailing `\` completes the command, and every fragment
+  (markers stripped) is joined with a single space and dispatched
+  exactly once — mirroring the familiar Unix shell convention.
+  `Ctrl+C` while accumulating discards the buffer. Implemented as a
+  pure, unit-tested `accumulate_line()` helper, decoupled from
+  `rustyline` so the accumulation logic itself is testable without an
+  interactive terminal.
+- **`ReplInterface::with_prompt_multiline()` / `CliBuilder::prompt_multiline()`**
+  (#67, #68, both additive fluent setters, mirroring the
+  `help_formatter()` precedent from DD-010): override the base segment
+  of the continuation prompt shown while accumulating. The default
+  base is `"..."`, always followed by the configured `prompt_suffix`;
+  an explicit override replaces only the base.
+- `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md` (#70): new "Multi-line
+  Continuation (REPL)" subsection under Metadata Section, covering the
+  mechanism, the continuation-prompt derivation, and the deliberate
+  no-configurable abort/continue policy (CLI/REPL parity).
+
+#### Registration-time fault-tolerance consistency check (DD-028)
+- **`CommandHandler::expected_fault_tolerance()` /
+  `AsyncCommandHandler::expected_fault_tolerance()`** (#71, both
+  additive, default `None`): lets a handler author declare an
+  expectation about the command's `continue_on_failure` (DD-026).
+  Declared directly on each trait rather than via a shared supertrait
+  — see Fixed below.
+- **`RegistryError::FaultToleranceMismatch`** (#72):
+  `CommandRegistry::register_sync`/`register_async` reject
+  registration when a handler's declared expectation contradicts the
+  command's configured `continue_on_failure`, catching a
+  misconfiguration at startup instead of at first use in a chain. A
+  handler that never overrides the default (`None`) is entirely
+  unaffected.
+- `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md` (#73): new "Handler-Side
+  Consistency Check" subsection under Command Definition / Command
+  Chaining.
+
+### Fixed
+
+- **`ReplInterface` now honours `config.metadata.prompt_suffix`**
+  (found during #67): the REPL prompt was hardcoded to `" > "`
+  regardless of the configured suffix — a live YAML change to
+  `prompt_suffix` had no effect on the running application. Now
+  sourced from the config, falling back to the schema's own default
+  when no config is supplied.
+
+### Documentation
+
+- `DESIGN_DECISIONS.md`: DD-028's originally-drafted `FaultToleranceHint`
+  shared supertrait is corrected in place, with the reasoning kept
+  visible as a dated note rather than silently rewritten — a new
+  supertrait bound on `CommandHandler`/`AsyncCommandHandler` would have
+  broken every existing implementor despite being described as
+  additive. Shipped instead as a directly-declared default method on
+  each trait, mirroring the precedent set by `validate()` (DD-022).
+- `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md`: the REPL prompt fields
+  (`prompt`/`prompt_suffix`) and the `continue_on_failure`/
+  `requires_success` command-chaining fields are now each documented
+  as a single topic at their point of definition (Metadata Section,
+  Command Definition) rather than split across a distant section.
+
+### Notes
+
+No breaking changes in this release.
+
+---
+
 ## [0.8.0] "Chain Reaction" - 2026-08-29
 
 **Theme**: CLI: repeatable commands — Multi-Command Chaining
