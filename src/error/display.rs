@@ -315,6 +315,7 @@ fn format_registry_error(output: &mut String, error: &RegistryError) {
         RegistryError::DuplicateRegistration { suggestion, .. } => suggestion.as_deref(),
         RegistryError::DuplicateAlias { suggestion, .. } => suggestion.as_deref(),
         RegistryError::MissingHandler { suggestion, .. } => suggestion.as_deref(),
+        RegistryError::FaultToleranceMismatch { suggestion, .. } => suggestion.as_deref(),
     };
 
     append_suggestion(output, suggestion);
@@ -806,6 +807,16 @@ mod tests {
         let formatted = format_error(&error);
         assert!(formatted.contains("run"));
         assert!(formatted.contains("Choose a different alias."));
+    }
+
+    #[test]
+    fn test_format_registry_fault_tolerance_mismatch_with_suggestion() {
+        let error: DynamicCliError =
+            RegistryError::fault_tolerance_mismatch("solve", false, true).into();
+
+        let formatted = format_error(&error);
+        assert!(formatted.contains("solve"));
+        assert!(formatted.contains("continue_on_failure: false"));
     }
 
     // ── WasmError ────────────────────────────────────────────

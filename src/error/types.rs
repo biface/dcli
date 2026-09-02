@@ -799,6 +799,46 @@ pub enum RegistryError {
         /// Actionable hint surfaced to the user (not part of the Display string)
         suggestion: Option<String>,
     },
+
+    /// A handler's declared `expected_fault_tolerance()` (DD-028)
+    /// contradicts the command's configured `continue_on_failure` (DD-026)
+    ///
+    /// Raised by `CommandRegistry::register_sync`/`register_async` when the
+    /// handler expresses an opinion (`Some(bool)`) that disagrees with the
+    /// YAML value — catching a misconfiguration at startup rather than at
+    /// first use in a chain. Never raised when the handler expresses no
+    /// opinion (`None`, the default).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::RegistryError;
+    ///
+    /// let error = RegistryError::FaultToleranceMismatch {
+    ///     command: "solve".to_string(),
+    ///     expected: false,
+    ///     configured: true,
+    ///     suggestion: Some(
+    ///         "set `continue_on_failure: false` for command 'solve' in the \
+    ///          YAML config, matching what its handler expects".to_string()
+    ///     ),
+    /// };
+    /// let msg = format!("{}", error);
+    /// assert!(msg.contains("solve"));
+    /// ```
+    #[error(
+        "Command '{command}' declares expected_fault_tolerance() = {expected}, \
+         but is configured with continue_on_failure: {configured}"
+    )]
+    FaultToleranceMismatch {
+        command: String,
+        /// What the handler's `expected_fault_tolerance()` returned (`Some` side)
+        expected: bool,
+        /// What `CommandDefinition::continue_on_failure` is actually set to
+        configured: bool,
+        /// Actionable hint surfaced to the user (not part of the Display string)
+        suggestion: Option<String>,
+    },
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1188,6 +1228,39 @@ impl RegistryError {
             )),
         }
     }
+
+    /// Create a fault-tolerance-mismatch error with an actionable suggestion
+    /// (DD-028)
+    ///
+    /// `expected` is what the handler's `expected_fault_tolerance()`
+    /// returned; `configured` is the command's actual
+    /// `CommandDefinition::continue_on_failure`. The suggestion tells the
+    /// user exactly which YAML value to change to resolve the contradiction.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::RegistryError;
+    ///
+    /// let error = RegistryError::fault_tolerance_mismatch("solve", false, true);
+    /// match error {
+    ///     RegistryError::FaultToleranceMismatch { suggestion, .. } => {
+    ///         assert!(suggestion.as_deref().unwrap_or("").contains("continue_on_failure: false"));
+    ///     }
+    ///     _ => panic!("wrong variant"),
+    /// }
+    /// ```
+    pub fn fault_tolerance_mismatch(command: &str, expected: bool, configured: bool) -> Self {
+        Self::FaultToleranceMismatch {
+            command: command.to_string(),
+            expected,
+            configured,
+            suggestion: Some(format!(
+                "set `continue_on_failure: {expected}` for command '{command}' in the \
+                 YAML config, matching what its handler expects"
+            )),
+        }
+    }
 }
 
 #[cfg(feature = "wasm-plugins")]
@@ -1574,6 +1647,41 @@ mod tests {
         let msg = format!("{}", error);
         assert!(msg.contains("run"));
         assert!(!msg.contains("Choose")); // suggestion separate from Display
+    }
+
+    #[test]
+    fn test_registry_fault_tolerance_mismatch_helper_interpolates_command() {
+        let error = RegistryError::fault_tolerance_mismatch("solve", false, true);
+        match error {
+            RegistryError::FaultToleranceMismatch {
+                command,
+                expected,
+                configured,
+                suggestion,
+            } => {
+                assert_eq!(command, "solve");
+                assert!(!expected);
+                assert!(configured);
+                let s = suggestion.unwrap();
+                assert!(s.contains("solve"));
+                assert!(s.contains("continue_on_failure: false"));
+            }
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn test_registry_fault_tolerance_mismatch_display() {
+        let error = RegistryError::FaultToleranceMismatch {
+            command: "solve".to_string(),
+            expected: false,
+            configured: true,
+            suggestion: None,
+        };
+        let msg = format!("{}", error);
+        assert!(msg.contains("solve"));
+        assert!(msg.contains("false"));
+        assert!(msg.contains("true"));
     }
 
     // ── WasmError ────────────────────────────────────────────

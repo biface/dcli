@@ -196,6 +196,36 @@ impl CommandRegistry {
         }
     }
 
+    /// Checks a handler's declared [`expected_fault_tolerance()`][ceft]
+    /// against `definition.continue_on_failure` (DD-028).
+    ///
+    /// Called by both `register_sync` and `register_async` after
+    /// `check_name_available` has confirmed there is no conflict, and
+    /// before the definition/handler pair is actually stored. Does nothing
+    /// when the handler expresses no opinion (`None`, the default) —
+    /// existing handlers that never heard of DD-028 are entirely
+    /// unaffected.
+    ///
+    /// [ceft]: crate::executor::CommandHandler::expected_fault_tolerance
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryError::FaultToleranceMismatch`] if the handler declared
+    /// `Some(expected)` and `expected != definition.continue_on_failure`.
+    fn check_fault_tolerance(definition: &CommandDefinition, expected: Option<bool>) -> Result<()> {
+        if let Some(expected) = expected {
+            if expected != definition.continue_on_failure {
+                return Err(RegistryError::fault_tolerance_mismatch(
+                    &definition.name,
+                    expected,
+                    definition.continue_on_failure,
+                )
+                .into());
+            }
+        }
+        Ok(())
+    }
+
     /// Register a command with its (sync) handler
     ///
     /// This method registers a command definition along with its handler.
@@ -216,11 +246,16 @@ impl CommandRegistry {
     /// - `Err(RegistryError)` if:
     ///   - A command with the same name is already registered (sync or async)
     ///   - An alias conflicts with an existing command or alias
+    ///   - The handler's declared `expected_fault_tolerance()` (DD-028)
+    ///     contradicts `definition.continue_on_failure`
     ///
     /// # Errors
     ///
     /// - [`RegistryError::DuplicateRegistration`] if the command name already exists
     /// - [`RegistryError::DuplicateAlias`] if an alias is already in use
+    /// - [`RegistryError::FaultToleranceMismatch`] if the handler's
+    ///   [`expected_fault_tolerance()`][crate::executor::CommandHandler::expected_fault_tolerance]
+    ///   disagrees with `definition.continue_on_failure` (DD-028)
     ///
     /// # Example
     ///
@@ -271,6 +306,7 @@ impl CommandRegistry {
         for alias in &definition.aliases {
             self.check_name_available(alias)?;
         }
+        Self::check_fault_tolerance(&definition, handler.expected_fault_tolerance())?;
         self.insert_aliases(definition.clone());
         self.commands.insert(
             definition.name.clone(),
@@ -308,6 +344,9 @@ impl CommandRegistry {
     ///
     /// - [`RegistryError::DuplicateRegistration`] if the command name already exists
     /// - [`RegistryError::DuplicateAlias`] if an alias is already in use
+    /// - [`RegistryError::FaultToleranceMismatch`] if the handler's
+    ///   [`expected_fault_tolerance()`][crate::executor::AsyncCommandHandler::expected_fault_tolerance]
+    ///   disagrees with `definition.continue_on_failure` (DD-028)
     ///
     /// # Example
     ///
@@ -356,6 +395,7 @@ impl CommandRegistry {
         for alias in &definition.aliases {
             self.check_name_available(alias)?;
         }
+        Self::check_fault_tolerance(&definition, handler.expected_fault_tolerance())?;
         self.insert_aliases(definition.clone());
         self.commands.insert(
             definition.name.clone(),
@@ -1344,5 +1384,146 @@ mod tests {
         assert!(registry.get_handler_async("fetch").is_some());
         assert!(registry.get_handler_sync("fetch").is_none());
         assert!(registry.get_handler_async("simulate").is_none());
+    }
+
+    // ========================================================================
+    // Fault-tolerance consistency check (DD-028, #72)
+    // ========================================================================
+
+    /// Declares its failures must never be silently continued past.
+    struct FaultIntolerantHandler;
+
+    impl CommandHandler for FaultIntolerantHandler {
+        fn execute(
+            &self,
+            _context: &mut dyn crate::context::ExecutionContext,
+            _args: &ParsedArgs,
+        ) -> crate::error::Result<()> {
+            Ok(())
+        }
+
+        fn expected_fault_tolerance(&self) -> Option<bool> {
+            Some(false)
+        }
+    }
+
+    /// Async mirror of [`FaultIntolerantHandler`].
+    struct AsyncFaultIntolerantHandler;
+
+    #[async_trait::async_trait]
+    impl AsyncCommandHandler for AsyncFaultIntolerantHandler {
+        async fn execute(
+            &self,
+            _context: &mut dyn crate::context::ExecutionContext,
+            _args: &ParsedArgs,
+        ) -> crate::error::Result<()> {
+            Ok(())
+        }
+
+        fn expected_fault_tolerance(&self) -> Option<bool> {
+            Some(false)
+        }
+    }
+
+    #[test]
+    fn test_register_sync_accepts_handler_with_no_opinion() {
+        // TestHandler never overrides expected_fault_tolerance() — the
+        // overwhelmingly common case, and it must keep working exactly as
+        // before DD-028, regardless of the configured continue_on_failure.
+        let mut registry = CommandRegistry::new();
+        let mut definition = create_test_definition("test", vec![]);
+        definition.continue_on_failure = true;
+
+        let result = registry.register_sync(definition, Box::new(TestHandler));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_register_sync_accepts_matching_expectation() {
+        let mut registry = CommandRegistry::new();
+        let mut definition = create_test_definition("solve", vec![]);
+        definition.continue_on_failure = false; // matches the handler's Some(false)
+
+        let result = registry.register_sync(definition, Box::new(FaultIntolerantHandler));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_register_sync_rejects_contradicting_expectation() {
+        let mut registry = CommandRegistry::new();
+        let mut definition = create_test_definition("solve", vec![]);
+        definition.continue_on_failure = true; // contradicts the handler's Some(false)
+
+        let result = registry.register_sync(definition, Box::new(FaultIntolerantHandler));
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Registry(RegistryError::FaultToleranceMismatch {
+                command,
+                expected,
+                configured,
+                ..
+            }) => {
+                assert_eq!(command, "solve");
+                assert!(!expected);
+                assert!(configured);
+            }
+            other => panic!("wrong error variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_register_sync_rejected_handler_is_not_stored() {
+        // A rejected registration must not leave a partial trace — the
+        // command should be registrable again with a corrected definition.
+        let mut registry = CommandRegistry::new();
+        let mut bad_definition = create_test_definition("solve", vec![]);
+        bad_definition.continue_on_failure = true;
+
+        assert!(registry
+            .register_sync(bad_definition, Box::new(FaultIntolerantHandler))
+            .is_err());
+        assert!(!registry.contains("solve"));
+        assert_eq!(registry.len(), 0);
+
+        let mut good_definition = create_test_definition("solve", vec![]);
+        good_definition.continue_on_failure = false;
+        assert!(registry
+            .register_sync(good_definition, Box::new(FaultIntolerantHandler))
+            .is_ok());
+        assert!(registry.contains("solve"));
+    }
+
+    #[test]
+    fn test_register_async_accepts_handler_with_no_opinion() {
+        let mut registry = CommandRegistry::new();
+        let mut definition = create_test_definition("fetch", vec![]);
+        definition.continue_on_failure = true;
+
+        let result = registry.register_async(definition, Box::new(TestAsyncHandler));
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_register_async_rejects_contradicting_expectation() {
+        let mut registry = CommandRegistry::new();
+        let mut definition = create_test_definition("solve", vec![]);
+        definition.continue_on_failure = true; // contradicts the handler's Some(false)
+
+        let result = registry.register_async(definition, Box::new(AsyncFaultIntolerantHandler));
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::DynamicCliError::Registry(RegistryError::FaultToleranceMismatch {
+                command,
+                ..
+            }) => {
+                assert_eq!(command, "solve");
+            }
+            other => panic!("wrong error variant: {other:?}"),
+        }
     }
 }
