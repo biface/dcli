@@ -80,6 +80,9 @@ use async_trait::async_trait;
 ///
 /// # Execution Flow
 ///
+/// 0. `expected_fault_tolerance()` is checked once, at registration time
+///    (DD-028) — before any of the steps below, and before this handler
+///    ever sees a command line.
 /// 1. Parser converts user input to [`crate::parser::ParsedArgs`]
 /// 2. Validator checks argument constraints
 /// 3. `validate()` is called for custom validation (optional)
@@ -266,6 +269,49 @@ pub trait CommandHandler: Send + Sync {
     fn validate(&self, _args: &ParsedArgs) -> Result<()> {
         Ok(())
     }
+
+    /// Declare an expectation about this command's configured
+    /// `continue_on_failure` (DD-026), if the handler's author has one.
+    ///
+    /// Purely informational at the trait level: `CommandRegistry::register`
+    /// compares this value (when `Some`) against the `continue_on_failure`
+    /// the YAML config actually declares for this command, and rejects
+    /// registration on a contradiction (`RegistryError::FaultToleranceMismatch`,
+    /// DD-028) — catching a misconfiguration at startup instead of at first
+    /// use. It does not, and cannot, verify that the handler's own code
+    /// actually behaves as declared; that remains the author's
+    /// responsibility, covered by the application's own tests.
+    ///
+    /// # Default Implementation
+    ///
+    /// `None` — no opinion, no check performed. Override only if this
+    /// handler's `execute()` was written under a specific assumption about
+    /// whether the chain may safely continue past its failure.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use dynamic_cli::executor::{CommandHandler, ParsedArgs};
+    /// # use dynamic_cli::context::ExecutionContext;
+    /// # use dynamic_cli::Result;
+    /// #
+    /// /// A command whose failure must always stop the chain — the handler
+    /// /// author never wants this one silently skipped over.
+    /// struct SolveCommand;
+    ///
+    /// impl CommandHandler for SolveCommand {
+    ///     fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
+    ///         Ok(())
+    ///     }
+    ///
+    ///     fn expected_fault_tolerance(&self) -> Option<bool> {
+    ///         Some(false)
+    ///     }
+    /// }
+    /// ```
+    fn expected_fault_tolerance(&self) -> Option<bool> {
+        None
+    }
 }
 
 /// Async counterpart of [`CommandHandler`].
@@ -344,6 +390,20 @@ pub trait AsyncCommandHandler: Send + Sync {
     /// validation logic.
     async fn validate(&self, _args: &ParsedArgs) -> Result<()> {
         Ok(())
+    }
+
+    /// Mirrors [`CommandHandler::expected_fault_tolerance`] exactly — same
+    /// contract, same default (`None`), checked by
+    /// `CommandRegistry::register_async` the same way `register_sync` checks
+    /// it for [`CommandHandler`] (DD-028).
+    ///
+    /// Deliberately **not** an `async fn`, unlike `execute`/`validate`
+    /// above: this method does no work of its own and is evaluated at
+    /// registration time, before any dispatch — sync or async — so making
+    /// it async would only force `register_async` (itself a synchronous
+    /// function) to `block_on` it for no benefit.
+    fn expected_fault_tolerance(&self) -> Option<bool> {
+        None
     }
 }
 
@@ -797,6 +857,77 @@ mod tests {
     fn test_no_generic_methods_documentation() {}
 
     // ============================================================================
+    // expected_fault_tolerance() TESTS (DD-028)
+    // ============================================================================
+
+    /// A handler whose author never expressed an opinion — the common case.
+    struct FaultAgnosticCommand;
+
+    impl CommandHandler for FaultAgnosticCommand {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A handler whose author declares its failures must never be ignored.
+    struct FaultIntolerantCommand;
+
+    impl CommandHandler for FaultIntolerantCommand {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
+            Ok(())
+        }
+
+        fn expected_fault_tolerance(&self) -> Option<bool> {
+            Some(false)
+        }
+    }
+
+    /// A handler whose author declares its failures are safe to ignore.
+    struct FaultTolerantCommand;
+
+    impl CommandHandler for FaultTolerantCommand {
+        fn execute(&self, _context: &mut dyn ExecutionContext, _args: &ParsedArgs) -> Result<()> {
+            Ok(())
+        }
+
+        fn expected_fault_tolerance(&self) -> Option<bool> {
+            Some(true)
+        }
+    }
+
+    #[test]
+    fn test_expected_fault_tolerance_defaults_to_none() {
+        // Every pre-existing handler that never heard of DD-028 keeps
+        // compiling and behaving exactly as before — no supertrait, no
+        // required impl, nothing to add.
+        let handler = FaultAgnosticCommand;
+        assert_eq!(handler.expected_fault_tolerance(), None);
+
+        // HelloCommand and ValidatedCommand, defined above DD-028 existed,
+        // are just as unaffected.
+        assert_eq!(HelloCommand.expected_fault_tolerance(), None);
+        assert_eq!(ValidatedCommand.expected_fault_tolerance(), None);
+    }
+
+    #[test]
+    fn test_expected_fault_tolerance_override() {
+        assert_eq!(
+            FaultIntolerantCommand.expected_fault_tolerance(),
+            Some(false)
+        );
+        assert_eq!(FaultTolerantCommand.expected_fault_tolerance(), Some(true));
+    }
+
+    #[test]
+    fn test_expected_fault_tolerance_via_trait_object() {
+        // The method must be reachable through `Box<dyn CommandHandler>`,
+        // exactly like `execute`/`validate` — this is what
+        // `CommandRegistry::register_sync` actually calls it through.
+        let handler: Box<dyn CommandHandler> = Box::new(FaultIntolerantCommand);
+        assert_eq!(handler.expected_fault_tolerance(), Some(false));
+    }
+
+    // ============================================================================
     // AsyncCommandHandler TESTS (DD-022)
     // ============================================================================
 
@@ -944,5 +1075,51 @@ mod tests {
         // If this compiles, AsyncCommandHandler is dyn-compatible.
         fn _accepts_trait_object(_: &dyn AsyncCommandHandler) {}
         _accepts_trait_object(&AsyncHelloCommand);
+    }
+
+    // ============================================================================
+    // expected_fault_tolerance() TESTS — async mirror (DD-028)
+    // ============================================================================
+
+    /// Async handler whose author declares its failures must never be
+    /// ignored — the async mirror of `FaultIntolerantCommand`.
+    struct AsyncFaultIntolerantCommand;
+
+    #[async_trait]
+    impl AsyncCommandHandler for AsyncFaultIntolerantCommand {
+        async fn execute(
+            &self,
+            _context: &mut dyn ExecutionContext,
+            _args: &ParsedArgs,
+        ) -> Result<()> {
+            Ok(())
+        }
+
+        fn expected_fault_tolerance(&self) -> Option<bool> {
+            Some(false)
+        }
+    }
+
+    #[test]
+    fn test_async_expected_fault_tolerance_defaults_to_none() {
+        // AsyncHelloCommand, defined before DD-028 existed, keeps compiling
+        // and behaving exactly as before — no supertrait, nothing to add.
+        assert_eq!(AsyncHelloCommand.expected_fault_tolerance(), None);
+    }
+
+    #[test]
+    fn test_async_expected_fault_tolerance_override() {
+        assert_eq!(
+            AsyncFaultIntolerantCommand.expected_fault_tolerance(),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn test_async_expected_fault_tolerance_via_trait_object() {
+        // Reachable through `Box<dyn AsyncCommandHandler>` — what
+        // `CommandRegistry::register_async` actually calls it through.
+        let handler: Box<dyn AsyncCommandHandler> = Box::new(AsyncFaultIntolerantCommand);
+        assert_eq!(handler.expected_fault_tolerance(), Some(false));
     }
 }
