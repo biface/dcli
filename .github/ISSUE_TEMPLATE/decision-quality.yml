@@ -1,20 +1,32 @@
-name: "🧭 Design Decision (DD)"
+name: "✅ Decision — Quality (DQ)"
 description: >
-  Propose or document an architecture / design decision.
-title: "[DD-NNN] "
+  Propose or document a quality decision (tests, CI, tooling, documentation as a deliverable, API/SemVer compatibility policy).
+title: "[DQ-NNN] "
 labels:
   - "type: decision"
   - "status: triage"
 
 body:
-  - type: input
-    id: dd-id
+  - type: markdown
     attributes:
-      label: "DD Identifier"
+      value: >
+        **Category: Quality** — fixed by this template, carried by the `DQ`
+        prefix in the title. Do not add a category label; `type: decision`
+        is the only decision label. The NNN counter is shared across
+        `DA`/`DD`/`DT`/`DQ`: take the highest number across all four
+        prefixes, plus one (three digits, zero-padded, e.g. `DQ-031`).
+        Wrong category? Close this form and use the matching template:
+        Architecture (DA), Design (DD), Technical (DT) or Quality (DQ).
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Summary"
       description: >
-        Three-digit sequential number with dash separator (e.g. DD-019).
-        Check DESIGN_DECISIONS.md for the next available number.
-      placeholder: "DD-NNN"
+        One plain-language sentence describing the decision, distinct from
+        the short title and from the Context below. Feeds the
+        DESIGN_DECISIONS.md index.
+      placeholder: "One sentence describing the decision."
     validations:
       required: true
 
@@ -23,7 +35,7 @@ body:
     attributes:
       label: "Target version"
       description: "Project version where this decision takes effect (= milestone)."
-      placeholder: "0.1.0"
+      placeholder: "0.11.0"
     validations:
       required: true
 
@@ -50,7 +62,6 @@ body:
         |--------|-----------|------|
         | **A** — … | … | … |
         | **B** — … | … | … |
-        | **C** — … | … | … |
       render: markdown
     validations:
       required: true
@@ -69,13 +80,14 @@ body:
     attributes:
       label: "Consequences"
       description: >
-        Impact on the public API, dependencies, tests,
-        backward compatibility, FEM invariants, or future decisions.
+        Impact on the public API, dependencies, tests, backward
+        compatibility, or future decisions. Name explicitly any mandatory
+        root file this touches (README, CHANGELOG, CONTRIBUTING, LICENSE,
+        CODE_OF_CONDUCT).
       placeholder: |
-        - Changes the signature of `xxx` → breaking change if not feature-flagged
+        - Changes the signature of `xxx` → breaking change
         - Requires a new dependency: `yyy`
-        - Activates invariant INV-N
-        - Related: #xx (DD-NNN)
+        - Related: #xx
     validations:
       required: false
 
@@ -85,10 +97,11 @@ body:
       label: "Affected scopes"
       description: "Apply the matching `scope:` labels manually after creation."
       options:
-        - label: "`api` — public traits or types (`PhysicalModel`, `Mesh`, `Solver`…)"
-        - label: "`docs` — rustdoc, examples, guides"
-        - label: "`tests` — unit tests, integration tests, doctests"
-        - label: "`ci` — GitHub Actions, coverage, semver-checks"
+        - label: "`api` — public traits, types, `CliBuilder`, `prelude`"
+        - label: "`ui` — CLI/REPL output, help, error messages, interaction flow"
+        - label: "`docs` — rustdoc, examples, guides, wiki"
+        - label: "`tests` — unit, integration and doc tests, coverage"
+        - label: "`ci` — GitHub Actions, clippy, cargo-llvm-cov"
 
   - type: dropdown
     id: priority
@@ -115,7 +128,7 @@ body:
         - "S  — half-day (light research)"
         - "M  — 1 day (prototype or benchmark needed)"
         - "L  — 2–3 days (refactoring involved)"
-        - "XL — > 3 days (major architectural impact)"
+        - "XL — > 3 days (major impact)"
     validations:
       required: true
 
@@ -125,10 +138,10 @@ body:
       label: "Ecosystem layer"
       description: "Apply the matching `ecosystem:` label after creation."
       options:
-        - "language — Rust idioms, borrow checker, traits, generics, MSRV"
-        - "framework — nalgebra, faer, rayon, thiserror"
-        - "ops — crates.io publishing, packaging, NOTICE"
-        - "pipeline — cargo, cargo-llvm-cov, clippy, cargo-semver-checks, GitHub Actions"
+        - "language — Rust idioms, traits, object-safety, generics, MSRV"
+        - "framework — serde, rustyline, thiserror, async-trait, wasmtime"
+        - "ops — crates.io publishing, packaging"
+        - "pipeline — cargo, clippy, cargo-llvm-cov, GitHub Actions"
     validations:
       required: false
 
@@ -136,10 +149,10 @@ body:
     id: references
     attributes:
       label: "Related issues & references"
-      description: "Previous DD issues, GitHub issues, PRs, relevant Rust RFCs."
+      description: "Previous DA/DD/DT/DQ issues, GitHub issues, PRs, relevant Rust RFCs."
       placeholder: |
-        - Follows from: #xx (DD-001 — licence)
-        - Blocks: #xx (feat: UniformGrid1D)
+        - Follows from: #xx
+        - Blocks: #xx
         - Rust RFC: https://…
     validations:
       required: false
@@ -153,3 +166,4 @@ body:
         - label: "Affected modules are identified"
         - label: "Implementation issues / PRs are linked"
         - label: "The `status: closed` label has been applied"
+        - label: "DESIGN_DECISIONS.md index row and section are up to date"

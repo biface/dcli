@@ -1,0 +1,169 @@
+name: "🏛️ Decision — Architecture (DA)"
+description: >
+  Propose or document a architecture decision (module and layer boundaries, public traits and entry points, extension mechanisms).
+title: "[DA-NNN] "
+labels:
+  - "type: decision"
+  - "status: triage"
+
+body:
+  - type: markdown
+    attributes:
+      value: >
+        **Category: Architecture** — fixed by this template, carried by the `DA`
+        prefix in the title. Do not add a category label; `type: decision`
+        is the only decision label. The NNN counter is shared across
+        `DA`/`DD`/`DT`/`DQ`: take the highest number across all four
+        prefixes, plus one (three digits, zero-padded, e.g. `DA-031`).
+        Wrong category? Close this form and use the matching template:
+        Architecture (DA), Design (DD), Technical (DT) or Quality (DQ).
+
+  - type: input
+    id: summary
+    attributes:
+      label: "Summary"
+      description: >
+        One plain-language sentence describing the decision, distinct from
+        the short title and from the Context below. Feeds the
+        DESIGN_DECISIONS.md index.
+      placeholder: "One sentence describing the decision."
+    validations:
+      required: true
+
+  - type: input
+    id: target-version
+    attributes:
+      label: "Target version"
+      description: "Project version where this decision takes effect (= milestone)."
+      placeholder: "0.11.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Context"
+      description: >
+        Why is this decision necessary?
+        What constraint, gap, or opportunity motivates it?
+      placeholder: |
+        The `xxx` module does not yet support…
+        The current abstraction `yyy` causes the following issue…
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: "Options considered"
+      description: "List the alternatives with their trade-offs."
+      placeholder: |
+        | Option | Advantage | Risk |
+        |--------|-----------|------|
+        | **A** — … | … | … |
+        | **B** — … | … | … |
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: decision
+    attributes:
+      label: "Decision"
+      description: "The chosen option and a brief justification."
+      placeholder: "Option A — because…"
+    validations:
+      required: false
+
+  - type: textarea
+    id: consequences
+    attributes:
+      label: "Consequences"
+      description: >
+        Impact on the public API, dependencies, tests, backward
+        compatibility, or future decisions. Name explicitly any mandatory
+        root file this touches (README, CHANGELOG, CONTRIBUTING, LICENSE,
+        CODE_OF_CONDUCT).
+      placeholder: |
+        - Changes the signature of `xxx` → breaking change
+        - Requires a new dependency: `yyy`
+        - Related: #xx
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: "Affected scopes"
+      description: "Apply the matching `scope:` labels manually after creation."
+      options:
+        - label: "`api` — public traits, types, `CliBuilder`, `prelude`"
+        - label: "`ui` — CLI/REPL output, help, error messages, interaction flow"
+        - label: "`docs` — rustdoc, examples, guides, wiki"
+        - label: "`tests` — unit, integration and doc tests, coverage"
+        - label: "`ci` — GitHub Actions, clippy, cargo-llvm-cov"
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Priority"
+      description: "Apply the matching `priority:` label after creation."
+      options:
+        - "none — informational, not urgent"
+        - "low — to address in target version"
+        - "medium — blocks a feature"
+        - "high — blocks the release"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: "Estimated effort"
+      description: >
+        Time to document, validate, and integrate the decision.
+        Apply the matching `effort:` label after creation.
+      options:
+        - "XS — < 1 h (obvious, immediate consensus)"
+        - "S  — half-day (light research)"
+        - "M  — 1 day (prototype or benchmark needed)"
+        - "L  — 2–3 days (refactoring involved)"
+        - "XL — > 3 days (major impact)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ecosystem
+    attributes:
+      label: "Ecosystem layer"
+      description: "Apply the matching `ecosystem:` label after creation."
+      options:
+        - "language — Rust idioms, traits, object-safety, generics, MSRV"
+        - "framework — serde, rustyline, thiserror, async-trait, wasmtime"
+        - "ops — crates.io publishing, packaging"
+        - "pipeline — cargo, clippy, cargo-llvm-cov, GitHub Actions"
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: "Related issues & references"
+      description: "Previous DA/DD/DT/DQ issues, GitHub issues, PRs, relevant Rust RFCs."
+      placeholder: |
+        - Follows from: #xx
+        - Blocks: #xx
+        - Rust RFC: https://…
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: done-checklist
+    attributes:
+      label: "Closing checklist"
+      description: "Check all boxes before closing the issue."
+      options:
+        - label: "Affected modules are identified"
+        - label: "Implementation issues / PRs are linked"
+        - label: "The `status: closed` label has been applied"
+        - label: "DESIGN_DECISIONS.md index row and section are up to date"
