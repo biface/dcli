@@ -44,6 +44,7 @@
 
 use crate::config::loader::load_config;
 use crate::config::schema::CommandsConfig;
+use crate::config::validator::validate_config;
 use crate::context::ExecutionContext;
 use crate::error::{ConfigError, DynamicCliError, Result};
 use crate::executor::{AsyncCommandHandler, CommandHandler};
@@ -148,7 +149,8 @@ impl CliBuilder {
 
     /// Specify the configuration file
     ///
-    /// The file will be loaded during `build()`. Supports YAML and JSON formats.
+    /// The file will be loaded and validated during `build()`. Supports YAML
+    /// and JSON formats.
     ///
     /// # Arguments
     ///
@@ -172,9 +174,12 @@ impl CliBuilder {
     /// Use this instead of `config_file()` if you want to load and potentially
     /// modify the configuration before building.
     ///
+    /// The configuration does not need to be validated beforehand: `build()`
+    /// runs [`validate_config`] on it.
+    ///
     /// # Arguments
     ///
-    /// * `config` - Loaded and validated configuration
+    /// * `config` - Loaded configuration
     ///
     /// # Example
     ///
@@ -509,11 +514,14 @@ impl CliBuilder {
     ///
     /// Performs the following steps:
     /// 1. Load configuration (if `config_file()` was used)
-    /// 2. Validate that a context was provided
-    /// 3. Create the command registry
-    /// 4. Register all command handlers
-    /// 5. Verify that all required commands have handlers
-    /// 6. Create the `CliApp`
+    /// 2. Validate the configuration with
+    ///    [`validate_config`], whether it
+    ///    came from `config_file()` or `config()`
+    /// 3. Validate that a context was provided
+    /// 4. Create the command registry
+    /// 5. Register all command handlers
+    /// 6. Verify that all required commands have handlers
+    /// 7. Create the `CliApp`
     ///
     /// # Returns
     ///
@@ -521,7 +529,8 @@ impl CliBuilder {
     ///
     /// # Errors
     ///
-    /// - Configuration errors (file not found, invalid format, etc.)
+    /// - Configuration errors (file not found, invalid format, configuration
+    ///   rejected by the validator, etc.)
     /// - Missing context
     /// - Missing required handlers
     /// - Registry errors
@@ -565,6 +574,10 @@ impl CliBuilder {
                 suggestion: None,
             }));
         };
+
+        // DA-002 (#2): the configuration is validated at startup, whatever
+        // its source (#96)
+        validate_config(&config)?;
 
         // Validate context was provided
         let context = self.context.take().ok_or_else(|| {
@@ -1128,6 +1141,120 @@ mod tests {
                 assert!(reason.contains("No configuration provided"));
             }
             other => panic!("Expected InvalidSchema error, got: {:?}", other),
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Configuration validation at build time (#96)
+    // ------------------------------------------------------------------
+
+    /// Configuration rejected by `validate_config`: a required argument
+    /// follows an optional one
+    fn create_invalid_config() -> CommandsConfig {
+        use crate::config::schema::{ArgumentDefinition, ArgumentType};
+
+        let argument = |name: &str, required: bool| ArgumentDefinition {
+            name: name.to_string(),
+            arg_type: ArgumentType::String,
+            required,
+            description: "Test argument".to_string(),
+            validation: vec![],
+            secure: false,
+        };
+        let mut config = create_test_config();
+        config.commands[0].arguments = vec![argument("first", false), argument("second", true)];
+        config
+    }
+
+    fn build_with(config: CommandsConfig) -> Result<CliApp> {
+        CliBuilder::new()
+            .config(config)
+            .context(Box::new(TestContext::default()))
+            .register_sync_handler(
+                "test_handler",
+                Box::new(TestHandler {
+                    name: "test".to_string(),
+                }),
+            )
+            .build()
+    }
+
+    #[test]
+    fn test_builder_build_rejects_invalid_config() {
+        // Without validation in `build()`, this configuration was accepted.
+        let config = create_invalid_config();
+        assert!(validate_config(&config).is_err());
+
+        match build_with(config) {
+            Err(DynamicCliError::Config(ConfigError::InvalidSchema { reason, path, .. })) => {
+                assert!(reason.contains("'second'"), "{}", reason);
+                assert_eq!(path.as_deref(), Some("test.arguments[1]"));
+            }
+            Err(other) => panic!("Expected InvalidSchema error, got: {:?}", other),
+            Ok(_) => panic!("Expected build() to reject the configuration"),
+        }
+    }
+
+    #[test]
+    fn test_builder_build_rejects_invalid_config_file() {
+        use std::io::Write;
+
+        let mut file = tempfile::Builder::new().suffix(".yaml").tempfile().unwrap();
+        let yaml = serde_yaml::to_string(&create_invalid_config()).unwrap();
+        file.write_all(yaml.as_bytes()).unwrap();
+
+        let result = CliBuilder::new()
+            .config_file(file.path())
+            .context(Box::new(TestContext::default()))
+            .register_sync_handler(
+                "test_handler",
+                Box::new(TestHandler {
+                    name: "test".to_string(),
+                }),
+            )
+            .build();
+
+        assert!(matches!(
+            result,
+            Err(DynamicCliError::Config(ConfigError::InvalidSchema { .. }))
+        ));
+    }
+
+    #[test]
+    fn test_builder_build_rejects_directive_collision() {
+        use crate::config::{DirectiveDefinition, ReplDirective};
+
+        // `q` stays the default alias of `repl_quit`.
+        let mut config = create_test_config();
+        config.directives = vec![DirectiveDefinition {
+            implementation: ReplDirective::Exit,
+            name: "q".to_string(),
+            aliases: vec![],
+            description: "Leave".to_string(),
+        }];
+
+        match build_with(config) {
+            Err(DynamicCliError::Config(ConfigError::InvalidSchema { reason, path, .. })) => {
+                assert!(reason.contains("'q'"), "{}", reason);
+                assert_eq!(path.as_deref(), Some("directives[0]"));
+            }
+            Err(other) => panic!("Expected InvalidSchema error, got: {:?}", other),
+            Ok(_) => panic!("Expected build() to reject the configuration"),
+        }
+    }
+
+    #[test]
+    fn test_builder_build_validates_before_context_check() {
+        // The configuration error is reported even when the context is
+        // missing too: validation is the first step after loading.
+        let result = CliBuilder::new().config(create_invalid_config()).build();
+
+        match result {
+            Err(DynamicCliError::Config(ConfigError::InvalidSchema { reason, .. })) => {
+                assert!(!reason.contains("No execution context"), "{}", reason);
+            }
+            Err(other) => panic!("Expected InvalidSchema error, got: {:?}", other),
+            Ok(_) => panic!("Expected build() to reject the configuration"),
         }
     }
 

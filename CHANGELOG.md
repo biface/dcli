@@ -42,6 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   whitespace or starting with `:`, and a name or alias shared by two
   directives once the defaults are merged are all reported as
   `ConfigError::InvalidSchema` with the path of the offending entry.
+- **`CliBuilder::build()` validates the configuration** (#96): it now runs
+  `validate_config()` right after obtaining the configuration, whether it
+  comes from `config_file()` or `config()`, and before checking the
+  context. Until v0.9.0 only the deserialization step ran, so a
+  configuration the validator rejects (a required argument after an
+  optional one, a default outside `choices`, an invalid `directives:`
+  override…) was accepted. Such a configuration now makes `build()` fail
+  with the validator's `ConfigError`; run `validate_config()` on it to see
+  the same error before upgrading. `load_config()` still only loads.
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
