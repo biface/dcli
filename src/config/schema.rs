@@ -10,6 +10,7 @@
 //! - [`ArgumentType`]: Supported argument types
 //! - [`ValidationRule`]: Validation constraints
 
+use crate::config::directive::DirectiveDefinition;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -30,6 +31,10 @@ use std::collections::HashMap;
 ///     description: "Say hello"
 ///     # ... more fields
 /// global_options: []
+/// directives:
+///   - implementation: repl_help
+///     name: aide
+///     description: "Afficher l'aide"
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CommandsConfig {
@@ -42,6 +47,15 @@ pub struct CommandsConfig {
     /// Global options available to all commands
     #[serde(default)]
     pub global_options: Vec<OptionDefinition>,
+
+    /// Overrides of the REPL directives (`:help`, `:quit`…)
+    ///
+    /// Each entry replaces the name, aliases and description of the
+    /// directive selected by its `implementation`; directives without an
+    /// entry keep their defaults. Empty when the section is absent. See
+    /// [`crate::config::directive`].
+    #[serde(default)]
+    pub directives: Vec<DirectiveDefinition>,
 }
 
 /// Metadata for the CLI/REPL interface
@@ -432,6 +446,7 @@ impl CommandsConfig {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         }
     }
 }
@@ -439,6 +454,7 @@ impl CommandsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::directive::ReplDirective;
 
     #[test]
     fn test_argument_type_as_str() {
@@ -767,6 +783,65 @@ mod tests {
         assert_eq!(config.metadata.version, "1.0.0");
         assert_eq!(config.commands.len(), 1);
         assert_eq!(config.commands[0].name, "hello");
+        assert!(config.directives.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_config_with_directives() {
+        let yaml = r#"
+            metadata:
+              version: "1.0.0"
+              prompt: "test"
+            commands: []
+            directives:
+              - implementation: repl_help
+                name: aide
+                aliases: [a]
+                description: "Afficher l'aide"
+              - implementation: repl_exit
+                name: sortir
+                description: "Sortir"
+        "#;
+
+        let config: CommandsConfig = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(config.directives.len(), 2);
+        assert_eq!(config.directives[0].implementation, ReplDirective::Help);
+        assert_eq!(config.directives[0].aliases, vec!["a".to_string()]);
+        assert_eq!(config.directives[1].implementation, ReplDirective::Exit);
+        assert!(config.directives[1].aliases.is_empty());
+    }
+
+    #[test]
+    fn test_deserialize_config_unknown_directive_implementation_fails() {
+        let yaml = r#"
+            metadata:
+              version: "1.0.0"
+              prompt: "test"
+            commands: []
+            directives:
+              - implementation: repl_history
+                name: hist
+                description: "History"
+        "#;
+        let err = serde_yaml::from_str::<CommandsConfig>(yaml)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repl_history"), "{}", err);
+        assert!(err.contains("repl_help"), "{}", err);
+
+        let json = r#"{
+            "metadata": {"version": "1.0.0", "prompt": "test"},
+            "commands": [],
+            "directives": [
+                {"implementation": "repl_history", "name": "hist", "description": "x"}
+            ]
+        }"#;
+        let err = serde_json::from_str::<CommandsConfig>(json)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("repl_history"), "{}", err);
+        assert!(err.contains("repl_exit"), "{}", err);
     }
 
     #[test]
@@ -789,6 +864,12 @@ mod tests {
                 requires_success: false,
             }],
             global_options: vec![],
+            directives: vec![DirectiveDefinition {
+                implementation: ReplDirective::Quit,
+                name: "quitter".to_string(),
+                aliases: vec!["q".to_string()],
+                description: "Quitter".to_string(),
+            }],
         };
 
         // Serialize to YAML

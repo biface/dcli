@@ -41,7 +41,7 @@ use rustyline::{CompletionType, Config, Context, Editor, Helper};
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, ExecutionError, ParseError, Result};
-use crate::help::HelpFormatter;
+use crate::help::{DefaultHelpFormatter, HelpFormatter};
 use crate::parser::{ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
 
@@ -480,8 +480,13 @@ impl ReplInterface {
 
     /// Try to handle a `--help` / `-h` request.
     ///
-    /// Returns `Some(output)` when the line is a help request and a formatter
-    /// is available, `None` otherwise (normal command processing continues).
+    /// Returns `Some(output)` when the line is a help request and a
+    /// configuration is available, `None` otherwise (normal command
+    /// processing continues).
+    ///
+    /// Renders through the formatter supplied to [`ReplInterface::new`], or
+    /// through [`DefaultHelpFormatter`] when none was supplied. Without a
+    /// configuration there is nothing to render, so help is not intercepted.
     ///
     /// Recognized patterns (case-sensitive):
     ///
@@ -495,7 +500,11 @@ impl ReplInterface {
     /// | `<command> -h`     | Per-command help          |
     fn try_handle_help(&self, line: &str) -> Option<String> {
         let config = self.config.as_deref()?;
-        let formatter = self.help_formatter.as_deref()?;
+        // `DefaultHelpFormatter` is a unit struct: the fallback costs no
+        // allocation and is only built when help is actually requested.
+        let default_formatter = DefaultHelpFormatter::new();
+        let formatter: &dyn HelpFormatter =
+            self.help_formatter.as_deref().unwrap_or(&default_formatter);
 
         let trimmed = line.trim();
 
@@ -969,6 +978,7 @@ mod tests {
                 requires_success: false,
             }],
             global_options: vec![],
+            directives: vec![],
         }
     }
 
@@ -1095,7 +1105,7 @@ mod tests {
     // ── Help interception ─────────────────────────────────────────────────────
 
     #[test]
-    fn test_try_handle_help_without_formatter_returns_none() {
+    fn test_try_handle_help_without_config_returns_none() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let repl = ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
@@ -1103,9 +1113,48 @@ mod tests {
         assert!(repl.try_handle_help("-h").is_none());
     }
 
+    /// Regression test for #76: without an explicit formatter, help falls
+    /// back to `DefaultHelpFormatter` instead of being skipped.
+    #[test]
+    fn test_try_handle_help_without_formatter_uses_default() {
+        colored::control::set_override(false);
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+        let repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+
+        let expected_app = DefaultHelpFormatter::new().format_app(repl.config.as_deref().unwrap());
+        let expected_cmd =
+            DefaultHelpFormatter::new().format_command(repl.config.as_deref().unwrap(), "hello");
+
+        assert_eq!(repl.try_handle_help("--help"), Some(expected_app.clone()));
+        assert_eq!(repl.try_handle_help("-h"), Some(expected_app));
+        for line in ["--help hello", "-h hello", "hello --help", "hello -h"] {
+            assert_eq!(
+                repl.try_handle_help(line),
+                Some(expected_cmd.clone()),
+                "line: {line}"
+            );
+        }
+    }
+
+    /// Regression test for #76 through the dispatch path used by `run()`:
+    /// `--help` must be handled, not reported as an unknown command.
+    #[test]
+    fn test_execute_line_help_without_formatter() {
+        colored::control::set_override(false);
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        let config = make_help_config();
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
+        assert!(repl.execute_line("--help").is_ok());
+        assert!(repl.execute_line("hello --help").is_ok());
+    }
+
     #[test]
     fn test_try_handle_help_global() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1127,7 +1176,6 @@ mod tests {
 
     #[test]
     fn test_try_handle_help_short_flag() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1147,7 +1195,6 @@ mod tests {
 
     #[test]
     fn test_try_handle_help_with_command_prefix() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1169,7 +1216,6 @@ mod tests {
 
     #[test]
     fn test_try_handle_help_command_suffix() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1191,7 +1237,6 @@ mod tests {
 
     #[test]
     fn test_try_handle_help_alias() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1211,7 +1256,6 @@ mod tests {
 
     #[test]
     fn test_execute_line_help_intercepted() {
-        use crate::help::DefaultHelpFormatter;
         colored::control::set_override(false);
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -1229,7 +1273,6 @@ mod tests {
 
     #[test]
     fn test_execute_line_normal_command_still_works_with_formatter() {
-        use crate::help::DefaultHelpFormatter;
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let config = make_help_config();
@@ -1396,6 +1439,7 @@ mod tests {
             },
             commands: vec![cmd_def],
             global_options: vec![],
+            directives: vec![],
         };
 
         (registry, config)

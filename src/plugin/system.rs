@@ -150,6 +150,7 @@ impl SystemPlugin {
     ///     },
     ///     commands: vec![],
     ///     global_options: vec![],
+    ///     directives: vec![],
     /// };
     ///
     /// let builtin = SystemPlugin::new().with_config(config);
@@ -360,6 +361,7 @@ mod tests {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         }
     }
 

@@ -82,6 +82,7 @@ impl VersionPlugin {
     ///     },
     ///     commands: vec![],
     ///     global_options: vec![],
+    ///     directives: vec![],
     /// };
     ///
     /// let builtin = VersionPlugin::new().with_config(config);
@@ -154,6 +155,7 @@ mod tests {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         }
     }
 

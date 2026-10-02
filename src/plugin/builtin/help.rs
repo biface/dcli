@@ -83,6 +83,7 @@ impl HelpPlugin {
     ///     },
     ///     commands: vec![],
     ///     global_options: vec![],
+    ///     directives: vec![],
     /// };
     ///
     /// let builtin = HelpPlugin::new().with_config(config);
@@ -155,6 +156,7 @@ mod tests {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         }
     }
 

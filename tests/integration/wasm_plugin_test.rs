@@ -143,6 +143,7 @@ fn test_config(wasm_implementation: &str) -> CommandsConfig {
             requires_success: false,
         }],
         global_options: vec![],
+        directives: vec![],
     }
 }
 
@@ -184,6 +185,7 @@ fn test_config_with_native(wasm_implementation: &str) -> CommandsConfig {
             },
         ],
         global_options: vec![],
+        directives: vec![],
     }
 }
 

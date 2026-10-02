@@ -1020,6 +1020,7 @@ mod tests {
                 requires_success: false,
             }],
             global_options: vec![],
+            directives: vec![],
         }
     }
 

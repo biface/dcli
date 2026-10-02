@@ -65,6 +65,7 @@ use colored::Colorize;
 ///     },
 ///     commands: vec![],
 ///     global_options: vec![],
+///     directives: vec![],
 /// };
 ///
 /// let formatter = DefaultHelpFormatter::new();
@@ -464,6 +465,7 @@ mod tests {
                 },
             ],
             global_options: vec![],
+            directives: vec![],
         }
     }
 
