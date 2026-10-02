@@ -92,6 +92,7 @@ impl ConfigPlugin {
     ///     },
     ///     commands: vec![],
     ///     global_options: vec![],
+    ///     directives: vec![],
     /// };
     ///
     /// let plugin = ConfigPlugin::new().with_config(config);
@@ -208,6 +209,7 @@ mod tests {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         }
     }
 

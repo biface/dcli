@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Decision**: [DA-030](https://github.com/biface/dcli/issues/92)
+
+### Added
+
+#### REPL directive table
+- **New `config::directive` module** (#93): `ReplDirective`
+  (`#[non_exhaustive]`; `repl_help`, `repl_load`, `repl_quit`, `repl_exit`)
+  carries each directive's default name, aliases, description and argument
+  usage; `DirectiveDefinition` describes one directive;
+  `effective_directives()` merges the configured overrides with the
+  defaults into the complete table, in `ReplDirective::ALL` order. All three
+  are re-exported from `config` and from the crate root, not from
+  `prelude`. The REPL does not dispatch directives yet (#94).
+- **Optional `directives:` configuration section** (#93): each entry
+  replaces the name, aliases and description of the directive named by its
+  `implementation`; `aliases` defaults to an empty list, directives without
+  an entry keep their defaults. An unknown `implementation` fails at load
+  time and the error lists the accepted values.
+
+### Changed — Breaking
+
+- **`CommandsConfig` gains a public field** `directives:
+  Vec<DirectiveDefinition>` (`#[serde(default)]`) (#93). YAML and JSON
+  configurations without the section load unchanged; Rust struct literals
+  must add `directives: vec![]`.
+- **`validate_config()` rejects command names and aliases starting with
+  `:`**, now reserved for REPL directives (#93). A `:` elsewhere in a name
+  (`db:migrate`) is still accepted.
+- **`validate_config()` validates the `directives:` section** (#93): a
+  directive overridden twice, an empty name or alias, one containing
+  whitespace or starting with `:`, and a name or alias shared by two
+  directives once the defaults are merged are all reported as
+  `ConfigError::InvalidSchema` with the path of the offending entry.
+
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
 - Subcommand support (git-style: `myapp config set key value`)

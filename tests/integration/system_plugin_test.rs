@@ -113,6 +113,7 @@ fn test_config() -> CommandsConfig {
             },
         ],
         global_options: vec![],
+        directives: vec![],
     }
 }
 
