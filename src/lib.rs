@@ -115,6 +115,7 @@ pub use config::schema::{
     ArgumentDefinition, ArgumentType, CommandDefinition, CommandsConfig, Metadata,
     OptionDefinition, ValidationRule,
 };
+pub use config::{effective_directives, DirectiveDefinition, ReplDirective};
 
 // Registry
 pub use registry::CommandRegistry;
@@ -281,6 +282,7 @@ mod tests {
             },
             commands: vec![],
             global_options: vec![],
+            directives: vec![],
         };
 
         // DefaultHelpFormatter accessible from prelude

@@ -439,6 +439,7 @@ pub mod test_helpers {
                 .map(|name| create_test_command(name, false))
                 .collect(),
             global_options: vec![],
+            directives: vec![],
         }
     }
 

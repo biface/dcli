@@ -22,19 +22,24 @@
 //!         prompt_suffix: " >".to_string()
 //!         },
 //!       commands: vec![],
-//!       global_options: vec![]
+//!       global_options: vec![],
+//!       directives: vec![],
 //! };
 //! // After loading configuration
 //! validate_config(&config)?;
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
 //! ```
 
+use crate::config::directive::{effective_directives, DirectiveDefinition, ReplDirective};
 use crate::config::schema::{
     ArgumentDefinition, ArgumentType, CommandDefinition, CommandsConfig, OptionDefinition,
     ValidationRule,
 };
 use crate::error::{ConfigError, Result};
 use std::collections::{HashMap, HashSet};
+
+/// Prefix reserved for REPL directives (`:help`, `:quit`…)
+const DIRECTIVE_PREFIX: char = ':';
 
 /// Validate the entire configuration
 ///
@@ -44,6 +49,12 @@ use std::collections::{HashMap, HashSet};
 /// - Valid argument types
 /// - Consistent validation rules
 /// - Option/argument naming conflicts
+/// - Command names and aliases starting with `:`, which is reserved for
+///   REPL directives
+/// - REPL directive overrides (see [`crate::config::directive`]): each
+///   directive overridden at most once; names and aliases non-empty,
+///   without whitespace or leading `:`; names and aliases unique across
+///   the directive table after merging with the defaults
 ///
 /// # Arguments
 ///
@@ -52,7 +63,8 @@ use std::collections::{HashMap, HashSet};
 /// # Errors
 ///
 /// - [`ConfigError::DuplicateCommand`] if command names/aliases conflict
-/// - [`ConfigError::InvalidSchema`] if structural issues are found
+/// - [`ConfigError::InvalidSchema`] if structural issues are found,
+///   including every invalid directive override
 /// - [`ConfigError::Inconsistency`] if logical inconsistencies are detected
 ///
 /// # Example
@@ -68,7 +80,8 @@ use std::collections::{HashMap, HashSet};
 ///         prompt_suffix: " >".to_string()
 ///         },
 ///       commands: vec![],
-///       global_options: vec![]
+///       global_options: vec![],
+///       directives: vec![],
 /// };
 /// // After loading configuration
 /// validate_config(&config)?;
@@ -112,6 +125,22 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
             .into());
         }
 
+        // DA-030 (#92): the `:` prefix belongs to REPL directives
+        if command.name.starts_with(DIRECTIVE_PREFIX) {
+            return Err(reserved_prefix_error(
+                &command.name,
+                format!("commands[{}].name", idx),
+            ));
+        }
+        for (alias_idx, alias) in command.aliases.iter().enumerate() {
+            if alias.starts_with(DIRECTIVE_PREFIX) {
+                return Err(reserved_prefix_error(
+                    alias,
+                    format!("commands[{}].aliases[{}]", idx, alias_idx),
+                ));
+            }
+        }
+
         // Validate that implementation is specified
         if command.implementation.trim().is_empty() {
             return Err(ConfigError::InvalidSchema {
@@ -126,7 +155,131 @@ pub fn validate_config(config: &CommandsConfig) -> Result<()> {
     // Validate global options
     validate_options(&config.global_options, "global_options")?;
 
+    // Validate REPL directive overrides
+    validate_directives(&config.directives)?;
+
     Ok(())
+}
+
+/// Error for a command name or alias using the directive prefix
+fn reserved_prefix_error(name: &str, path: String) -> crate::error::DynamicCliError {
+    ConfigError::InvalidSchema {
+        reason: format!(
+            "Command name or alias '{}' starts with '{}', which is reserved for REPL directives",
+            name, DIRECTIVE_PREFIX
+        ),
+        path: Some(path),
+        suggestion: Some(format!(
+            "Remove the leading '{}' from '{}'.",
+            DIRECTIVE_PREFIX, name
+        )),
+    }
+    .into()
+}
+
+/// Validate the `directives:` overrides
+///
+/// Checks, in order:
+/// 1. each directive is overridden at most once;
+/// 2. every overriding name and alias is non-empty, contains no
+///    whitespace and does not start with `:`;
+/// 3. names and aliases are unique across the effective directive table
+///    (defaults merged with overrides), so an override cannot reuse a name
+///    or alias that another directive keeps by default.
+///
+/// Directive names are not compared with command names: a directive is
+/// always typed with its `:` prefix, so the two cannot collide.
+fn validate_directives(overrides: &[DirectiveDefinition]) -> Result<()> {
+    // DA-030 (#92): overrides are keyed by `implementation`
+    let mut overridden: HashMap<ReplDirective, usize> = HashMap::new();
+    for (idx, entry) in overrides.iter().enumerate() {
+        if let Some(first) = overridden.insert(entry.implementation, idx) {
+            return Err(ConfigError::InvalidSchema {
+                reason: format!(
+                    "Directive '{}' is overridden more than once (also at directives[{}])",
+                    entry.implementation.as_str(),
+                    first
+                ),
+                path: Some(format!("directives[{}].implementation", idx)),
+                suggestion: Some(format!(
+                    "Merge the entries for '{}' into a single one.",
+                    entry.implementation.as_str()
+                )),
+            }
+            .into());
+        }
+
+        validate_directive_token(&entry.name, format!("directives[{}].name", idx))?;
+        for (alias_idx, alias) in entry.aliases.iter().enumerate() {
+            validate_directive_token(alias, format!("directives[{}].aliases[{}]", idx, alias_idx))?;
+        }
+    }
+
+    // Defaults never collide among themselves, so any collision involves at
+    // least one override; the reported path points at it.
+    let mut owners: HashMap<&str, ReplDirective> = HashMap::new();
+    let table = effective_directives(overrides);
+    for def in &table {
+        let tokens =
+            std::iter::once(def.name.as_str()).chain(def.aliases.iter().map(String::as_str));
+        for token in tokens {
+            if let Some(owner) = owners.insert(token, def.implementation) {
+                let culprit = overridden
+                    .get(&def.implementation)
+                    .or_else(|| overridden.get(&owner))
+                    .copied();
+                let detail = if owner == def.implementation {
+                    format!(
+                        "Directive name or alias '{}' is used twice by '{}'",
+                        token,
+                        owner.as_str()
+                    )
+                } else {
+                    format!(
+                        "Directive name or alias '{}' is used by both '{}' and '{}'",
+                        token,
+                        owner.as_str(),
+                        def.implementation.as_str()
+                    )
+                };
+                return Err(ConfigError::InvalidSchema {
+                    reason: detail,
+                    path: culprit.map(|idx| format!("directives[{}]", idx)),
+                    suggestion: Some(
+                        "Give each directive its own names; an override also replaces \
+                         the default aliases of its directive."
+                            .to_string(),
+                    ),
+                }
+                .into());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate one directive name or alias
+fn validate_directive_token(token: &str, path: String) -> Result<()> {
+    let reason = if token.trim().is_empty() {
+        "Directive name or alias cannot be empty".to_string()
+    } else if token.chars().any(char::is_whitespace) {
+        format!("Directive name or alias '{}' contains whitespace", token)
+    } else if token.starts_with(DIRECTIVE_PREFIX) {
+        format!(
+            "Directive name or alias '{}' must not start with '{}'; the REPL adds it",
+            token, DIRECTIVE_PREFIX
+        )
+    } else {
+        return Ok(());
+    };
+
+    Err(ConfigError::InvalidSchema {
+        reason,
+        path: Some(path),
+        suggestion: None,
+    }
+    .into())
 }
 
 /// Validate a single command definition
@@ -1205,5 +1358,230 @@ mod tests {
 
         let result = validate_options(&options, "test");
         assert!(result.is_ok());
+    }
+
+    // ------------------------------------------------------------------
+    // REPL directives and the reserved `:` prefix
+    // ------------------------------------------------------------------
+
+    fn command(name: &str, aliases: &[&str]) -> CommandDefinition {
+        CommandDefinition {
+            name: name.to_string(),
+            aliases: aliases.iter().map(|a| a.to_string()).collect(),
+            description: "Test".to_string(),
+            required: false,
+            arguments: vec![],
+            options: vec![],
+            implementation: format!("{}_handler", name.trim_start_matches(':')),
+            continue_on_failure: false,
+            requires_success: false,
+        }
+    }
+
+    fn directive(
+        implementation: ReplDirective,
+        name: &str,
+        aliases: &[&str],
+    ) -> DirectiveDefinition {
+        DirectiveDefinition {
+            implementation,
+            name: name.to_string(),
+            aliases: aliases.iter().map(|a| a.to_string()).collect(),
+            description: "Custom".to_string(),
+        }
+    }
+
+    fn config_with_directives(directives: Vec<DirectiveDefinition>) -> CommandsConfig {
+        let mut config = CommandsConfig::minimal();
+        config.directives = directives;
+        config
+    }
+
+    /// Unwrap an `InvalidSchema` error and return `(reason, path)`
+    fn invalid_schema(result: Result<()>) -> (String, Option<String>) {
+        match result {
+            Err(crate::error::DynamicCliError::Config(ConfigError::InvalidSchema {
+                reason,
+                path,
+                ..
+            })) => (reason, path),
+            other => panic!("Expected InvalidSchema error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_config_from_yaml_without_directives() {
+        let yaml = r#"
+metadata:
+  version: "1.0.0"
+  prompt: "test"
+commands:
+  - name: hello
+    description: "Say hello"
+    implementation: "hello_handler"
+"#;
+        let config: CommandsConfig = serde_yaml::from_str(yaml).unwrap();
+        assert!(config.directives.is_empty());
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_command_names_may_match_directive_names() {
+        // Directives are typed with `:`, so `help` and `quit` stay free for
+        // application commands.
+        let mut config = CommandsConfig::minimal();
+        config.commands = vec![command("help", &["h"]), command("quit", &["q"])];
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_config_command_name_with_colon_prefix() {
+        let mut config = CommandsConfig::minimal();
+        config.commands = vec![command(":run", &[])];
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("':run'"), "{}", reason);
+        assert!(
+            reason.contains("reserved for REPL directives"),
+            "{}",
+            reason
+        );
+        assert_eq!(path.as_deref(), Some("commands[0].name"));
+    }
+
+    #[test]
+    fn test_validate_config_command_alias_with_colon_prefix() {
+        let mut config = CommandsConfig::minimal();
+        config.commands = vec![command("list", &[]), command("run", &["r", ":r"])];
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("':r'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("commands[1].aliases[1]"));
+    }
+
+    #[test]
+    fn test_validate_config_command_colon_inside_name_allowed() {
+        let mut config = CommandsConfig::minimal();
+        config.commands = vec![command("db:migrate", &[])];
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_directives_valid_overrides() {
+        let config = config_with_directives(vec![
+            directive(ReplDirective::Help, "aide", &["a", "?"]),
+            directive(ReplDirective::Quit, "quitter", &["q"]),
+        ]);
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_directives_override_may_reuse_its_own_default_alias() {
+        // `h` belongs to `repl_help` by default; overriding `repl_help`
+        // replaces its aliases, so the override may keep `h`.
+        let config = config_with_directives(vec![directive(ReplDirective::Help, "aide", &["h"])]);
+        assert!(validate_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_validate_directives_implementation_overridden_twice() {
+        let config = config_with_directives(vec![
+            directive(ReplDirective::Quit, "quitter", &[]),
+            directive(ReplDirective::Help, "aide", &[]),
+            directive(ReplDirective::Quit, "partir", &[]),
+        ]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("'repl_quit'"), "{}", reason);
+        assert!(reason.contains("directives[0]"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[2].implementation"));
+    }
+
+    #[test]
+    fn test_validate_directives_empty_name() {
+        let config = config_with_directives(vec![directive(ReplDirective::Help, "  ", &[])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("cannot be empty"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].name"));
+    }
+
+    #[test]
+    fn test_validate_directives_empty_alias() {
+        let config = config_with_directives(vec![directive(ReplDirective::Load, "load", &[""])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("cannot be empty"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].aliases[0]"));
+    }
+
+    #[test]
+    fn test_validate_directives_name_with_whitespace() {
+        let config =
+            config_with_directives(vec![directive(ReplDirective::Exit, "sortir vite", &[])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("whitespace"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].name"));
+    }
+
+    #[test]
+    fn test_validate_directives_alias_with_whitespace() {
+        let config = config_with_directives(vec![directive(ReplDirective::Exit, "exit", &["e\t"])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("whitespace"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].aliases[0]"));
+    }
+
+    #[test]
+    fn test_validate_directives_name_with_colon_prefix() {
+        let config = config_with_directives(vec![directive(ReplDirective::Quit, ":quit", &[])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("must not start with ':'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].name"));
+    }
+
+    #[test]
+    fn test_validate_directives_alias_with_colon_prefix() {
+        let config = config_with_directives(vec![directive(ReplDirective::Quit, "quit", &[":q"])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("must not start with ':'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0].aliases[0]"));
+    }
+
+    #[test]
+    fn test_validate_directives_override_name_collides_with_default_alias() {
+        // `q` is a default alias of `repl_quit`, which is not overridden.
+        let config = config_with_directives(vec![directive(ReplDirective::Exit, "q", &[])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("'q'"), "{}", reason);
+        assert!(reason.contains("'repl_quit'"), "{}", reason);
+        assert!(reason.contains("'repl_exit'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0]"));
+    }
+
+    #[test]
+    fn test_validate_directives_override_alias_collides_with_default_name() {
+        // The override of `repl_help` (first in `ALL`) takes `load`, the
+        // default name of a later directive: the path still points at it.
+        let config =
+            config_with_directives(vec![directive(ReplDirective::Help, "help", &["load"])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("'load'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0]"));
+    }
+
+    #[test]
+    fn test_validate_directives_two_overrides_collide() {
+        let config = config_with_directives(vec![
+            directive(ReplDirective::Quit, "partir", &[]),
+            directive(ReplDirective::Exit, "sortir", &["partir"]),
+        ]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("'partir'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[1]"));
+    }
+
+    #[test]
+    fn test_validate_directives_name_repeated_as_own_alias() {
+        let config =
+            config_with_directives(vec![directive(ReplDirective::Load, "load", &["load"])]);
+        let (reason, path) = invalid_schema(validate_config(&config));
+        assert!(reason.contains("used twice by 'repl_load'"), "{}", reason);
+        assert_eq!(path.as_deref(), Some("directives[0]"));
     }
 }

@@ -6,6 +6,7 @@
 //! # Module Structure
 //!
 //! - [`schema`]: Data structures for configuration
+//! - [`directive`]: REPL directives and their overrides
 //! - [`loader`]: Functions to load configuration files
 //! - [`validator`]: Configuration validation logic
 //!
@@ -82,6 +83,7 @@
 //! ```
 
 // Public submodules
+pub mod directive;
 pub mod loader;
 pub mod schema;
 pub mod validator;
@@ -92,6 +94,8 @@ pub use schema::{
     ArgumentDefinition, ArgumentType, CommandDefinition, CommandsConfig, Metadata,
     OptionDefinition, ValidationRule,
 };
+
+pub use directive::{effective_directives, DirectiveDefinition, ReplDirective};
 
 #[allow(unused_imports)]
 pub use loader::{load_config, load_json, load_yaml};
