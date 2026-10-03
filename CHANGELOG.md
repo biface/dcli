@@ -21,12 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `effective_directives()` merges the configured overrides with the
   defaults into the complete table, in `ReplDirective::ALL` order. All three
   are re-exported from `config` and from the crate root, not from
-  `prelude`. The REPL does not dispatch directives yet (#94).
+  `prelude`.
 - **Optional `directives:` configuration section** (#93): each entry
   replaces the name, aliases and description of the directive named by its
   `implementation`; `aliases` defaults to an empty list, directives without
   an entry keep their defaults. An unknown `implementation` fails at load
   time and the error lists the accepted values.
+
+#### REPL directives
+- **The REPL dispatches `:`-prefixed directives** (#94) through the
+  effective directive table: `:help [command]` (`:h`, `:?`), `:load <path>`,
+  `:quit` (`:q`) and `:exit`, under their configured names when the
+  `directives:` section renames them. `:help` renders like `--help`, with
+  the default formatter when none is supplied, and reports `help is not
+  available` when the REPL has no configuration. An unknown directive is
+  an error listing the available ones; a directive with wrong arguments
+  shows its usage. Directive lines are never added to the history.
+- `exit`, `quit` or another directive name typed without `:` is an
+  ordinary command; when the application has no command of that name,
+  the error suggests the directive (`Did you mean: :quit`) (#94).
 
 ### Changed — Breaking
 
@@ -51,6 +64,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   override…) was accepted. Such a configuration now makes `build()` fail
   with the validator's `ConfigError`; run `validate_config()` on it to see
   the same error before upgrading. `load_config()` still only loads.
+- **Leaving the REPL** (#94): bare `exit` and `quit` no longer leave it;
+  use `:quit` or `:exit`. Applications that declare their own `exit` or
+  `quit` command keep it, since directives always carry the `:` prefix.
+- **REPL history is written only by `:quit` and end of input (Ctrl-D)**
+  (#94). New entries stay in memory during the session; `:exit`, an input
+  error, a handler that ends the process (such as `ExitPlugin`'s default
+  callback), a panic or a signal leave the history file as it was at
+  startup. `ReplInterface` no longer implements `Drop`, so dropping it
+  writes nothing; until v0.9.0 the history was saved on every normal exit
+  and again on drop.
+- **`:load` scripts cannot leave the session** (#94): a `:quit` or `:exit`
+  line in a loaded script, under any of its names, is reported and skipped;
+  the other lines still run.
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
