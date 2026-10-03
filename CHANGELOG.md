@@ -78,6 +78,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line in a loaded script, under any of its names, is reported and skipped;
   the other lines still run.
 
+### Fixed
+
+- **`--help` / `-h` in the REPL without a custom formatter** (#76): the
+  REPL now falls back to `DefaultHelpFormatter`, as `ReplInterface::new()`
+  documents and as CLI mode already did. Until v0.9.0, a REPL built by
+  `CliBuilder` without `help_formatter()` answered `--help`, `-h`,
+  `--help <command>` and `<command> --help` with
+  `Unknown command: '--help'`.
+
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
 - Subcommand support (git-style: `myapp config set key value`)
