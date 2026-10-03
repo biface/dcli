@@ -46,7 +46,7 @@ use crate::config::directive::{
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, ExecutionError, ParseError, Result};
-use crate::help::{DefaultHelpFormatter, HelpFormatter};
+use crate::help::{command_help_footer, DefaultHelpFormatter, HelpFormatter};
 use crate::parser::{ParsedArgs, ReplParser};
 use crate::registry::CommandRegistry;
 
@@ -527,7 +527,9 @@ impl ReplInterface {
         }
     }
 
-    /// Render the application help, or the help of `command`.
+    /// Render the application help, followed by the line on the help
+    /// directive (`Type ':help <command>' …`, under the directive's
+    /// effective name), or the help of `command`.
     ///
     /// Uses the formatter supplied to [`ReplInterface::new`], or
     /// [`DefaultHelpFormatter`] when none was supplied. Returns `None`
@@ -542,7 +544,18 @@ impl ReplInterface {
 
         Some(match command {
             Some(cmd) => formatter.format_command(config, cmd),
-            None => formatter.format_app(config),
+            None => {
+                let mut out = formatter.format_app(config);
+                out.push_str(&command_help_footer(
+                    "Type",
+                    &format!(
+                        "{}{} <command>",
+                        DIRECTIVE_PREFIX,
+                        self.help_directive_name()
+                    ),
+                ));
+                out
+            }
         })
     }
 
@@ -706,27 +719,46 @@ impl ReplInterface {
         })
     }
 
-    /// Offer the directive when an unknown command is a directive name or
-    /// alias typed without its `:` (`quit` → `:quit`).
+    /// Complete an unknown-command error for the REPL.
     ///
-    /// The parser only reports an unknown command when the application has
-    /// no command of that name, so a command always takes precedence.
-    fn suggest_directive(&self, error: DynamicCliError) -> DynamicCliError {
+    /// - When the unknown command is a directive name or alias typed
+    ///   without its `:` (`quit`), the directive (`:quit`) becomes the
+    ///   first suggestion. The parser only reports an unknown command when
+    ///   the application has no command of that name, so a command always
+    ///   takes precedence.
+    /// - The hint names the help directive under its effective name:
+    ///   `Type ':help' for available commands`.
+    ///
+    /// Any other error is returned unchanged.
+    fn complete_unknown_command(&self, error: DynamicCliError) -> DynamicCliError {
         match error {
             DynamicCliError::Parse(ParseError::UnknownCommand {
                 command,
                 mut suggestions,
-            }) if self.resolve_directive(&command).is_some() => {
-                let directive = format!("{}{}", DIRECTIVE_PREFIX, command);
-                suggestions.retain(|s| *s != directive);
-                suggestions.insert(0, directive);
+                ..
+            }) => {
+                if self.resolve_directive(&command).is_some() {
+                    let directive = format!("{}{}", DIRECTIVE_PREFIX, command);
+                    suggestions.retain(|s| *s != directive);
+                    suggestions.insert(0, directive);
+                }
                 DynamicCliError::Parse(ParseError::UnknownCommand {
                     command,
                     suggestions,
+                    hint: Some(format!(
+                        "Type '{}{}' for available commands",
+                        DIRECTIVE_PREFIX,
+                        self.help_directive_name()
+                    )),
                 })
             }
             other => other,
         }
+    }
+
+    /// Effective name of the help directive (`help` unless overridden).
+    fn help_directive_name(&self) -> &str {
+        &self.directive_definition(ReplDirective::Help).name
     }
 
     /// Run every line of the script at `path` (`:load <path>`).
@@ -1038,7 +1070,7 @@ impl ReplInterface {
         let parser = ReplParser::new(&self.registry);
         let parsed = parser
             .parse_line(line)
-            .map_err(|e| self.suggest_directive(e))?;
+            .map_err(|e| self.complete_unknown_command(e))?;
 
         // Write to history only on successful parse and when no secure
         // argument is present in the parsed command.
@@ -1314,7 +1346,10 @@ mod tests {
         let repl =
             ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
 
-        let expected_app = DefaultHelpFormatter::new().format_app(repl.config.as_deref().unwrap());
+        let expected_app = format!(
+            "{}\nType ':help <command>' for more information on a command.\n",
+            DefaultHelpFormatter::new().format_app(repl.config.as_deref().unwrap())
+        );
         let expected_cmd =
             DefaultHelpFormatter::new().format_command(repl.config.as_deref().unwrap(), "hello");
 
@@ -2174,6 +2209,16 @@ mod tests {
         }
     }
 
+    /// Unwrap an `UnknownCommand` error into its hint
+    fn unknown_command_hint(result: Result<SessionControl>) -> String {
+        match result {
+            Err(DynamicCliError::Parse(ParseError::UnknownCommand { hint, .. })) => {
+                hint.expect("the REPL sets the hint")
+            }
+            other => panic!("Expected UnknownCommand error, got {:?}", other),
+        }
+    }
+
     #[test]
     fn test_directive_table_defaults_without_config() {
         let repl = repl_with(None, None);
@@ -2229,6 +2274,87 @@ mod tests {
         assert_eq!(
             repl.render_help(Some("hello")),
             repl.try_handle_help("--help hello")
+        );
+    }
+
+    // ── Help hints (#86) ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_unknown_command_hint_names_help_directive() {
+        let mut repl = repl_with(Some(make_help_config()), None);
+        assert_eq!(
+            unknown_command_hint(repl.handle_line("frobnicate")),
+            "Type ':help' for available commands"
+        );
+    }
+
+    #[test]
+    fn test_unknown_command_hint_without_config() {
+        // The hint does not depend on the configuration.
+        let mut repl = repl_with(None, None);
+        assert_eq!(
+            unknown_command_hint(repl.handle_line("frobnicate")),
+            "Type ':help' for available commands"
+        );
+    }
+
+    #[test]
+    fn test_unknown_command_hint_with_directive_suggestion() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(Some(make_help_config()), None);
+        let error = repl.handle_line("quit").unwrap_err();
+        let formatted = crate::error::format_error(&error);
+
+        let suggestion_at = formatted.find(":quit").expect("directive suggested");
+        let hint_at = formatted
+            .find("Type ':help' for available commands")
+            .expect("hint shown");
+        assert!(suggestion_at < hint_at, "{}", formatted);
+    }
+
+    #[test]
+    fn test_help_hints_use_translated_help_directive() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(
+            Some(config_with_directives(vec![override_directive(
+                ReplDirective::Help,
+                "aide",
+                &["?"],
+            )])),
+            None,
+        );
+
+        assert_eq!(
+            unknown_command_hint(repl.handle_line("frobnicate")),
+            "Type ':aide' for available commands"
+        );
+
+        let app_help = repl.render_help(None).unwrap();
+        assert!(
+            app_help.ends_with("\nType ':aide <command>' for more information on a command.\n"),
+            "{}",
+            app_help
+        );
+        assert!(!app_help.contains(":help"), "{}", app_help);
+    }
+
+    #[test]
+    fn test_app_help_footer_names_help_directive() {
+        colored::control::set_override(false);
+        let repl = repl_with(Some(make_help_config()), None);
+        let config = repl.config.as_deref().unwrap();
+
+        assert_eq!(
+            repl.render_help(None).unwrap(),
+            format!(
+                "{}\nType ':help <command>' for more information on a command.\n",
+                DefaultHelpFormatter::new().format_app(config)
+            )
+        );
+        // Per-command help has no footer.
+        assert_eq!(
+            repl.render_help(Some("hello")).unwrap(),
+            DefaultHelpFormatter::new().format_command(config, "hello")
         );
     }
 

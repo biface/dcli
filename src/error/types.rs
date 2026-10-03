@@ -237,11 +237,32 @@ pub enum ParseError {
     ///
     /// The user typed a command that doesn't exist.
     /// Includes suggestions based on Levenshtein distance.
-    #[error("Unknown command: '{command}'. Type 'help' for available commands.")]
+    ///
+    /// The way to list the available commands depends on the interface
+    /// (`--help` in CLI mode, the help directive in the REPL), so the
+    /// interface that reports the error fills `hint`;
+    /// [`ParseError::unknown_command_with_suggestions`] leaves it empty.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::error::ParseError;
+    ///
+    /// let error = ParseError::UnknownCommand {
+    ///     command: "simulat".to_string(),
+    ///     suggestions: vec!["simulate".to_string()],
+    ///     hint: Some("Run with '--help' for available commands".to_string()),
+    /// };
+    /// assert_eq!(error.to_string(), "Unknown command: 'simulat'");
+    /// ```
+    #[error("Unknown command: '{command}'")]
     UnknownCommand {
         command: String,
         /// Similar command suggestions (from Levenshtein distance)
         suggestions: Vec<String>,
+        /// How to list the available commands, set by the interface
+        /// (not part of the Display string)
+        hint: Option<String>,
     },
 
     /// Missing required positional argument
@@ -992,10 +1013,24 @@ impl ParseError {
     /// }
     /// ```
     pub fn unknown_command_with_suggestions(command: &str, available: &[String]) -> Self {
-        let suggestions = crate::error::find_similar_strings(command, available, 3);
+        Self::unknown_command(command, available, None)
+    }
+
+    /// Same as [`unknown_command_with_suggestions`](Self::unknown_command_with_suggestions),
+    /// with the hint set by the interface reporting the error.
+    pub(crate) fn unknown_command_with_hint(
+        command: &str,
+        available: &[String],
+        hint: &str,
+    ) -> Self {
+        Self::unknown_command(command, available, Some(hint.to_string()))
+    }
+
+    fn unknown_command(command: &str, available: &[String], hint: Option<String>) -> Self {
         Self::UnknownCommand {
             command: command.to_string(),
-            suggestions,
+            suggestions: crate::error::find_similar_strings(command, available, 3),
+            hint,
         }
     }
 
@@ -1425,12 +1460,25 @@ mod tests {
             ParseError::UnknownCommand {
                 command,
                 suggestions,
+                hint,
             } => {
                 assert_eq!(command, "simulat");
                 assert!(suggestions.contains(&"simulate".to_string()));
+                assert!(hint.is_none(), "the interface sets the hint");
             }
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn test_parse_unknown_command_display_names_only_the_command() {
+        let error = ParseError::UnknownCommand {
+            command: "simulat".to_string(),
+            suggestions: vec!["simulate".to_string()],
+            hint: Some("Type ':help' for available commands".to_string()),
+        };
+        // Neither the suggestions nor the hint belong to the Display string.
+        assert_eq!(error.to_string(), "Unknown command: 'simulat'");
     }
 
     #[test]
