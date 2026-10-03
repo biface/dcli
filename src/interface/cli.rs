@@ -32,6 +32,10 @@ use crate::registry::CommandRegistry;
 use std::path::Path;
 use std::process;
 
+/// Hint attached to an unknown command: in CLI mode, `--help` lists the
+/// commands.
+const COMMANDS_HINT: &str = "Run with '--help' for available commands";
+
 /// One resolved, fully-parsed command within a (possibly single-command)
 /// chain (DD-026, #52) — the unit [`CliInterface::segment`] produces and
 /// [`CliInterface::execute_segment`] consumes.
@@ -280,9 +284,9 @@ impl CliInterface {
     /// [`crate::error::ParseError::too_many_arguments`] a single,
     /// non-chained command would raise today — no observable behaviour
     /// change for existing callers. A genuinely unknown command name is
-    /// reported via
-    /// [`crate::error::ParseError::unknown_command_with_suggestions`],
-    /// exactly as before chaining existed.
+    /// reported as [`crate::error::ParseError::UnknownCommand`] with
+    /// similar names, as before chaining existed, and a hint pointing to
+    /// `--help`.
     ///
     /// `resolve_name`/`get_definition` are stateless lookups, so the same
     /// command name (or one of its aliases) may legitimately resolve more
@@ -306,7 +310,7 @@ impl CliInterface {
             let command_name = &args[offset];
 
             let resolved_name = self.registry.resolve_name(command_name).ok_or_else(|| {
-                crate::error::ParseError::unknown_command_with_suggestions(
+                crate::error::ParseError::unknown_command_with_hint(
                     command_name,
                     &self
                         .registry
@@ -314,6 +318,7 @@ impl CliInterface {
                         .iter()
                         .map(|cmd| cmd.name.clone())
                         .collect::<Vec<_>>(),
+                    COMMANDS_HINT,
                 )
             })?;
 
@@ -754,7 +759,12 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            DynamicCliError::Parse(crate::error::ParseError::UnknownCommand { .. }) => {}
+            DynamicCliError::Parse(crate::error::ParseError::UnknownCommand { hint, .. }) => {
+                assert_eq!(
+                    hint.as_deref(),
+                    Some("Run with '--help' for available commands")
+                );
+            }
             other => panic!("Expected UnknownCommand error, got: {:?}", other),
         }
     }

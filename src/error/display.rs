@@ -14,14 +14,16 @@
 //!   ℹ  <suggestion>       ← only when a suggestion is available
 //! ```
 //!
-//! For parse errors with Levenshtein suggestions:
+//! For parse errors with Levenshtein suggestions, followed by the hint the
+//! interface attached to the error:
 //!
 //! ```text
-//! Error: Unknown command: 'simulat'. Type 'help' for available commands.
+//! Error: Unknown command: 'simulat'
 //!
 //! ?  Did you mean:
 //!   •  simulate
 //!   •  simulate2
+//!   ℹ  Type ':help' for available commands
 //! ```
 
 use colored::Colorize;
@@ -97,6 +99,7 @@ fn color_dimmed(s: &str) -> String {
 /// let error = ParseError::UnknownCommand {
 ///     command: "simulat".to_string(),
 ///     suggestions: vec!["simulate".to_string()],
+///     hint: None,
 /// };
 /// display_error(&error.into());
 /// ```
@@ -115,7 +118,8 @@ pub fn display_error(error: &DynamicCliError) {
 /// ```
 ///
 /// For parse errors with Levenshtein suggestions, a "Did you mean:" block
-/// is appended instead of the `ℹ` line.
+/// is appended instead of the `ℹ` line. An unknown command can have both:
+/// the block, then the `ℹ` line carrying the hint set by the interface.
 ///
 /// # Arguments
 ///
@@ -164,15 +168,20 @@ fn format_parse_error(output: &mut String, error: &ParseError) {
     output.push_str(&format!("{}\n", error));
 
     match error {
-        ParseError::UnknownCommand { suggestions, .. } if !suggestions.is_empty() => {
-            output.push_str(&format!("\n{} Did you mean:\n", color_question("?")));
-            for s in suggestions {
-                output.push_str(&format!(
-                    "  {} {}\n",
-                    color_bullet("•"),
-                    color_suggestion(s)
-                ));
+        ParseError::UnknownCommand {
+            suggestions, hint, ..
+        } => {
+            if !suggestions.is_empty() {
+                output.push_str(&format!("\n{} Did you mean:\n", color_question("?")));
+                for s in suggestions {
+                    output.push_str(&format!(
+                        "  {} {}\n",
+                        color_bullet("•"),
+                        color_suggestion(s)
+                    ));
+                }
             }
+            append_suggestion(output, hint.as_deref());
         }
 
         ParseError::UnknownOption { suggestions, .. } if !suggestions.is_empty() => {
@@ -456,6 +465,7 @@ mod tests {
         let error: DynamicCliError = ParseError::UnknownCommand {
             command: "simulat".to_string(),
             suggestions: vec!["simulate".to_string(), "validation".to_string()],
+            hint: None,
         }
         .into();
 
@@ -471,12 +481,50 @@ mod tests {
         let error: DynamicCliError = ParseError::UnknownCommand {
             command: "xyz".to_string(),
             suggestions: vec![],
+            hint: None,
         }
         .into();
 
         let formatted = format_error(&error);
         assert!(formatted.contains("xyz"));
         assert!(!formatted.contains("Did you mean"));
+        assert!(!formatted.contains('ℹ'), "no hint, no hint line");
+        assert!(
+            !formatted.contains("help"),
+            "the error itself names no help"
+        );
+    }
+
+    #[test]
+    fn test_format_parse_unknown_command_hint_after_suggestions() {
+        let error: DynamicCliError = ParseError::UnknownCommand {
+            command: "simulat".to_string(),
+            suggestions: vec!["simulate".to_string()],
+            hint: Some("Type ':help' for available commands".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        let suggestion_at = formatted.find("simulate").expect("suggestion shown");
+        let hint_at = formatted
+            .find("Type ':help' for available commands")
+            .expect("hint shown");
+        assert!(suggestion_at < hint_at, "hint comes after the suggestions");
+        assert!(formatted.contains('ℹ'));
+    }
+
+    #[test]
+    fn test_format_parse_unknown_command_hint_without_suggestions() {
+        let error: DynamicCliError = ParseError::UnknownCommand {
+            command: "xyz".to_string(),
+            suggestions: vec![],
+            hint: Some("Run with '--help' for available commands".to_string()),
+        }
+        .into();
+
+        let formatted = format_error(&error);
+        assert!(!formatted.contains("Did you mean"));
+        assert!(formatted.contains("Run with '--help' for available commands"));
     }
 
     #[test]
