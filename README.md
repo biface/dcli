@@ -148,10 +148,10 @@ HELLO, BOB!
 $ myapp
 myapp > greet Alice
 Hello, Alice!
-myapp > help
+myapp > :help
 Available commands:
   greet [name] - Greet someone
-myapp > exit
+myapp > :quit
 ```
 
 **Multi-line commands in REPL** (v0.9.0+) — end a line with `\` to

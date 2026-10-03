@@ -30,16 +30,15 @@
 //! # Ok::<(), dynamic_cli::error::DynamicCliError>(())
 //! ```
 
-use crate::config::directive::{effective_directives, DirectiveDefinition, ReplDirective};
+use crate::config::directive::{
+    effective_directives, DirectiveDefinition, ReplDirective, DIRECTIVE_PREFIX,
+};
 use crate::config::schema::{
     ArgumentDefinition, ArgumentType, CommandDefinition, CommandsConfig, OptionDefinition,
     ValidationRule,
 };
 use crate::error::{ConfigError, Result};
 use std::collections::{HashMap, HashSet};
-
-/// Prefix reserved for REPL directives (`:help`, `:quit`…)
-const DIRECTIVE_PREFIX: char = ':';
 
 /// Validate the entire configuration
 ///

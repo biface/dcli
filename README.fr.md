@@ -149,10 +149,10 @@ BONJOUR, BOB !
 $ monapp
 monapp > saluer Alice
 Bonjour, Alice !
-monapp > help
+monapp > :help
 Commandes disponibles :
   saluer [nom] - Saluer quelqu'un
-monapp > exit
+monapp > :quit
 ```
 
 **Commandes multi-lignes en REPL** (v0.9.0+) — terminez une ligne par

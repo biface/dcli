@@ -41,6 +41,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Prefix that marks a REPL line as a directive
+pub(crate) const DIRECTIVE_PREFIX: char = ':';
+
 /// Framework directive available in the REPL
 ///
 /// Deserialized from the `implementation` field of a `directives:` entry

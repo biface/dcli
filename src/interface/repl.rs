@@ -5,6 +5,8 @@
 //! - Per-application command history (persistent across sessions)
 //! - Tab completion at three levels: commands, sub-commands, argument flags
 //! - Colored prompts and error display
+//! - `:`-prefixed directives (`:help`, `:load`, `:quit`, `:exit`), whose
+//!   names can be overridden in the configuration
 //!
 //! # Example
 //!
@@ -38,6 +40,9 @@ use rustyline::hint::Hinter;
 use rustyline::validate::Validator;
 use rustyline::{CompletionType, Config, Context, Editor, Helper};
 
+use crate::config::directive::{
+    effective_directives, DirectiveDefinition, ReplDirective, DIRECTIVE_PREFIX,
+};
 use crate::config::schema::CommandsConfig;
 use crate::context::ExecutionContext;
 use crate::error::{display_error, DynamicCliError, ExecutionError, ParseError, Result};
@@ -242,7 +247,7 @@ impl Validator for DcliHelper {}
 /// - Per-application persistent command history
 /// - Tab completion (commands, aliases, option flags)
 /// - Graceful error handling
-/// - Special commands (exit, quit, --help)
+/// - `:`-prefixed directives and `--help` interception
 ///
 /// # Architecture
 ///
@@ -253,12 +258,27 @@ impl Validator for DcliHelper {}
 ///          (commands + flags)
 /// ```
 ///
-/// # Special Commands
+/// # Directives
 ///
-/// The REPL recognizes these built-in commands:
-/// - `exit`, `quit` — Exit the REPL
-/// - `--help`, `-h` — Show application-level help (if a formatter is attached)
-/// - `<cmd> --help`, `--help <cmd>` — Show per-command help
+/// A line starting with `:` is a framework directive; any other line is an
+/// application command, so a directive never shadows a command. With the
+/// default names:
+///
+/// | Directive         | Aliases    | Effect                                        |
+/// |-------------------|------------|-----------------------------------------------|
+/// | `:help [command]` | `:h`, `:?` | Application help, or the help of one command  |
+/// | `:load <path>`    |            | Run every line of a script file               |
+/// | `:quit`           | `:q`       | Save the session history, then leave          |
+/// | `:exit`           |            | Leave without saving the session history      |
+///
+/// Names, aliases and descriptions come from the configuration's
+/// `directives:` section when present (see [`crate::config::directive`]);
+/// a renamed directive no longer answers to its default name. `exit` or
+/// `quit` typed without `:` is an ordinary command; when the application
+/// has no such command, the error suggests the matching directive.
+///
+/// `--help`, `-h`, `--help <command>` and `<command> --help` are also
+/// intercepted and rendered like `:help`.
 ///
 /// # History
 ///
@@ -266,8 +286,14 @@ impl Validator for DcliHelper {}
 /// - Linux/macOS: `~/.local/share/<app_name>/history`
 /// - Windows:     `%LOCALAPPDATA%\<app_name>\history`
 ///
-/// Lines containing a `secure: true` argument are never written to history.
-/// Lines that fail to parse are discarded silently.
+/// The history file is read when the REPL starts. During the session, new
+/// entries are kept in memory; the file is written only when the session
+/// ends with `:quit` or end of input (Ctrl-D). Leaving with `:exit`, an
+/// input error, a handler that exits the process, a panic or a signal
+/// leaves the file as it was at startup.
+///
+/// Lines containing a `secure: true` argument are never added to history.
+/// Lines that fail to parse and directive lines are not added either.
 pub struct ReplInterface {
     /// Shared command registry — single source of truth for names, aliases,
     /// definitions, and handlers.
@@ -313,6 +339,20 @@ pub struct ReplInterface {
     /// (the constructor argument) only ever supplied the app-name segment
     /// of the main prompt.
     prompt_multiline: Option<String>,
+
+    /// Effective directive table: the configured overrides merged with the
+    /// defaults, one entry per [`ReplDirective`] in `ReplDirective::ALL`
+    /// order. Defaults only when no config was supplied.
+    directives: Vec<DirectiveDefinition>,
+}
+
+/// What the REPL session does after a line
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SessionControl {
+    /// Read the next line
+    Continue,
+    /// Leave the REPL, writing the session history first or not
+    Leave { save_history: bool },
 }
 
 impl ReplInterface {
@@ -381,6 +421,14 @@ impl ReplInterface {
             .map(|c| c.metadata.prompt_suffix.clone())
             .unwrap_or_else(crate::config::schema::default_prompt_suffix);
 
+        // DA-030 (#92): the directive table is fixed for the session.
+        let directives = effective_directives(
+            config
+                .as_ref()
+                .map(|c| c.directives.as_slice())
+                .unwrap_or_default(),
+        );
+
         // Wrap config in Arc if present — shared with the completer.
         let config: Option<Arc<CommandsConfig>> = config.map(Arc::new);
 
@@ -409,6 +457,7 @@ impl ReplInterface {
             config,
             help_formatter,
             prompt_multiline: None,
+            directives,
         };
 
         repl.load_history();
@@ -478,15 +527,31 @@ impl ReplInterface {
         }
     }
 
+    /// Render the application help, or the help of `command`.
+    ///
+    /// Uses the formatter supplied to [`ReplInterface::new`], or
+    /// [`DefaultHelpFormatter`] when none was supplied. Returns `None`
+    /// without a configuration, since there is nothing to render.
+    fn render_help(&self, command: Option<&str>) -> Option<String> {
+        let config = self.config.as_deref()?;
+        // `DefaultHelpFormatter` is a unit struct: the fallback costs no
+        // allocation and is only built when help is actually requested.
+        let default_formatter = DefaultHelpFormatter::new();
+        let formatter: &dyn HelpFormatter =
+            self.help_formatter.as_deref().unwrap_or(&default_formatter);
+
+        Some(match command {
+            Some(cmd) => formatter.format_command(config, cmd),
+            None => formatter.format_app(config),
+        })
+    }
+
     /// Try to handle a `--help` / `-h` request.
     ///
     /// Returns `Some(output)` when the line is a help request and a
     /// configuration is available, `None` otherwise (normal command
-    /// processing continues).
-    ///
-    /// Renders through the formatter supplied to [`ReplInterface::new`], or
-    /// through [`DefaultHelpFormatter`] when none was supplied. Without a
-    /// configuration there is nothing to render, so help is not intercepted.
+    /// processing continues). Rendering goes through
+    /// [`render_help`][Self::render_help].
     ///
     /// Recognized patterns (case-sensitive):
     ///
@@ -499,17 +564,10 @@ impl ReplInterface {
     /// | `<command> --help` | Per-command help          |
     /// | `<command> -h`     | Per-command help          |
     fn try_handle_help(&self, line: &str) -> Option<String> {
-        let config = self.config.as_deref()?;
-        // `DefaultHelpFormatter` is a unit struct: the fallback costs no
-        // allocation and is only built when help is actually requested.
-        let default_formatter = DefaultHelpFormatter::new();
-        let formatter: &dyn HelpFormatter =
-            self.help_formatter.as_deref().unwrap_or(&default_formatter);
-
         let trimmed = line.trim();
 
         if trimmed == "--help" || trimmed == "-h" {
-            return Some(formatter.format_app(config));
+            return self.render_help(None);
         }
 
         if let Some(rest) = trimmed
@@ -518,7 +576,7 @@ impl ReplInterface {
         {
             let cmd = rest.trim();
             if !cmd.is_empty() {
-                return Some(formatter.format_command(config, cmd));
+                return self.render_help(Some(cmd));
             }
         }
 
@@ -526,54 +584,170 @@ impl ReplInterface {
         if parts.len() >= 2 {
             let last = *parts.last().unwrap();
             if last == "--help" || last == "-h" {
-                return Some(formatter.format_command(config, parts[0]));
+                return self.render_help(Some(parts[0]));
             }
         }
 
         None
     }
 
-    /// Intercept a `:load <path>` line before normal command parsing (#41
-    /// scope extension).
+    /// Dispatch one input line: a directive when it starts with `:`, an
+    /// application command otherwise.
     ///
-    /// Returns `None` when `line` doesn't start with `:load ` — normal
-    /// dispatch proceeds. Returns `Some(result)` when it does, whether
-    /// the load itself succeeds or fails.
-    ///
-    /// Unlike [`CliInterface::run_script`][crate::interface::CliInterface::run_script],
-    /// there is no error-policy parameter here: a failing line is
-    /// reported inline (via [`display_error`]) and the load always
-    /// continues to the next line, printing a final `succeeded/attempted`
-    /// summary. This matches how the REPL already surfaces errors for
-    /// interactively-typed lines — one at a time, without halting the
-    /// session — rather than the batch abort/continue choice that makes
-    /// sense for a one-shot script run.
-    ///
-    /// Each loaded line is dispatched via [`execute_line`][Self::execute_line]
-    /// itself — the same scalar-only path (DD-024 addendum) as any other
-    /// REPL-typed line, **not**
-    /// [`crate::interface::CliInterface::run_script`]'s typed/repeatable-options
-    /// path. A loaded script is not added to `rustyline` history, and a
-    /// script that `:load`s itself (directly or via another file) will
-    /// recurse until the file handle limit or stack is exhausted — no
-    /// cycle detection is implemented.
-    fn try_handle_load(&mut self, line: &str) -> Option<Result<()>> {
-        let path = line.trim().strip_prefix(":load ").map(str::trim)?;
+    /// Shared by [`run`][Self::run] and [`load_script`][Self::load_script].
+    /// Returns what the session does next; only `:quit` and `:exit` ask to
+    /// leave. Leaving, and writing the history, is up to the caller.
+    fn handle_line(&mut self, line: &str) -> Result<SessionControl> {
+        let line = line.trim();
 
-        if path.is_empty() {
-            return Some(Err(DynamicCliError::Parse(ParseError::InvalidSyntax {
-                details: "`:load` requires a file path".to_string(),
-                hint: Some("Usage: :load <path/to/script.txt>".to_string()),
-            })));
+        if line.starts_with(DIRECTIVE_PREFIX) {
+            return self.dispatch_directive(line);
         }
 
-        Some(self.load_script(path))
+        self.execute_line(line)?;
+        Ok(SessionControl::Continue)
     }
 
-    /// Read `path` and dispatch each non-blank, non-comment (`#`-prefixed)
-    /// line through [`execute_line`][Self::execute_line], continuing past
-    /// any failure. See [`try_handle_load`][Self::try_handle_load] for the
-    /// full behaviour.
+    /// Directive whose effective name or alias is `name` (typed without
+    /// its `:`), if any.
+    fn resolve_directive(&self, name: &str) -> Option<ReplDirective> {
+        self.directives
+            .iter()
+            .find(|def| def.name == name || def.aliases.iter().any(|alias| alias == name))
+            .map(|def| def.implementation)
+    }
+
+    /// Effective definition of `directive`.
+    fn directive_definition(&self, directive: ReplDirective) -> &DirectiveDefinition {
+        self.directives
+            .iter()
+            .find(|def| def.implementation == directive)
+            // The table holds every variant: built by `effective_directives`.
+            .expect("directive table covers every ReplDirective")
+    }
+
+    /// Usage line of `directive` with its effective name, e.g.
+    /// `:help [command]`.
+    fn directive_usage(&self, directive: ReplDirective) -> String {
+        let name = &self.directive_definition(directive).name;
+        match directive.usage() {
+            "" => format!("{}{}", DIRECTIVE_PREFIX, name),
+            args => format!("{}{} {}", DIRECTIVE_PREFIX, name, args),
+        }
+    }
+
+    /// Run one directive line (starting with `:`).
+    ///
+    /// The first word after `:` selects the directive through the effective
+    /// table; the rest of the line is its argument.
+    fn dispatch_directive(&mut self, line: &str) -> Result<SessionControl> {
+        let body = &line[DIRECTIVE_PREFIX.len_utf8()..];
+        let (name, rest) = match body.split_once(char::is_whitespace) {
+            Some((name, rest)) => (name, rest.trim()),
+            None => (body, ""),
+        };
+
+        let directive = self
+            .resolve_directive(name)
+            .ok_or_else(|| self.unknown_directive_error(name))?;
+
+        // DA-030 (#92): exhaustive match — a new variant must be handled here.
+        match directive {
+            ReplDirective::Help => {
+                if rest.split_whitespace().count() > 1 {
+                    return Err(self.usage_error(name, directive, "takes at most one command"));
+                }
+                let command = (!rest.is_empty()).then_some(rest);
+                let output = self.render_help(command).ok_or_else(|| {
+                    DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
+                        "help is not available"
+                    )))
+                })?;
+                print!("{}", output);
+                Ok(SessionControl::Continue)
+            }
+            ReplDirective::Load => {
+                if rest.is_empty() {
+                    return Err(self.usage_error(name, directive, "requires a file path"));
+                }
+                self.load_script(rest)?;
+                Ok(SessionControl::Continue)
+            }
+            ReplDirective::Quit | ReplDirective::Exit => {
+                if !rest.is_empty() {
+                    return Err(self.usage_error(name, directive, "takes no argument"));
+                }
+                Ok(SessionControl::Leave {
+                    save_history: directive == ReplDirective::Quit,
+                })
+            }
+        }
+    }
+
+    /// Error for a directive typed as `:<typed>` with invalid arguments.
+    fn usage_error(&self, typed: &str, directive: ReplDirective, problem: &str) -> DynamicCliError {
+        DynamicCliError::Parse(ParseError::InvalidSyntax {
+            details: format!("`{}{}` {}", DIRECTIVE_PREFIX, typed, problem),
+            hint: Some(format!("Usage: {}", self.directive_usage(directive))),
+        })
+    }
+
+    /// Error for `:<typed>` matching no directive, listing the effective
+    /// directive names.
+    fn unknown_directive_error(&self, typed: &str) -> DynamicCliError {
+        let available: Vec<String> = self
+            .directives
+            .iter()
+            .map(|def| format!("{}{}", DIRECTIVE_PREFIX, def.name))
+            .collect();
+        DynamicCliError::Parse(ParseError::InvalidSyntax {
+            details: format!("Unknown directive '{}{}'", DIRECTIVE_PREFIX, typed),
+            hint: Some(format!("Available directives: {}", available.join(", "))),
+        })
+    }
+
+    /// Offer the directive when an unknown command is a directive name or
+    /// alias typed without its `:` (`quit` → `:quit`).
+    ///
+    /// The parser only reports an unknown command when the application has
+    /// no command of that name, so a command always takes precedence.
+    fn suggest_directive(&self, error: DynamicCliError) -> DynamicCliError {
+        match error {
+            DynamicCliError::Parse(ParseError::UnknownCommand {
+                command,
+                mut suggestions,
+            }) if self.resolve_directive(&command).is_some() => {
+                let directive = format!("{}{}", DIRECTIVE_PREFIX, command);
+                suggestions.retain(|s| *s != directive);
+                suggestions.insert(0, directive);
+                DynamicCliError::Parse(ParseError::UnknownCommand {
+                    command,
+                    suggestions,
+                })
+            }
+            other => other,
+        }
+    }
+
+    /// Run every line of the script at `path` (`:load <path>`).
+    ///
+    /// Each non-blank, non-comment (`#`-prefixed) line goes through
+    /// [`handle_line`][Self::handle_line], like a typed line: commands,
+    /// `--help` and the `:help` / `:load` directives run normally. A
+    /// directive that leaves the session (`:quit`, `:exit`, under any of
+    /// their names) is refused: it is reported and skipped, and the script
+    /// goes on.
+    ///
+    /// There is no error-policy parameter, unlike
+    /// [`CliInterface::run_script`][crate::interface::CliInterface::run_script]:
+    /// a failing line is reported inline (via [`display_error`]) and the
+    /// load always continues, then prints a `succeeded/attempted` summary.
+    ///
+    /// Loaded lines follow the REPL's scalar-only parsing path, not
+    /// `run_script()`'s typed/repeatable-options path, and are not added to
+    /// history. A script that loads itself (directly or through another
+    /// file) recurses until the file handle limit or the stack is
+    /// exhausted: no cycle detection is implemented.
     fn load_script(&mut self, path: &str) -> Result<()> {
         let content = std::fs::read_to_string(path).map_err(|e| {
             DynamicCliError::Execution(ExecutionError::CommandFailed(anyhow::anyhow!(
@@ -596,8 +770,16 @@ impl ReplInterface {
 
             attempted += 1;
 
-            match self.execute_line(script_line) {
-                Ok(()) => succeeded += 1,
+            match self.handle_line(script_line) {
+                Ok(SessionControl::Continue) => succeeded += 1,
+                Ok(SessionControl::Leave { .. }) => {
+                    // Nothing has happened yet: leaving is done by `run()`.
+                    let typed = script_line.split_whitespace().next().unwrap_or_default();
+                    eprintln!(
+                        "  :load {} — line {}: '{}' cannot be used in a script; line skipped",
+                        path, line_number, typed
+                    );
+                }
                 Err(e) => {
                     eprintln!("  :load {} — line {}:", path, line_number);
                     display_error(&e);
@@ -656,7 +838,9 @@ impl ReplInterface {
         }
     }
 
-    /// Save command history to file.
+    /// Write the session history to the history file.
+    ///
+    /// Called only when the session ends with `:quit` or end of input.
     fn save_history(&mut self) {
         if let Some(ref path) = self.history_path {
             if let Err(e) = self.editor.save_history(path) {
@@ -673,7 +857,7 @@ impl ReplInterface {
     /// 2. Reads user input (with tab completion)
     /// 3. Parses and executes the command
     /// 4. Displays results or errors
-    /// 5. Repeats until the user exits
+    /// 5. Repeats until `:quit`, `:exit` or end of input
     ///
     /// # Multi-line option accumulation (DD-027, #69)
     ///
@@ -682,11 +866,10 @@ impl ReplInterface {
     /// [`effective_prompt_multiline`][Self::effective_prompt_multiline],
     /// and another line is read. The first line that does *not* end in `\`
     /// completes the buffer — every fragment plus this final one are
-    /// joined with a single space and dispatched through
-    /// [`execute_line`][Self::execute_line] exactly once, with the normal
-    /// prompt restored. Only this fully reconstructed line (no `\`
-    /// markers) can ever reach REPL history — `execute_line()` never sees
-    /// a raw partial fragment.
+    /// joined with a single space and dispatched exactly once, with the
+    /// normal prompt restored. Only this fully reconstructed line (no `\`
+    /// markers) can ever reach REPL history — the dispatch never sees a raw
+    /// partial fragment.
     ///
     /// A `Ctrl+C` while accumulating discards the buffer and returns to
     /// the normal prompt, mirroring the familiar shell convention of
@@ -699,8 +882,11 @@ impl ReplInterface {
     ///
     /// # Returns
     ///
-    /// - `Ok(())` when the user exits normally (via `exit` or `quit`)
-    /// - `Err(_)` on critical errors (I/O failures, etc.)
+    /// - `Ok(())` when the session ends: `:quit` or end of input (Ctrl-D),
+    ///   which save the session history, `:exit`, which does not, or an
+    ///   input error, reported on stderr, which does not either
+    /// - `Err(_)` is reserved for critical errors; command and directive
+    ///   errors are displayed and the loop goes on
     ///
     /// # Example
     ///
@@ -748,16 +934,15 @@ impl ReplInterface {
                         continue;
                     }
 
-                    if line == "exit" || line == "quit" {
-                        println!("Goodbye!");
-                        break;
-                    }
-
-                    // Parse and execute command.
-                    // History is written inside execute_line(), after successful
-                    // parsing and only when no secure argument is present.
-                    match self.execute_line(&line) {
-                        Ok(()) => {}
+                    // History entries are added inside execute_line(), after
+                    // successful parsing and only when no secure argument is
+                    // present; directives are never added.
+                    match self.handle_line(&line) {
+                        Ok(SessionControl::Continue) => {}
+                        Ok(SessionControl::Leave { save_history }) => {
+                            self.end_session(save_history);
+                            break;
+                        }
                         Err(e) => {
                             display_error(&e);
                         }
@@ -772,11 +957,15 @@ impl ReplInterface {
                     continue;
                 }
 
+                // End of input (Ctrl-D) ends the session like `:quit`.
                 Err(ReadlineError::Eof) => {
-                    println!("exit");
+                    println!();
+                    self.end_session(true);
                     break;
                 }
 
+                // DA-030 (#92): any other termination leaves the history
+                // file untouched.
                 Err(err) => {
                     eprintln!("Error reading input: {}", err);
                     break;
@@ -784,8 +973,16 @@ impl ReplInterface {
             }
         }
 
-        self.save_history();
         Ok(())
+    }
+
+    /// End the session: write the history when `save_history` is set, then
+    /// say goodbye.
+    fn end_session(&mut self, save_history: bool) {
+        if save_history {
+            self.save_history();
+        }
+        println!("Goodbye!");
     }
 
     /// Feed one raw input line into the `\`-continuation buffer (DD-027,
@@ -827,6 +1024,7 @@ impl ReplInterface {
     ///
     /// Parses the line and executes the corresponding command.
     /// `--help` and `-h` requests are intercepted before dispatch.
+    /// Directives are handled earlier, by [`handle_line`][Self::handle_line].
     ///
     /// History is written here — after successful parsing — so that:
     /// - Failed or invalid commands are never persisted.
@@ -837,12 +1035,10 @@ impl ReplInterface {
             return Ok(());
         }
 
-        if let Some(result) = self.try_handle_load(line) {
-            return result;
-        }
-
         let parser = ReplParser::new(&self.registry);
-        let parsed = parser.parse_line(line)?;
+        let parsed = parser
+            .parse_line(line)
+            .map_err(|e| self.suggest_directive(e))?;
 
         // Write to history only on successful parse and when no secure
         // argument is present in the parsed command.
@@ -874,12 +1070,6 @@ impl ReplInterface {
         }
 
         Ok(())
-    }
-}
-
-impl Drop for ReplInterface {
-    fn drop(&mut self) {
-        self.save_history();
     }
 }
 
@@ -1577,7 +1767,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_executes_each_line_via_execute_line() {
+    fn test_load_executes_each_line_via_handle_line() {
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let mut repl =
@@ -1586,7 +1776,7 @@ mod tests {
         let script = write_script("test\nt\n");
         let line = format!(":load {}", script.path().display());
 
-        assert!(repl.execute_line(&line).is_ok());
+        assert!(repl.handle_line(&line).is_ok());
 
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         assert_eq!(ctx.executed_commands, vec!["test", "test"]);
@@ -1602,7 +1792,7 @@ mod tests {
         let script = write_script("# a comment\n\ntest\n   \n# another\n");
         let line = format!(":load {}", script.path().display());
 
-        assert!(repl.execute_line(&line).is_ok());
+        assert!(repl.handle_line(&line).is_ok());
 
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         assert_eq!(ctx.executed_commands, vec!["test"]);
@@ -1621,7 +1811,7 @@ mod tests {
         // Unlike CliInterface::run_script(Abort), :load never returns Err
         // just because a line inside it failed — the failure is displayed
         // inline and the load proceeds to the next line.
-        let result = repl.execute_line(&line);
+        let result = repl.handle_line(&line);
         assert!(result.is_ok());
 
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
@@ -1635,7 +1825,7 @@ mod tests {
         let mut repl =
             ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
 
-        let result = repl.execute_line(":load");
+        let result = repl.handle_line(":load");
         assert!(result.is_err());
     }
 
@@ -1646,7 +1836,7 @@ mod tests {
         let mut repl =
             ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
 
-        let result = repl.execute_line(":load /nonexistent/path/to/script.txt");
+        let result = repl.handle_line(":load /nonexistent/path/to/script.txt");
         assert!(result.is_err());
     }
 
@@ -1659,7 +1849,7 @@ mod tests {
 
         let script = write_script("test\n");
         let line = format!(":load {}", script.path().display());
-        assert!(repl.execute_line(&line).is_ok());
+        assert!(repl.handle_line(&line).is_ok());
 
         let history = repl.editor.history();
         let load_in_history = (0..history.len()).any(|i| {
@@ -1899,7 +2089,7 @@ mod tests {
     #[test]
     fn test_load_line_ending_in_backslash_is_not_continued() {
         // :load bypasses run()'s accumulation buffer entirely — each script
-        // line goes straight to execute_line(), one at a time. A trailing
+        // line goes straight to handle_line(), one at a time. A trailing
         // `\` in a script has no special meaning there (DD-027 scopes
         // continuation to the interactive `run()` loop only).
         let registry = create_test_registry();
@@ -1913,10 +2103,357 @@ mod tests {
         // The first line ("test \") is dispatched as-is — "\" is an
         // unexpected extra positional argument for the zero-arity "test"
         // command, not silently joined with the next line.
-        assert!(repl.execute_line(&line).is_ok());
+        assert!(repl.handle_line(&line).is_ok());
 
         let ctx = crate::context::downcast_ref::<TestContext>(&*repl.context).unwrap();
         // Only the second, unadorned "test" line actually executed.
         assert_eq!(ctx.executed_commands, vec!["test"]);
+    }
+
+    // ── Directives (#94) ─────────────────────────────────────────────────────
+
+    use crate::config::directive::DirectiveDefinition;
+
+    fn repl_with(
+        config: Option<CommandsConfig>,
+        formatter: Option<Box<dyn HelpFormatter>>,
+    ) -> ReplInterface {
+        let registry = create_test_registry();
+        let context = Box::new(TestContext::default());
+        ReplInterface::new(registry, context, "test".to_string(), config, formatter).unwrap()
+    }
+
+    /// `make_help_config()` with the given directive overrides
+    fn config_with_directives(directives: Vec<DirectiveDefinition>) -> CommandsConfig {
+        let mut config = make_help_config();
+        config.directives = directives;
+        config
+    }
+
+    fn override_directive(
+        implementation: ReplDirective,
+        name: &str,
+        aliases: &[&str],
+    ) -> DirectiveDefinition {
+        DirectiveDefinition {
+            implementation,
+            name: name.to_string(),
+            aliases: aliases.iter().map(|a| a.to_string()).collect(),
+            description: "Custom".to_string(),
+        }
+    }
+
+    fn history_len(repl: &ReplInterface) -> usize {
+        repl.editor.history().len()
+    }
+
+    fn executed(repl: &ReplInterface) -> Vec<String> {
+        crate::context::downcast_ref::<TestContext>(&*repl.context)
+            .unwrap()
+            .executed_commands
+            .clone()
+    }
+
+    /// Unwrap an `InvalidSyntax` error into `(details, hint)`
+    fn invalid_syntax(result: Result<SessionControl>) -> (String, String) {
+        match result {
+            Err(DynamicCliError::Parse(ParseError::InvalidSyntax { details, hint })) => {
+                (details, hint.unwrap_or_default())
+            }
+            other => panic!("Expected InvalidSyntax error, got {:?}", other),
+        }
+    }
+
+    /// Unwrap an `UnknownCommand` error into its suggestions
+    fn unknown_command_suggestions(result: Result<SessionControl>) -> Vec<String> {
+        match result {
+            Err(DynamicCliError::Parse(ParseError::UnknownCommand { suggestions, .. })) => {
+                suggestions
+            }
+            other => panic!("Expected UnknownCommand error, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_directive_table_defaults_without_config() {
+        let repl = repl_with(None, None);
+        assert_eq!(repl.directives, effective_directives(&[]));
+        assert_eq!(repl.resolve_directive("q"), Some(ReplDirective::Quit));
+        assert_eq!(repl.resolve_directive("?"), Some(ReplDirective::Help));
+        assert_eq!(repl.resolve_directive("test"), None);
+    }
+
+    #[test]
+    fn test_directive_help_forms_without_formatter() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(Some(make_help_config()), None);
+        for line in [
+            ":help",
+            ":h",
+            ":?",
+            ":help hello",
+            ":h hi",
+            "  :help  hello  ",
+        ] {
+            assert_eq!(
+                repl.handle_line(line).unwrap(),
+                SessionControl::Continue,
+                "{}",
+                line
+            );
+        }
+    }
+
+    #[test]
+    fn test_directive_help_forms_with_formatter() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(
+            Some(make_help_config()),
+            Some(Box::new(DefaultHelpFormatter::new())),
+        );
+        for line in [":help", ":h", ":?", ":help hello"] {
+            assert_eq!(
+                repl.handle_line(line).unwrap(),
+                SessionControl::Continue,
+                "{}",
+                line
+            );
+        }
+    }
+
+    #[test]
+    fn test_directive_help_renders_like_help_flag() {
+        colored::control::set_override(false);
+        let repl = repl_with(Some(make_help_config()), None);
+        assert_eq!(repl.render_help(None), repl.try_handle_help("--help"));
+        assert_eq!(
+            repl.render_help(Some("hello")),
+            repl.try_handle_help("--help hello")
+        );
+    }
+
+    #[test]
+    fn test_directive_help_without_config_is_not_available() {
+        let mut repl = repl_with(None, None);
+        let err = repl.handle_line(":help").unwrap_err();
+        assert!(err.to_string().contains("help is not available"), "{}", err);
+    }
+
+    #[test]
+    fn test_directive_help_with_two_arguments_is_a_usage_error() {
+        let mut repl = repl_with(Some(make_help_config()), None);
+        let (details, hint) = invalid_syntax(repl.handle_line(":h hello extra"));
+        assert!(details.contains("`:h`"), "{}", details);
+        assert_eq!(hint, "Usage: :help [command]");
+    }
+
+    #[test]
+    fn test_directive_quit_and_exit_leave() {
+        let mut repl = repl_with(None, None);
+        let save = SessionControl::Leave { save_history: true };
+        let discard = SessionControl::Leave {
+            save_history: false,
+        };
+        assert_eq!(repl.handle_line(":quit").unwrap(), save);
+        assert_eq!(repl.handle_line(":q").unwrap(), save);
+        assert_eq!(repl.handle_line(":exit").unwrap(), discard);
+    }
+
+    #[test]
+    fn test_directive_quit_with_argument_is_a_usage_error() {
+        let mut repl = repl_with(None, None);
+        let (details, hint) = invalid_syntax(repl.handle_line(":q now"));
+        assert!(details.contains("takes no argument"), "{}", details);
+        assert_eq!(hint, "Usage: :quit");
+    }
+
+    #[test]
+    fn test_directive_load_without_path_shows_usage() {
+        let mut repl = repl_with(None, None);
+        let (details, hint) = invalid_syntax(repl.handle_line(":load"));
+        assert!(details.contains("requires a file path"), "{}", details);
+        assert_eq!(hint, "Usage: :load <path>");
+    }
+
+    #[test]
+    fn test_end_session_with_save_writes_history_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history");
+        let mut repl = repl_with(None, None);
+        repl.history_path = Some(path.clone());
+
+        assert!(repl.handle_line("test").is_ok());
+        repl.end_session(true);
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        assert!(content.lines().any(|l| l == "test"), "{}", content);
+    }
+
+    #[test]
+    fn test_end_session_without_save_leaves_history_file_unchanged() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history");
+        std::fs::write(&path, "previous\n").unwrap();
+        let mut repl = repl_with(None, None);
+        repl.history_path = Some(path.clone());
+
+        assert!(repl.handle_line("test").is_ok());
+        repl.end_session(false);
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "previous\n");
+    }
+
+    #[test]
+    fn test_drop_does_not_write_history_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("history");
+        let mut repl = repl_with(None, None);
+        repl.history_path = Some(path.clone());
+
+        assert!(repl.handle_line("test").is_ok());
+        drop(repl);
+
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn test_directive_lines_are_not_added_to_history() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(Some(make_help_config()), None);
+        // `new()` loads the history file of the "test" prompt, if any.
+        let before = history_len(&repl);
+        for line in [":help", ":quit", ":exit", ":unknown"] {
+            let _ = repl.handle_line(line);
+        }
+        assert_eq!(history_len(&repl), before);
+    }
+
+    #[test]
+    fn test_bare_quit_and_exit_no_longer_leave() {
+        let mut repl = repl_with(None, None);
+
+        let suggestions = unknown_command_suggestions(repl.handle_line("quit"));
+        assert_eq!(suggestions.first().map(String::as_str), Some(":quit"));
+
+        let suggestions = unknown_command_suggestions(repl.handle_line("exit"));
+        assert_eq!(suggestions.first().map(String::as_str), Some(":exit"));
+
+        let suggestions = unknown_command_suggestions(repl.handle_line("q"));
+        assert_eq!(suggestions.first().map(String::as_str), Some(":q"));
+    }
+
+    #[test]
+    fn test_unknown_command_unrelated_to_directives_gets_no_directive() {
+        let mut repl = repl_with(None, None);
+        let suggestions = unknown_command_suggestions(repl.handle_line("frobnicate"));
+        assert!(suggestions.iter().all(|s| !s.starts_with(':')));
+    }
+
+    #[test]
+    fn test_application_command_named_like_a_directive_runs() {
+        let mut registry = create_test_registry();
+        let exit = CommandDefinition {
+            name: "exit".to_string(),
+            aliases: vec![],
+            description: "Application exit command".to_string(),
+            required: false,
+            arguments: vec![],
+            options: vec![],
+            implementation: "exit_handler".to_string(),
+            continue_on_failure: false,
+            requires_success: false,
+        };
+        registry
+            .register_sync(
+                exit,
+                Box::new(TestHandler {
+                    name: "exit".to_string(),
+                }),
+            )
+            .unwrap();
+        let context = Box::new(TestContext::default());
+        let mut repl =
+            ReplInterface::new(registry, context, "test".to_string(), None, None).unwrap();
+
+        assert_eq!(repl.handle_line("exit").unwrap(), SessionControl::Continue);
+        assert_eq!(executed(&repl), vec!["exit"]);
+        // The directive stays reachable with its prefix.
+        assert_eq!(
+            repl.handle_line(":exit").unwrap(),
+            SessionControl::Leave {
+                save_history: false
+            }
+        );
+    }
+
+    #[test]
+    fn test_translated_directive_names_replace_defaults() {
+        let mut repl = repl_with(
+            Some(config_with_directives(vec![
+                override_directive(ReplDirective::Quit, "quitter", &[]),
+                override_directive(ReplDirective::Load, "charger", &["c"]),
+            ])),
+            None,
+        );
+
+        assert_eq!(
+            repl.handle_line(":quitter").unwrap(),
+            SessionControl::Leave { save_history: true }
+        );
+        // `quit` and its default alias `q` no longer match.
+        assert!(repl.handle_line(":quit").is_err());
+        assert!(repl.handle_line(":q").is_err());
+        // Untouched directives keep their defaults.
+        assert_eq!(
+            repl.handle_line(":exit").unwrap(),
+            SessionControl::Leave {
+                save_history: false
+            }
+        );
+
+        let script = write_script("test\n");
+        let line = format!(":c {}", script.path().display());
+        assert!(repl.handle_line(&line).is_ok());
+        assert_eq!(executed(&repl), vec!["test"]);
+
+        let (_, hint) = invalid_syntax(repl.handle_line(":charger"));
+        assert_eq!(hint, "Usage: :charger <path>");
+
+        let suggestions = unknown_command_suggestions(repl.handle_line("quitter"));
+        assert_eq!(suggestions.first().map(String::as_str), Some(":quitter"));
+        // `quit` is no longer a directive name: no directive suggested.
+        let suggestions = unknown_command_suggestions(repl.handle_line("quit"));
+        assert!(!suggestions.iter().any(|s| s == ":quit"));
+    }
+
+    #[test]
+    fn test_unknown_directive_lists_effective_directives() {
+        let mut repl = repl_with(
+            Some(config_with_directives(vec![override_directive(
+                ReplDirective::Help,
+                "aide",
+                &[],
+            )])),
+            None,
+        );
+
+        let (details, hint) = invalid_syntax(repl.handle_line(":foo"));
+        assert_eq!(details, "Unknown directive ':foo'");
+        assert_eq!(hint, "Available directives: :aide, :load, :quit, :exit");
+
+        let (details, _) = invalid_syntax(repl.handle_line(":"));
+        assert_eq!(details, "Unknown directive ':'");
+    }
+
+    #[test]
+    fn test_load_refuses_leaving_directives_and_runs_other_lines() {
+        colored::control::set_override(false);
+        let mut repl = repl_with(Some(make_help_config()), None);
+
+        let script = write_script("test\n:quit\n:q\n:exit\n:help\ntest\n");
+        let line = format!(":load {}", script.path().display());
+
+        assert_eq!(repl.handle_line(&line).unwrap(), SessionControl::Continue);
+        assert_eq!(executed(&repl), vec!["test", "test"]);
     }
 }
