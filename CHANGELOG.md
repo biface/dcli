@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ordinary command; when the application has no command of that name,
   the error suggests the directive (`Did you mean: :quit`) (#94).
 
+### Changed
+
+- **`DefaultHelpFormatter::format_app()` output** (#86): the `USAGE` line
+  no longer starts with `metadata.prompt` (`<command> [arguments]
+  [options]`), and the closing `Run '<prompt> --help <command>' …` line is
+  gone. `HelpFormatter` is unchanged. The interfaces now append that line
+  after the application help, whichever formatter renders it: `Run with
+  '--help <command>' for more information on a command.` in CLI mode,
+  `Type ':help <command>' …` in the REPL, under the help directive's
+  configured name.
+
 ### Changed — Breaking
 
 - **`CommandsConfig` gains a public field** `directives:
@@ -77,6 +88,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`:load` scripts cannot leave the session** (#94): a `:quit` or `:exit`
   line in a loaded script, under any of its names, is reported and skipped;
   the other lines still run.
+- **`ParseError::UnknownCommand` gains a public field** `hint:
+  Option<String>` (#86). Its `Display` is now `Unknown command: '<cmd>'`,
+  without the `Type 'help' for available commands.` sentence; the hint is
+  rendered by `format_error()` after the similar-command suggestions.
+  `unknown_command_with_suggestions()` leaves it `None`. Struct literals
+  must add the field and patterns must list it or use `..`; code matching
+  the old message text must drop the sentence.
 
 ### Fixed
 
@@ -86,6 +104,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `CliBuilder` without `help_formatter()` answered `--help`, `-h`,
   `--help <command>` and `<command> --help` with
   `Unknown command: '--help'`.
+- **Help hints name the entry point of the running interface** (#86): an
+  unknown command used to advise `Type 'help' for available commands`,
+  pointing to a `help` command that only exists when the configuration
+  declares one. The CLI now hints `Run with '--help' for available
+  commands`; the REPL hints `Type ':help' for available commands`, under
+  the help directive's configured name (`:aide` when renamed so).
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools

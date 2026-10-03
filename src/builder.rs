@@ -48,7 +48,7 @@ use crate::config::validator::validate_config;
 use crate::context::ExecutionContext;
 use crate::error::{ConfigError, DynamicCliError, Result};
 use crate::executor::{AsyncCommandHandler, CommandHandler};
-use crate::help::{DefaultHelpFormatter, HelpFormatter};
+use crate::help::{command_help_footer, DefaultHelpFormatter, HelpFormatter};
 use crate::interface::{CliInterface, ReplInterface};
 use crate::plugin::Plugin;
 use crate::registry::CommandRegistry;
@@ -797,20 +797,13 @@ impl CliApp {
     /// ```
     pub fn run_cli(self, args: Vec<String>) -> Result<()> {
         // Intercept --help before command dispatch.
-        // The formatter is instantiated lazily, only when --help is detected.
         match args.as_slice() {
             [flag] if flag == "--help" => {
-                let formatter: Box<dyn HelpFormatter> = self
-                    .help_formatter
-                    .unwrap_or_else(|| Box::new(DefaultHelpFormatter::new()));
-                print!("{}", formatter.format_app(&self.config));
+                print!("{}", self.render_cli_help(None));
                 return Ok(());
             }
             [flag, command] if flag == "--help" => {
-                let formatter: Box<dyn HelpFormatter> = self
-                    .help_formatter
-                    .unwrap_or_else(|| Box::new(DefaultHelpFormatter::new()));
-                print!("{}", formatter.format_command(&self.config, command));
+                print!("{}", self.render_cli_help(Some(command)));
                 return Ok(());
             }
             _ => {}
@@ -818,6 +811,27 @@ impl CliApp {
 
         let cli = CliInterface::new(self.registry, self.context);
         cli.run(args)
+    }
+
+    /// Render the CLI help: the application help followed by the line on
+    /// `--help <command>`, or the help of `command`.
+    ///
+    /// Uses the supplied formatter, or [`DefaultHelpFormatter`] when none
+    /// was supplied. `DefaultHelpFormatter` is a unit struct: the fallback
+    /// costs no allocation and is only built when help is requested.
+    fn render_cli_help(&self, command: Option<&str>) -> String {
+        let default_formatter = DefaultHelpFormatter::new();
+        let formatter: &dyn HelpFormatter =
+            self.help_formatter.as_deref().unwrap_or(&default_formatter);
+
+        match command {
+            Some(cmd) => formatter.format_command(&self.config, cmd),
+            None => {
+                let mut out = formatter.format_app(&self.config);
+                out.push_str(&command_help_footer("Run with", "--help <command>"));
+                out
+            }
+        }
     }
 
     /// Run a batch of command lines read from a file (#41).
@@ -1580,5 +1594,79 @@ mod tests {
         // --help with an unknown command name: formatter handles it gracefully.
         let result = app.run_cli(vec!["--help".to_string(), "ghost".to_string()]);
         assert!(result.is_ok());
+    }
+
+    fn build_help_app() -> CliApp {
+        CliBuilder::new()
+            .config(create_test_config())
+            .context(Box::new(TestContext::default()))
+            .register_sync_handler(
+                "test_handler",
+                Box::new(TestHandler {
+                    name: "test".to_string(),
+                }),
+            )
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn test_render_cli_help_app_ends_with_cli_footer() {
+        colored::control::set_override(false);
+        let app = build_help_app();
+        let out = app.render_cli_help(None);
+
+        assert_eq!(
+            out,
+            format!(
+                "{}\nRun with '--help <command>' for more information on a command.\n",
+                DefaultHelpFormatter::new().format_app(&app.config)
+            )
+        );
+    }
+
+    #[test]
+    fn test_render_cli_help_command_has_no_footer() {
+        colored::control::set_override(false);
+        let app = build_help_app();
+        let out = app.render_cli_help(Some("test"));
+
+        assert_eq!(
+            out,
+            DefaultHelpFormatter::new().format_command(&app.config, "test")
+        );
+    }
+
+    #[test]
+    fn test_render_cli_help_footer_follows_custom_formatter() {
+        struct Plain;
+        impl HelpFormatter for Plain {
+            fn format_app(&self, _: &CommandsConfig) -> String {
+                "APP\n".to_string()
+            }
+            fn format_command(&self, _: &CommandsConfig, command: &str) -> String {
+                format!("CMD {command}\n")
+            }
+        }
+
+        colored::control::set_override(false);
+        let app = CliBuilder::new()
+            .config(create_test_config())
+            .context(Box::new(TestContext::default()))
+            .help_formatter(Box::new(Plain))
+            .register_sync_handler(
+                "test_handler",
+                Box::new(TestHandler {
+                    name: "test".to_string(),
+                }),
+            )
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            app.render_cli_help(None),
+            "APP\n\nRun with '--help <command>' for more information on a command.\n"
+        );
+        assert_eq!(app.render_cli_help(Some("x")), "CMD x\n");
     }
 }

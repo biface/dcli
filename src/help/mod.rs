@@ -268,14 +268,16 @@ impl HelpFormatter for DefaultHelpFormatter {
     /// myapp 1.0.0
     ///
     /// USAGE:
-    ///     myapp <command> [arguments] [options]
+    ///     <command> [arguments] [options]
     ///
     /// COMMANDS:
     ///     hello      Say hello to someone
     ///     process    Process data files
-    ///
-    /// Run 'myapp --help <command>' for more information on a command.
     /// ```
+    ///
+    /// The output is the same in CLI and REPL mode. How to ask for the help
+    /// of one command differs between them, so the interface appends that
+    /// line itself.
     fn format_app(&self, config: &CommandsConfig) -> String {
         let mut out = String::new();
 
@@ -290,8 +292,7 @@ impl HelpFormatter for DefaultHelpFormatter {
         out.push('\n');
         out.push_str(&format!("{}\n", "USAGE:".bold()));
         out.push_str(&format!(
-            "    {} {} [arguments] [options]\n",
-            config.metadata.prompt,
+            "    {} [arguments] [options]\n",
             "<command>".green()
         ));
 
@@ -316,15 +317,6 @@ impl HelpFormatter for DefaultHelpFormatter {
                 ));
             }
         }
-
-        // Footer hint
-        out.push('\n');
-        out.push_str(&format!(
-            "{} '{}' {}\n",
-            "Run".dimmed(),
-            format!("{} --help <command>", config.metadata.prompt).italic(),
-            "for more information on a command.".dimmed()
-        ));
 
         out
     }
@@ -392,6 +384,26 @@ impl HelpFormatter for DefaultHelpFormatter {
 
         out
     }
+}
+
+// ============================================================================
+// Interface hints
+// ============================================================================
+
+/// Footer an interface appends after the application help, telling how to
+/// get the help of one command, e.g.
+/// `Type ':help <command>' for more information on a command.`
+///
+/// `lead` is the verb phrase (`"Type"`, `"Run with"`) and `invocation` what
+/// the user enters (`":help <command>"`, `"--help <command>"`). Shared by
+/// both interfaces so the line keeps a single style.
+pub(crate) fn command_help_footer(lead: &str, invocation: &str) -> String {
+    format!(
+        "\n{} '{}' {}\n",
+        lead.dimmed(),
+        invocation.italic(),
+        "for more information on a command.".dimmed()
+    )
 }
 
 // ============================================================================
@@ -518,16 +530,46 @@ mod tests {
     }
 
     #[test]
-    fn test_format_app_contains_usage_and_footer() {
+    fn test_format_app_contains_usage_and_commands_sections() {
         no_color();
         let config = make_config();
         let out = make_formatter().format_app(&config);
 
         assert!(out.contains("USAGE:"), "should have USAGE section");
         assert!(out.contains("COMMANDS:"), "should have COMMANDS section");
+    }
+
+    #[test]
+    fn test_format_app_usage_line_has_no_prompt_prefix() {
+        no_color();
+        let config = make_config();
+        let out = make_formatter().format_app(&config);
+
         assert!(
-            out.contains("--help <command>"),
-            "should hint at per-command help"
+            out.contains("\n    <command> [arguments] [options]\n"),
+            "USAGE line valid in both modes: {out}"
+        );
+        assert!(!out.contains("myapp <command>"), "{out}");
+    }
+
+    #[test]
+    fn test_format_app_has_no_footer() {
+        no_color();
+        let config = make_config();
+        let out = make_formatter().format_app(&config);
+
+        // The interface appends its own footer.
+        assert!(!out.contains("--help"), "{out}");
+        assert!(!out.contains("for more information"), "{out}");
+        assert!(out.ends_with("Process data files\n"), "{out}");
+    }
+
+    #[test]
+    fn test_command_help_footer() {
+        no_color();
+        assert_eq!(
+            command_help_footer("Type", ":aide <command>"),
+            "\nType ':aide <command>' for more information on a command.\n"
         );
     }
 
