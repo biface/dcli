@@ -3,7 +3,7 @@
 //! This module provides an interactive REPL interface with:
 //! - Line editing (arrow keys, history navigation)
 //! - Per-application command history (persistent across sessions)
-//! - Tab completion at three levels: commands, sub-commands, argument flags
+//! - Tab completion of command names, `:` directives and option flags
 //! - Colored prompts and error display
 //! - `:`-prefixed directives (`:help`, `:load`, `:quit`, `:exit`), whose
 //!   names can be overridden in the configuration
@@ -58,15 +58,20 @@ use crate::registry::CommandRegistry;
 ///
 /// Completes at three depth levels driven by the YAML configuration:
 ///
-/// | Input                    | Candidates                              |
-/// |--------------------------|------------------------------------------|
-/// | `<Tab>`                  | all command names + aliases              |
-/// | `he<Tab>`                | command names/aliases starting with `he` |
-/// | `hello <Tab>`            | long and short option flags of `hello`   |
-/// | `hello --<Tab>`          | long flags of `hello`                    |
-/// | `hello -<Tab>`           | short flags of `hello`                   |
+/// | Input                    | Candidates                                     |
+/// |--------------------------|------------------------------------------------|
+/// | `<Tab>`                  | all command names + aliases                    |
+/// | `he<Tab>`                | command names/aliases starting with `he`       |
+/// | `:<Tab>`                 | all directive names + aliases, with their `:`  |
+/// | `:he<Tab>`               | directive names/aliases starting with `he`     |
+/// | `hello <Tab>`            | long and short option flags of `hello`         |
+/// | `hello --<Tab>`          | long flags of `hello`                          |
+/// | `hello -<Tab>`           | short flags of `hello`                         |
 ///
-/// Positional argument values are not completed (open-ended strings).
+/// Directives are completed under their effective names, so a renamed or
+/// translated directive completes under its configured name. Positional
+/// argument values, including the argument of a directive, are not
+/// completed.
 ///
 /// The completer holds `Arc` references so it shares the same data as
 /// `ReplInterface` without duplication or unsafe aliasing.
@@ -77,11 +82,34 @@ struct DcliCompleter {
     /// Shared configuration — source of truth for option flags.
     /// `None` when the REPL was constructed without a config.
     config: Option<Arc<CommandsConfig>>,
+
+    /// Shared effective directive table — source of truth for directive
+    /// names and aliases.
+    directives: Arc<[DirectiveDefinition]>,
 }
 
 impl DcliCompleter {
-    fn new(registry: Arc<CommandRegistry>, config: Option<Arc<CommandsConfig>>) -> Self {
-        Self { registry, config }
+    fn new(
+        registry: Arc<CommandRegistry>,
+        config: Option<Arc<CommandsConfig>>,
+        directives: Arc<[DirectiveDefinition]>,
+    ) -> Self {
+        Self {
+            registry,
+            config,
+            directives,
+        }
+    }
+
+    /// Directive names and aliases starting with `typed`, each with its
+    /// leading `:`. `typed` includes the `:`.
+    fn directives_matching(&self, typed: &str) -> Vec<String> {
+        self.directives
+            .iter()
+            .flat_map(|def| std::iter::once(&def.name).chain(&def.aliases))
+            .map(|name| format!("{}{}", DIRECTIVE_PREFIX, name))
+            .filter(|candidate| candidate.starts_with(typed))
+            .collect()
     }
 
     /// Collect all flag completions for a given canonical command name.
@@ -134,16 +162,25 @@ impl Completer for DcliCompleter {
             let prefix = tokens.first().copied().unwrap_or("");
             let start = pos - prefix.len();
 
-            let mut candidates: Vec<Pair> = self
-                .registry
-                .list_commands()
+            // Command names cannot start with `:` (rejected by the config
+            // validator), so a `:` prefix selects directives only.
+            let names: Vec<String> = if prefix.starts_with(DIRECTIVE_PREFIX) {
+                self.directives_matching(prefix)
+            } else {
+                self.registry
+                    .list_commands()
+                    .into_iter()
+                    .flat_map(|def| {
+                        let mut names = vec![def.name.clone()];
+                        names.extend(def.aliases.clone());
+                        names
+                    })
+                    .filter(|name| name.starts_with(prefix))
+                    .collect()
+            };
+
+            let mut candidates: Vec<Pair> = names
                 .into_iter()
-                .flat_map(|def| {
-                    let mut names = vec![def.name.clone()];
-                    names.extend(def.aliases.clone());
-                    names
-                })
-                .filter(|name| name.starts_with(prefix))
                 .map(|name| Pair {
                     display: name.clone(),
                     replacement: name,
@@ -205,9 +242,13 @@ struct DcliHelper {
 }
 
 impl DcliHelper {
-    fn new(registry: Arc<CommandRegistry>, config: Option<Arc<CommandsConfig>>) -> Self {
+    fn new(
+        registry: Arc<CommandRegistry>,
+        config: Option<Arc<CommandsConfig>>,
+        directives: Arc<[DirectiveDefinition]>,
+    ) -> Self {
         Self {
-            completer: DcliCompleter::new(registry, config),
+            completer: DcliCompleter::new(registry, config, directives),
         }
     }
 }
@@ -245,7 +286,7 @@ impl Validator for DcliHelper {}
 /// Provides an interactive command-line interface with:
 /// - Line editing and history
 /// - Per-application persistent command history
-/// - Tab completion (commands, aliases, option flags)
+/// - Tab completion (commands, aliases, directives, option flags)
 /// - Graceful error handling
 /// - `:`-prefixed directives and `--help` interception
 ///
@@ -255,7 +296,7 @@ impl Validator for DcliHelper {}
 /// User input → rustyline (DcliHelper) → ReplParser → CommandExecutor → Handler
 ///                    ↓                                      ↓
 ///             Tab completion                         ExecutionContext
-///          (commands + flags)
+///    (commands, directives, flags)
 /// ```
 ///
 /// # Directives
@@ -342,8 +383,9 @@ pub struct ReplInterface {
 
     /// Effective directive table: the configured overrides merged with the
     /// defaults, one entry per [`ReplDirective`] in `ReplDirective::ALL`
-    /// order. Defaults only when no config was supplied.
-    directives: Vec<DirectiveDefinition>,
+    /// order. Defaults only when no config was supplied. Shared with the
+    /// completer.
+    directives: Arc<[DirectiveDefinition]>,
 }
 
 /// What the REPL session does after a line
@@ -422,12 +464,13 @@ impl ReplInterface {
             .unwrap_or_else(crate::config::schema::default_prompt_suffix);
 
         // DA-030 (#92): the directive table is fixed for the session.
-        let directives = effective_directives(
+        let directives: Arc<[DirectiveDefinition]> = effective_directives(
             config
                 .as_ref()
                 .map(|c| c.directives.as_slice())
                 .unwrap_or_default(),
-        );
+        )
+        .into();
 
         // Wrap config in Arc if present — shared with the completer.
         let config: Option<Arc<CommandsConfig>> = config.map(Arc::new);
@@ -437,7 +480,11 @@ impl ReplInterface {
             .completion_type(CompletionType::List)
             .build();
 
-        let helper = DcliHelper::new(Arc::clone(&registry), config.clone());
+        let helper = DcliHelper::new(
+            Arc::clone(&registry),
+            config.clone(),
+            Arc::clone(&directives),
+        );
 
         let mut editor = Editor::with_config(rl_config).map_err(|e| {
             ExecutionError::CommandFailed(anyhow::anyhow!("Failed to initialize REPL: {}", e))
@@ -527,9 +574,11 @@ impl ReplInterface {
         }
     }
 
-    /// Render the application help, followed by the line on the help
-    /// directive (`Type ':help <command>' …`, under the directive's
-    /// effective name), or the help of `command`.
+    /// Render the application help, or the help of `command`.
+    ///
+    /// The application help is followed by the directive list, then by the
+    /// line on the help directive (`Type ':help <command>' …`); both use
+    /// the effective directive names.
     ///
     /// Uses the formatter supplied to [`ReplInterface::new`], or
     /// [`DefaultHelpFormatter`] when none was supplied. Returns `None`
@@ -546,6 +595,7 @@ impl ReplInterface {
             Some(cmd) => formatter.format_command(config, cmd),
             None => {
                 let mut out = formatter.format_app(config);
+                out.push_str(&formatter.format_directives(&self.directives));
                 out.push_str(&command_help_footer(
                     "Type",
                     &format!(
@@ -639,16 +689,6 @@ impl ReplInterface {
             .expect("directive table covers every ReplDirective")
     }
 
-    /// Usage line of `directive` with its effective name, e.g.
-    /// `:help [command]`.
-    fn directive_usage(&self, directive: ReplDirective) -> String {
-        let name = &self.directive_definition(directive).name;
-        match directive.usage() {
-            "" => format!("{}{}", DIRECTIVE_PREFIX, name),
-            args => format!("{}{} {}", DIRECTIVE_PREFIX, name, args),
-        }
-    }
-
     /// Run one directive line (starting with `:`).
     ///
     /// The first word after `:` selects the directive through the effective
@@ -701,7 +741,10 @@ impl ReplInterface {
     fn usage_error(&self, typed: &str, directive: ReplDirective, problem: &str) -> DynamicCliError {
         DynamicCliError::Parse(ParseError::InvalidSyntax {
             details: format!("`{}{}` {}", DIRECTIVE_PREFIX, typed, problem),
-            hint: Some(format!("Usage: {}", self.directive_usage(directive))),
+            hint: Some(format!(
+                "Usage: {}",
+                self.directive_definition(directive).usage_line()
+            )),
         })
     }
 
@@ -1346,9 +1389,11 @@ mod tests {
         let repl =
             ReplInterface::new(registry, context, "test".to_string(), Some(config), None).unwrap();
 
+        let formatter = DefaultHelpFormatter::new();
         let expected_app = format!(
-            "{}\nType ':help <command>' for more information on a command.\n",
-            DefaultHelpFormatter::new().format_app(repl.config.as_deref().unwrap())
+            "{}{}\nType ':help <command>' for more information on a command.\n",
+            formatter.format_app(repl.config.as_deref().unwrap()),
+            formatter.format_directives(&effective_directives(&[]))
         );
         let expected_cmd =
             DefaultHelpFormatter::new().format_command(repl.config.as_deref().unwrap(), "hello");
@@ -1514,10 +1559,14 @@ mod tests {
 
     // ── Tab completion ────────────────────────────────────────────────────────
 
+    fn default_directives() -> Arc<[DirectiveDefinition]> {
+        effective_directives(&[]).into()
+    }
+
     #[test]
     fn test_completer_commands_empty_input() {
         let registry = Arc::new(create_test_registry());
-        let completer = DcliCompleter::new(Arc::clone(&registry), None);
+        let completer = DcliCompleter::new(Arc::clone(&registry), None, default_directives());
         let history = rustyline::history::DefaultHistory::new();
         let ctx = rustyline::Context::new(&history);
         let (_, candidates) = completer.complete("", 0, &ctx).unwrap();
@@ -1529,7 +1578,7 @@ mod tests {
     #[test]
     fn test_completer_commands_prefix_filter() {
         let registry = Arc::new(create_test_registry());
-        let completer = DcliCompleter::new(Arc::clone(&registry), None);
+        let completer = DcliCompleter::new(Arc::clone(&registry), None, default_directives());
         let history = rustyline::history::DefaultHistory::new();
         let ctx = rustyline::Context::new(&history);
         let (_, candidates) = completer.complete("te", 2, &ctx).unwrap();
@@ -1555,7 +1604,11 @@ mod tests {
             .unwrap();
         let registry = Arc::new(registry);
 
-        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let completer = DcliCompleter::new(
+            Arc::clone(&registry),
+            Some(Arc::clone(&config)),
+            default_directives(),
+        );
         let history = rustyline::history::DefaultHistory::new();
         let ctx = rustyline::Context::new(&history);
 
@@ -1586,7 +1639,11 @@ mod tests {
             .unwrap();
         let registry = Arc::new(registry);
 
-        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let completer = DcliCompleter::new(
+            Arc::clone(&registry),
+            Some(Arc::clone(&config)),
+            default_directives(),
+        );
         let history = rustyline::history::DefaultHistory::new();
         let ctx = rustyline::Context::new(&history);
 
@@ -1601,7 +1658,11 @@ mod tests {
     fn test_completer_no_flags_for_unknown_command() {
         let config = Arc::new(make_help_config());
         let registry = Arc::new(create_test_registry());
-        let completer = DcliCompleter::new(Arc::clone(&registry), Some(Arc::clone(&config)));
+        let completer = DcliCompleter::new(
+            Arc::clone(&registry),
+            Some(Arc::clone(&config)),
+            default_directives(),
+        );
         let history = rustyline::history::DefaultHistory::new();
         let ctx = rustyline::Context::new(&history);
         // "unknown " → empty (command not in registry)
@@ -2222,7 +2283,7 @@ mod tests {
     #[test]
     fn test_directive_table_defaults_without_config() {
         let repl = repl_with(None, None);
-        assert_eq!(repl.directives, effective_directives(&[]));
+        assert_eq!(&repl.directives[..], effective_directives(&[]).as_slice());
         assert_eq!(repl.resolve_directive("q"), Some(ReplDirective::Quit));
         assert_eq!(repl.resolve_directive("?"), Some(ReplDirective::Help));
         assert_eq!(repl.resolve_directive("test"), None);
@@ -2344,11 +2405,13 @@ mod tests {
         let repl = repl_with(Some(make_help_config()), None);
         let config = repl.config.as_deref().unwrap();
 
+        let formatter = DefaultHelpFormatter::new();
         assert_eq!(
             repl.render_help(None).unwrap(),
             format!(
-                "{}\nType ':help <command>' for more information on a command.\n",
-                DefaultHelpFormatter::new().format_app(config)
+                "{}{}\nType ':help <command>' for more information on a command.\n",
+                formatter.format_app(config),
+                formatter.format_directives(&repl.directives)
             )
         );
         // Per-command help has no footer.
@@ -2569,6 +2632,157 @@ mod tests {
 
         let (details, _) = invalid_syntax(repl.handle_line(":"));
         assert_eq!(details, "Unknown directive ':'");
+    }
+
+    // ── Directive discoverability (#95) ──────────────────────────────────────
+
+    /// Display strings and start offset of the completion of `line`, with
+    /// the cursor at its end.
+    fn complete_with(directives: Arc<[DirectiveDefinition]>, line: &str) -> (usize, Vec<String>) {
+        let completer = DcliCompleter::new(Arc::new(create_test_registry()), None, directives);
+        let history = rustyline::history::DefaultHistory::new();
+        let ctx = rustyline::Context::new(&history);
+        let (start, candidates) = completer.complete(line, line.len(), &ctx).unwrap();
+        (
+            start,
+            candidates
+                .into_iter()
+                .map(|pair| pair.replacement)
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn test_completer_colon_lists_all_directives() {
+        let (start, names) = complete_with(default_directives(), ":");
+        assert_eq!(start, 0);
+        assert_eq!(
+            names,
+            vec![":?", ":exit", ":h", ":help", ":load", ":q", ":quit"]
+        );
+    }
+
+    #[test]
+    fn test_completer_directive_prefix() {
+        assert_eq!(complete_with(default_directives(), ":he").1, vec![":help"]);
+        assert_eq!(
+            complete_with(default_directives(), ":q").1,
+            vec![":q", ":quit"]
+        );
+        assert!(complete_with(default_directives(), ":zz").1.is_empty());
+        // Leading spaces: the replacement starts at the token.
+        assert_eq!(
+            complete_with(default_directives(), "  :lo"),
+            (2, vec![":load".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_completer_directives_follow_configuration() {
+        let table: Arc<[DirectiveDefinition]> =
+            effective_directives(&[override_directive(ReplDirective::Help, "aide", &["a"])]).into();
+        assert_eq!(
+            complete_with(Arc::clone(&table), ":a").1,
+            vec![":a", ":aide"]
+        );
+        assert!(complete_with(table, ":h").1.is_empty());
+    }
+
+    #[test]
+    fn test_completer_commands_unchanged_by_directives() {
+        // No `:` candidates without a leading `:`; directive arguments are
+        // not completed.
+        let (_, names) = complete_with(default_directives(), "");
+        assert!(names.iter().all(|n| !n.starts_with(':')), "{:?}", names);
+        assert!(names.contains(&"test".to_string()));
+        assert!(complete_with(default_directives(), ":help ").1.is_empty());
+    }
+
+    #[test]
+    fn test_completer_shares_repl_directive_table() {
+        let repl = repl_with(
+            Some(config_with_directives(vec![override_directive(
+                ReplDirective::Quit,
+                "quitter",
+                &[],
+            )])),
+            None,
+        );
+        let helper = repl.editor.helper().expect("helper installed");
+        assert!(Arc::ptr_eq(&helper.completer.directives, &repl.directives));
+    }
+
+    #[test]
+    fn test_app_help_lists_directives_before_footer() {
+        colored::control::set_override(false);
+        let repl = repl_with(Some(make_help_config()), None);
+        let help = repl.render_help(None).unwrap();
+
+        let commands_at = help.find("COMMANDS:").expect("commands");
+        let directives_at = help.find("DIRECTIVES:").expect("directives");
+        let footer_at = help.find("Type ':help <command>'").expect("footer");
+        assert!(
+            commands_at < directives_at && directives_at < footer_at,
+            "{}",
+            help
+        );
+        for usage in [":help [command]", ":load <path>", ":quit", ":exit"] {
+            assert!(help.contains(usage), "{}", help);
+        }
+    }
+
+    #[test]
+    fn test_app_help_lists_translated_directives() {
+        colored::control::set_override(false);
+        let repl = repl_with(
+            Some(config_with_directives(vec![
+                override_directive(ReplDirective::Help, "aide", &["?"]),
+                override_directive(ReplDirective::Load, "charger", &[]),
+            ])),
+            None,
+        );
+        let help = repl.render_help(None).unwrap();
+
+        assert!(help.contains(":aide [command]"), "{}", help);
+        assert!(help.contains("[aliases: :?]"), "{}", help);
+        assert!(help.contains(":charger <path>"), "{}", help);
+        assert!(!help.contains(":help"), "{}", help);
+        assert!(!help.contains(":load"), "{}", help);
+        // `--help` in the REPL renders the same output.
+        assert_eq!(Some(help), repl.try_handle_help("--help"));
+    }
+
+    #[test]
+    fn test_app_help_uses_custom_directive_listing() {
+        struct ListingFormatter;
+        impl HelpFormatter for ListingFormatter {
+            fn format_app(&self, _: &CommandsConfig) -> String {
+                "APP\n".to_string()
+            }
+            fn format_command(&self, _: &CommandsConfig, command: &str) -> String {
+                command.to_string()
+            }
+            fn format_directives(&self, directives: &[DirectiveDefinition]) -> String {
+                let names: Vec<&str> = directives.iter().map(|d| d.name.as_str()).collect();
+                format!("DIR {}\n", names.join(","))
+            }
+        }
+
+        colored::control::set_override(false);
+        let repl = repl_with(Some(make_help_config()), Some(Box::new(ListingFormatter)));
+        assert_eq!(
+            repl.render_help(None).unwrap(),
+            "APP\nDIR help,load,quit,exit\n\
+             \nType ':help <command>' for more information on a command.\n"
+        );
+    }
+
+    #[test]
+    fn test_command_help_has_no_directive_list() {
+        colored::control::set_override(false);
+        let repl = repl_with(Some(make_help_config()), None);
+        let help = repl.render_help(Some("hello")).unwrap();
+        assert!(!help.contains("DIRECTIVES:"), "{}", help);
     }
 
     #[test]
