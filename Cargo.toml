@@ -11,7 +11,7 @@ documentation = "https://docs.rs/dynamic-cli"
 homepage = "https://github.com/biface/dcli"
 keywords = ["cli", "repl", "command", "yaml", "configuration"]
 categories = ["command-line-interface", "command-line-utilities", "config"]
-rust-version = "1.70"
+rust-version = "1.88"
 exclude = [
     ".git*",
     "*.md",
