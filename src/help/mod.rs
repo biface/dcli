@@ -34,6 +34,7 @@
 //! }
 //! ```
 
+use crate::config::directive::{DirectiveDefinition, DIRECTIVE_PREFIX};
 use crate::config::schema::{ArgumentType, CommandDefinition, CommandsConfig};
 use colored::Colorize;
 
@@ -43,8 +44,12 @@ use colored::Colorize;
 
 /// Generates help text from a runtime configuration.
 ///
-/// Both methods receive the full [`CommandsConfig`] so implementations
-/// have access to metadata, commands, and global options.
+/// [`format_app`](Self::format_app) and
+/// [`format_command`](Self::format_command) receive the full
+/// [`CommandsConfig`] so implementations have access to metadata, commands,
+/// and global options. [`format_directives`](Self::format_directives)
+/// receives the REPL directive table and has a default implementation, so
+/// a formatter only needs the first two methods.
 ///
 /// # Object safety
 ///
@@ -85,6 +90,59 @@ pub trait HelpFormatter {
     /// options, and aliases. If the command is not found, returns an
     /// informative error string (never panics).
     fn format_command(&self, config: &CommandsConfig, command: &str) -> String;
+
+    /// Generate the list of REPL directives.
+    ///
+    /// `directives` is the effective table, with the names, aliases and
+    /// descriptions set by the `directives:` configuration section. The
+    /// REPL shows the result after the application help.
+    ///
+    /// Names and aliases are stored without their leading `:`; the output
+    /// is expected to show it, since that is what the user types.
+    ///
+    /// The default implementation renders plain text, without colours:
+    ///
+    /// ```text
+    /// DIRECTIVES:
+    ///     :help [command]      Show the application help, or the help of a command [aliases: :h, :?]
+    ///     :load <path>         Run every line of a script file
+    ///     :quit                Save the session history and leave [aliases: :q]
+    ///     :exit                Leave without saving the session history
+    /// ```
+    ///
+    /// It returns an empty string for an empty table.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use dynamic_cli::config::{effective_directives, DirectiveDefinition, ReplDirective};
+    /// use dynamic_cli::config::schema::CommandsConfig;
+    /// use dynamic_cli::help::HelpFormatter;
+    ///
+    /// struct MyFormatter;
+    ///
+    /// impl HelpFormatter for MyFormatter {
+    ///     fn format_app(&self, _config: &CommandsConfig) -> String {
+    ///         String::new()
+    ///     }
+    ///     fn format_command(&self, _config: &CommandsConfig, command: &str) -> String {
+    ///         command.to_string()
+    ///     }
+    /// }
+    ///
+    /// let overrides = vec![DirectiveDefinition {
+    ///     implementation: ReplDirective::Help,
+    ///     name: "aide".to_string(),
+    ///     aliases: vec![],
+    ///     description: "Afficher l'aide".to_string(),
+    /// }];
+    /// let list = MyFormatter.format_directives(&effective_directives(&overrides));
+    /// assert!(list.contains(":aide [command]"));
+    /// assert!(list.contains("Afficher l'aide"));
+    /// ```
+    fn format_directives(&self, directives: &[DirectiveDefinition]) -> String {
+        directive_section(directives, false)
+    }
 }
 
 // ============================================================================
@@ -234,9 +292,14 @@ impl DefaultHelpFormatter {
         )
     }
 
-    /// Build the inline usage token for a command (e.g. `<input> [output]`).
+    /// Build the inline usage of a command after its name (e.g.
+    /// `<input> [output] [options]`).
+    ///
+    /// Tokens are joined by single spaces, without leading or trailing
+    /// space; the result is empty for a command with neither arguments nor
+    /// options.
     fn usage_args(cmd: &CommandDefinition) -> String {
-        let args: String = cmd
+        let mut tokens: Vec<String> = cmd
             .arguments
             .iter()
             .map(|a| {
@@ -246,16 +309,13 @@ impl DefaultHelpFormatter {
                     format!("[{}]", a.name)
                 }
             })
-            .collect::<Vec<_>>()
-            .join(" ");
+            .collect();
 
-        let opts = if cmd.options.is_empty() {
-            String::new()
-        } else {
-            " [options]".to_string()
-        };
+        if !cmd.options.is_empty() {
+            tokens.push("[options]".to_string());
+        }
 
-        format!("{args}{opts}")
+        tokens.join(" ")
     }
 }
 
@@ -371,11 +431,13 @@ impl HelpFormatter for DefaultHelpFormatter {
         // USAGE
         out.push('\n');
         out.push_str(&format!("{}\n", "USAGE:".bold()));
-        out.push_str(&format!(
-            "    {} {}\n",
-            cmd.name.green(),
-            Self::usage_args(cmd)
-        ));
+        out.push_str(&format!("    {}", cmd.name.green()));
+        let usage = Self::usage_args(cmd);
+        if !usage.is_empty() {
+            out.push(' ');
+            out.push_str(&usage);
+        }
+        out.push('\n');
 
         // ARGUMENTS, OPTIONS, ALIASES (empty sections are omitted)
         out.push_str(&Self::format_arguments(cmd));
@@ -384,6 +446,86 @@ impl HelpFormatter for DefaultHelpFormatter {
 
         out
     }
+
+    /// Format the list of REPL directives, in the layout of the default
+    /// trait implementation with colours.
+    ///
+    /// # Output structure
+    ///
+    /// ```text
+    /// DIRECTIVES:
+    ///     :help [command]      Show the application help, or the help of a command [aliases: :h, :?]
+    ///     :load <path>         Run every line of a script file
+    ///     :quit                Save the session history and leave [aliases: :q]
+    ///     :exit                Leave without saving the session history
+    /// ```
+    fn format_directives(&self, directives: &[DirectiveDefinition]) -> String {
+        directive_section(directives, true)
+    }
+}
+
+// ============================================================================
+// Directive list
+// ============================================================================
+
+/// Render the DIRECTIVES section, coloured when `styled` is set.
+///
+/// Shared by the default [`HelpFormatter::format_directives`] (plain) and
+/// [`DefaultHelpFormatter`] (coloured) so both keep the same layout: one
+/// line per directive with its usage under the effective name, the
+/// description, then the aliases when there are any.
+fn directive_section(directives: &[DirectiveDefinition], styled: bool) -> String {
+    if directives.is_empty() {
+        return String::new();
+    }
+
+    let rows: Vec<(String, String)> = directives
+        .iter()
+        .map(|def| {
+            let aliases = if def.aliases.is_empty() {
+                String::new()
+            } else {
+                let prefixed: Vec<String> = def
+                    .aliases
+                    .iter()
+                    .map(|alias| format!("{}{}", DIRECTIVE_PREFIX, alias))
+                    .collect();
+                format!(" [aliases: {}]", prefixed.join(", "))
+            };
+            (def.usage_line(), aliases)
+        })
+        .collect();
+
+    // Width in characters, as used by the padding: translated names may
+    // be non-ASCII.
+    let col_width = rows
+        .iter()
+        .map(|(usage, _)| usage.chars().count())
+        .max()
+        .unwrap_or(0)
+        + 4;
+
+    let header = "DIRECTIVES:";
+    let mut out = if styled {
+        format!("\n{}\n", header.bold())
+    } else {
+        format!("\n{}\n", header)
+    };
+
+    for (def, (usage, aliases)) in directives.iter().zip(rows) {
+        let usage = DefaultHelpFormatter::pad(&usage, col_width);
+        if styled {
+            out.push_str(&format!(
+                "    {}  {}{}\n",
+                usage.green(),
+                def.description,
+                aliases.dimmed()
+            ));
+        } else {
+            out.push_str(&format!("    {}  {}{}\n", usage, def.description, aliases));
+        }
+    }
+    out
 }
 
 // ============================================================================
@@ -413,6 +555,7 @@ pub(crate) fn command_help_footer(lead: &str, invocation: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::directive::{effective_directives, ReplDirective};
     use crate::config::schema::{
         ArgumentDefinition, ArgumentType, CommandDefinition, Metadata, OptionDefinition,
     };
@@ -768,5 +911,147 @@ mod tests {
 
         assert_eq!(f.format_app(&config), "myapp");
         assert_eq!(f.format_command(&config, "hello"), "hello");
+    }
+
+    // -----------------------------------------------------------------------
+    // format_command — USAGE line spacing
+    // -----------------------------------------------------------------------
+
+    /// The USAGE line of `cmd`, as rendered by `format_command`.
+    fn usage_line(config: &CommandsConfig, cmd: &str) -> String {
+        let out = make_formatter().format_command(config, cmd);
+        out.lines()
+            .skip_while(|line| *line != "USAGE:")
+            .nth(1)
+            .expect("USAGE line")
+            .to_string()
+    }
+
+    #[test]
+    fn test_format_command_usage_without_arguments_or_options() {
+        // Regression: the line used to end with a space (`add` in
+        // examples/rpn_calculator.rs).
+        no_color();
+        assert_eq!(usage_line(&make_config(), "process"), "    process");
+    }
+
+    #[test]
+    fn test_format_command_usage_options_without_arguments() {
+        // Regression: two spaces before `[options]` (`list` in
+        // examples/task_runner.rs).
+        no_color();
+        let mut config = make_config();
+        config.commands[1].options = config.commands[0].options.clone();
+        assert_eq!(usage_line(&config, "process"), "    process [options]");
+    }
+
+    #[test]
+    fn test_format_command_usage_arguments_and_options() {
+        no_color();
+        let mut config = make_config();
+        assert_eq!(usage_line(&config, "hello"), "    hello <name> [options]");
+
+        config.commands[0].options.clear();
+        assert_eq!(usage_line(&config, "hello"), "    hello <name>");
+    }
+
+    // -----------------------------------------------------------------------
+    // format_directives
+    // -----------------------------------------------------------------------
+
+    fn directive(
+        implementation: ReplDirective,
+        name: &str,
+        aliases: &[&str],
+        description: &str,
+    ) -> DirectiveDefinition {
+        DirectiveDefinition {
+            implementation,
+            name: name.to_string(),
+            aliases: aliases.iter().map(|a| a.to_string()).collect(),
+            description: description.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_format_directives_default_table() {
+        no_color();
+        let out = make_formatter().format_directives(&effective_directives(&[]));
+        assert_eq!(
+            out,
+            "\nDIRECTIVES:\n\
+             \x20   :help [command]      Show the application help, or the help of a command [aliases: :h, :?]\n\
+             \x20   :load <path>         Run every line of a script file\n\
+             \x20   :quit                Save the session history and leave [aliases: :q]\n\
+             \x20   :exit                Leave without saving the session history\n"
+        );
+    }
+
+    #[test]
+    fn test_format_directives_uses_effective_names() {
+        no_color();
+        let table = effective_directives(&[
+            directive(ReplDirective::Help, "aide", &["a", "?"], "Afficher l'aide"),
+            directive(ReplDirective::Exit, "sortir", &[], "Sortir"),
+        ]);
+        let out = make_formatter().format_directives(&table);
+
+        assert!(out.contains(":aide [command]"), "{out}");
+        assert!(out.contains("Afficher l'aide [aliases: :a, :?]"), "{out}");
+        assert!(out.contains(":sortir"), "{out}");
+        assert!(!out.contains(":help"), "{out}");
+        assert!(!out.contains(":h,"), "{out}");
+        assert!(!out.contains(":exit"), "{out}");
+    }
+
+    #[test]
+    fn test_format_directives_aligns_non_ascii_names() {
+        no_color();
+        let table =
+            effective_directives(&[directive(ReplDirective::Load, "chargé", &[], "Charger")]);
+        let out = make_formatter().format_directives(&table);
+
+        // Every description starts at the same character column.
+        let columns: Vec<usize> = out
+            .lines()
+            .skip(2)
+            .zip(&table)
+            .map(|(line, def)| {
+                let byte = line.find(&def.description).expect("description");
+                line[..byte].chars().count()
+            })
+            .collect();
+        assert!(columns.windows(2).all(|w| w[0] == w[1]), "{out}");
+    }
+
+    #[test]
+    fn test_format_directives_empty_table() {
+        assert_eq!(make_formatter().format_directives(&[]), "");
+        assert_eq!(MinimalFormatter.format_directives(&[]), "");
+    }
+
+    #[test]
+    fn test_format_directives_trait_default_is_plain() {
+        // `MinimalFormatter` does not implement `format_directives`.
+        let table = effective_directives(&[]);
+        let out = MinimalFormatter.format_directives(&table);
+
+        assert!(!out.contains('\x1b'), "{out:?}");
+        assert_eq!(out, directive_section(&table, false));
+        for def in &table {
+            assert!(out.contains(&def.usage_line()), "{out}");
+            assert!(out.contains(&def.description), "{out}");
+        }
+    }
+
+    #[test]
+    fn test_format_directives_default_matches_trait_layout() {
+        // Same layout; the default formatter only adds colours.
+        no_color();
+        let table = effective_directives(&[]);
+        assert_eq!(
+            make_formatter().format_directives(&table),
+            MinimalFormatter.format_directives(&table)
+        );
     }
 }
