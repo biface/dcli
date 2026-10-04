@@ -41,6 +41,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ordinary command; when the application has no command of that name,
   the error suggests the directive (`Did you mean: :quit`) (#94).
 
+#### Directive discoverability
+- **The REPL application help lists the directives** (#95): `:help` and
+  `--help` without a command show a `DIRECTIVES` section after the
+  commands, then the `Type ':help <command>' …` line. Each directive
+  appears under its configured name, with its arguments, description and
+  aliases. Help for one command and CLI `--help` are unchanged.
+- **`HelpFormatter::format_directives()`** (#95): renders that section from
+  the effective directive table. The method has a default implementation
+  (plain text, no colours), so existing formatters compile unchanged and
+  still show the list; `DefaultHelpFormatter` renders it in colour.
+- **Tab completion of directives** (#95): after a leading `:`, Tab
+  completes directive names and aliases under their configured names
+  (`:he` → `:help`). Completion of commands and options is unchanged.
+
 ### Changed
 
 - **`DefaultHelpFormatter::format_app()` output** (#86): the `USAGE` line
@@ -110,6 +124,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declares one. The CLI now hints `Run with '--help' for available
   commands`; the REPL hints `Type ':help' for available commands`, under
   the help directive's configured name (`:aide` when renamed so).
+- **Spacing of the `USAGE` line in command help** (#95):
+  `DefaultHelpFormatter::format_command()` left a trailing space after the
+  name of a command with neither arguments nor options (`add `), and two
+  spaces before `[options]` for a command with options but no arguments
+  (`list  [options]`). The line now uses single spaces only.
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools

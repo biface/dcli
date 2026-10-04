@@ -202,6 +202,18 @@ impl DirectiveDefinition {
             description: directive.default_description().to_string(),
         }
     }
+
+    /// Usage line under the effective name, e.g. `:help [command]` or
+    /// `:quit`
+    ///
+    /// Shared by the REPL error hints and the help formatters, so both show
+    /// the same line.
+    pub(crate) fn usage_line(&self) -> String {
+        match self.implementation.usage() {
+            "" => format!("{}{}", DIRECTIVE_PREFIX, self.name),
+            args => format!("{}{} {}", DIRECTIVE_PREFIX, self.name, args),
+        }
+    }
 }
 
 /// Complete directive table after applying the configuration overrides
@@ -332,6 +344,30 @@ mod tests {
             assert_eq!(def.aliases, directive.default_aliases());
             assert_eq!(def.description, directive.default_description());
         }
+    }
+
+    #[test]
+    fn test_usage_line_defaults() {
+        let lines: Vec<_> = ReplDirective::ALL
+            .iter()
+            .map(|&d| DirectiveDefinition::default_for(d).usage_line())
+            .collect();
+        assert_eq!(
+            lines,
+            vec![":help [command]", ":load <path>", ":quit", ":exit"]
+        );
+    }
+
+    #[test]
+    fn test_usage_line_follows_overridden_name() {
+        assert_eq!(
+            entry(ReplDirective::Help, "aide", &[]).usage_line(),
+            ":aide [command]"
+        );
+        assert_eq!(
+            entry(ReplDirective::Exit, "sortir", &[]).usage_line(),
+            ":sortir"
+        );
     }
 
     // ------------------------------------------------------------------
