@@ -120,9 +120,13 @@ pub(crate) fn default_prompt_suffix() -> String {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 pub struct CommandDefinition {
     /// Command name (used for invocation)
+    ///
+    /// May not start with `:`, which marks REPL directives.
     pub name: String,
 
     /// Alternative names for the command
+    ///
+    /// Like [`Self::name`], an alias may not start with `:`.
     #[serde(default)]
     pub aliases: Vec<String>,
 

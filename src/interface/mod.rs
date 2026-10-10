@@ -87,9 +87,9 @@
 //! |--------|-----|------|
 //! | Input | Command-line args | Interactive lines |
 //! | Parser | [`CliParser`] | [`ReplParser`] |
-//! | History | None | Persistent to disk |
+//! | History | None | Written to disk by `:quit` and Ctrl-D |
 //! | Errors | Exit process | Display and continue |
-//! | Lifecycle | One command, exit | Loop until user quits |
+//! | Lifecycle | One command, exit | Loop until `:quit`, `:exit` or Ctrl-D |
 //!
 //! # Error Handling
 //!
@@ -107,7 +107,49 @@
 //! - Parse errors → show suggestions, continue
 //! - Validation errors → explain issue, continue
 //! - Execution errors → display error, continue
-//! - Critical errors → exit REPL
+//! - Directive errors → list the available directives (unknown directive)
+//!   or show the expected usage (wrong arguments), continue
+//! - Input failure (the terminal cannot be read) → reported, the REPL exits
+//!   without writing the history
+//!
+//! # REPL Directives
+//!
+//! In the REPL, a line starting with `:` is a framework directive; any
+//! other line is an application command. The two never compete for a name:
+//! `:quit` is always the directive, `quit` is always looked up among the
+//! application's commands.
+//!
+//! | Directive          | Aliases    | Action                                      |
+//! |--------------------|------------|---------------------------------------------|
+//! | `:help [command]`  | `:h`, `:?` | Application help, or the help of `command`  |
+//! | `:load <path>`     |            | Run every line of a script file             |
+//! | `:quit`            | `:q`       | Write the session history, then leave       |
+//! | `:exit`            |            | Leave without writing the session history   |
+//!
+//! These are the default names. An application can rename a directive,
+//! replace its aliases or its description through the `directives:` section
+//! of its configuration, for instance to translate them; it can neither add
+//! nor disable one. See [`crate::config::directive`].
+//!
+//! Leaving the REPL:
+//!
+//! - `:quit` and end of input (Ctrl-D) write the session history, then
+//!   leave.
+//! - `:exit` leaves without writing it. Any other termination (a handler
+//!   calling `std::process::exit`, a panic, the process being killed) also
+//!   leaves the history file as it was when the session started.
+//! - `exit` or `quit` typed without `:` is an ordinary command name. When
+//!   the application has no command of that name, the error suggests the
+//!   matching directive (`:quit`).
+//!
+//! Inside a `:load` script, `:quit` and `:exit` are reported and skipped;
+//! the other lines run.
+//!
+//! `:help` lists the directives after the application help, under their
+//! effective names (see
+//! [`HelpFormatter::format_directives`](crate::help::HelpFormatter::format_directives)).
+//! Tab completion after a leading `:` offers the directive names and
+//! aliases. `--help` and `-h` work in the REPL as in CLI mode.
 //!
 //! # Examples
 //!
