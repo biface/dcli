@@ -154,9 +154,10 @@ Available commands:
 myapp > :quit
 ```
 
-**Multi-line commands in REPL** (v0.9.0+) — end a line with `\` to
-continue a command onto the next line, shell-style; the continuation
-prompt (`...` by default) is derived from your app's own prompt:
+**Multi-line commands in REPL** (v0.9.0+,
+[DD-027](https://github.com/biface/dcli/issues/48)) — end a line with `\` to continue a
+command onto the next line, shell-style; the continuation prompt (`...`
+by default) is derived from your app's own prompt:
 
 ```bash
 myapp > greet Bob \
@@ -164,8 +165,9 @@ myapp > greet Bob \
 HELLO, BOB!
 ```
 
-**Command chaining** (v0.8.0+) — chain more than one command in a single
-invocation, no separator needed: once a command's arguments are
+**Command chaining** (v0.8.0+,
+[DD-026](https://github.com/biface/dcli/issues/52)) — chain more than one command in a
+single invocation, no separator needed: once a command's arguments are
 exhausted, the next recognized command name starts the next one.
 
 ```bash
@@ -175,8 +177,9 @@ $ myapp configure model.yml configure scenario.yml solve
 ```
 
 Handlers can declare their own expectation about `continue_on_failure`
-via `expected_fault_tolerance()` (v0.9.0+) — a mismatch with the YAML
-config is caught at startup, not at first use in a chain.
+via `expected_fault_tolerance()` (v0.9.0+,
+[DD-028](https://github.com/biface/dcli/issues/64)) — a mismatch with the YAML config is
+caught at startup, not at first use in a chain.
 
 **Batch mode** — run a whole file of commands, one per line (blank lines and
 `#`-prefixed comments are skipped):
@@ -262,7 +265,7 @@ truth for command definitions either way.
 **[Full Plugin Guide →](PLUGIN_GUIDE.md)** ([Français](PLUGIN_GUIDE.fr.md)) —
 the complete WASM ABI contract for third-party plugin authors, a worked
 example, and the architecture decision behind it
-([DD-021](https://github.com/biface/dcli/issues/10)).
+([DA-021](https://github.com/biface/dcli/issues/10)).
 
 ---
 
