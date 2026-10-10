@@ -9,7 +9,9 @@
 //! The plugin system follows the same rules as the rest of the framework:
 //! - **The YAML config is the sole source of truth** for command definitions.
 //! - **Plugins supply handlers only** — identified by their `implementation`
-//!   name, exactly as [`CliBuilder::register_sync_handler`] does.
+//!   name, exactly as
+//!   [`CliBuilder::register_sync_handler`](crate::CliBuilder::register_sync_handler)
+//!   does.
 //! - **The framework controls registration** — the plugin declares what it
 //!   provides via [`Plugin::handlers`]; the framework validates and registers.
 //!   The plugin never receives a `&mut CommandRegistry`.
@@ -91,15 +93,17 @@ pub use system::SystemPlugin;
 /// Extension point for grouping related command handlers.
 ///
 /// A plugin declares its metadata and the handlers it provides. The framework
-/// validates and registers those handlers into the [`CommandRegistry`] during
-/// [`CliBuilder::build()`]. The plugin never has direct access to the registry.
+/// validates and registers those handlers into the
+/// [`CommandRegistry`](crate::CommandRegistry) during
+/// [`CliBuilder::build()`](crate::CliBuilder::build). The plugin never has
+/// direct access to the registry.
 ///
 /// # Contract
 ///
 /// - [`Plugin::handlers`] returns `(implementation_name, handler)` pairs.
 /// - Each `implementation_name` must match the `implementation` field of a
 ///   command declared in the YAML config — exactly as with
-///   [`CliBuilder::register_sync_handler`].
+///   [`CliBuilder::register_sync_handler`](crate::CliBuilder::register_sync_handler).
 /// - The YAML config remains the sole source of truth for command definitions.
 ///   A plugin cannot inject commands that are not declared in the config.
 ///

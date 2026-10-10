@@ -133,8 +133,9 @@ impl SystemPlugin {
 
     /// Attach a config so the system handlers can access app metadata.
     ///
-    /// Called automatically by [`CliBuilder::build()`] when the builtin is
-    /// registered via [`CliBuilder::register_plugin`].
+    /// Called automatically by [`CliBuilder::build()`](crate::CliBuilder::build)
+    /// when the builtin is registered via
+    /// [`CliBuilder::register_plugin`](crate::CliBuilder::register_plugin).
     ///
     /// # Example
     ///
