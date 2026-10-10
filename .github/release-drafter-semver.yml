@@ -113,7 +113,6 @@ autolabeler:
     files:
       - "*.md"
       - "docs/**"
-      - "CONFIG_SYNTAX_REFERENCE*.md"
   - label: "type: ci"
     files:
       - ".github/**"

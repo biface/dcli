@@ -88,7 +88,7 @@ global_options: []
 
 > Note :
 > 
->  La syntaxe du fichier de configuration est disponible dans [cet espace projet](CONFIG_SYNTAX_REFERENCE.fr.md) 
+>  La syntaxe du fichier de configuration est disponible dans la [référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE.fr) du wiki.
 
 **2. Implémentez vos gestionnaires de commandes** :
 
@@ -175,8 +175,8 @@ suivante.
 
 ```bash
 $ monapp configurer modele.yml configurer scenario.yml resoudre
-# "configurer" s'exécute deux fois, puis "resoudre" — voir
-# CONFIG_SYNTAX_REFERENCE.fr.md pour la politique d'échec
+# "configurer" s'exécute deux fois, puis "resoudre" — voir la
+# référence de syntaxe du wiki pour la politique d'échec
 # continue_on_failure / requires_success
 ```
 
@@ -280,6 +280,8 @@ concret, et la décision d'architecture associée
 ## 📖 Documentation
 
 - **[Référence API](https://docs.rs/dynamic-cli)** - Documentation API complète
+- **[Référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE.fr)** - Structure du fichier de configuration (wiki)
+- **[Directives du REPL](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES.fr)** - `:help`, `:load`, `:quit`, `:exit` et comment les renommer (wiki)
 - **[Exemples](examples/README.md)** - Exemples fonctionnels et échantillons de code
 - **[Guide de Contribution](CONTRIBUTING.fr.md)** - Comment contribuer au projet
 
