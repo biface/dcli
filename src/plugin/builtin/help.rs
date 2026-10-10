@@ -1,8 +1,7 @@
 //! Standalone `HelpPlugin`.
 //!
 //! Contributes the same `system_help` handler as [`SystemPlugin`], reusing
-//! [`SystemHelpHandler`]'s logic internally — no duplicated logic (#44 /
-//! DD-025).
+//! [`SystemHelpHandler`]'s logic internally — no duplicated logic (#44).
 //!
 //! [`SystemPlugin`]: crate::plugin::system::SystemPlugin
 //! [`SystemHelpHandler`]: crate::plugin::system::SystemHelpHandler

@@ -1,4 +1,4 @@
-//! WASM plugin loader for `dynamic-cli` (Option C — DD-021)
+//! WASM plugin loader for `dynamic-cli`
 //!
 //! Provides [`WasmPlugin`], a [`Plugin`] implementation backed by a sandboxed
 //! WebAssembly module loaded and executed via `wasmtime`. Only available
@@ -40,7 +40,7 @@
 //!
 //! Handler arguments (`HashMap<String, String>`) are serialized to a byte
 //! buffer before crossing the host/guest boundary. YAML is the default,
-//! consistent with the framework's config-first principle (DD-002); JSON is
+//! consistent with the framework's config-first principle; JSON is
 //! available via [`WasmPlugin::with_format`].
 //!
 //! # Known limitation — no `ExecutionContext` access
@@ -53,8 +53,8 @@
 //!
 //! Future work may introduce a restricted set of host functions (e.g.
 //! `host_log`, `host_get_state`) or WASI integration for guests that need
-//! controlled access to host capabilities — see DD-021 for the open
-//! discussion. This version intentionally ships without them.
+//! controlled access to host capabilities. This version intentionally
+//! ships without them.
 //!
 //! Full reference: `WASM_PLUGIN_INTERFACE.md`.
 //!
@@ -91,7 +91,7 @@ use wasmtime::{Engine, Instance, Module, Store};
 /// host/guest boundary.
 ///
 /// YAML is the default, consistent with the framework's config-first
-/// principle (DD-002). Guests that prefer JSON can request it via
+/// principle. Guests that prefer JSON can request it via
 /// [`WasmPlugin::with_format`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WasmSerializationFormat {

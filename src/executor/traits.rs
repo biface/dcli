@@ -21,7 +21,7 @@
 //! Arguments are passed as [`crate::parser::ParsedArgs`] rather than generic
 //! types. This design choice:
 //! - Maintains object safety
-//! - Represents both scalar and repeatable-option values (DD-024)
+//! - Represents both scalar and repeatable-option values
 //! - Delegates type parsing to the parser module
 //!
 //! ## Thread Safety
@@ -81,8 +81,8 @@ use async_trait::async_trait;
 /// # Execution Flow
 ///
 /// 0. `expected_fault_tolerance()` is checked once, at registration time
-///    (DD-028) — before any of the steps below, and before this handler
-///    ever sees a command line.
+///    — before any of the steps below, and before this handler ever sees
+///    a command line.
 /// 1. Parser converts user input to [`crate::parser::ParsedArgs`]
 /// 2. Validator checks argument constraints
 /// 3. `validate()` is called for custom validation (optional)
@@ -271,13 +271,13 @@ pub trait CommandHandler: Send + Sync {
     }
 
     /// Declare an expectation about this command's configured
-    /// `continue_on_failure` (DD-026), if the handler's author has one.
+    /// `continue_on_failure`, if the handler's author has one.
     ///
     /// Purely informational at the trait level: `CommandRegistry::register_sync`
     /// compares this value (when `Some`) against the `continue_on_failure`
     /// the YAML config actually declares for this command, and rejects
-    /// registration on a contradiction (`RegistryError::FaultToleranceMismatch`,
-    /// DD-028) — catching a misconfiguration at startup instead of at first
+    /// registration on a contradiction (`RegistryError::FaultToleranceMismatch`)
+    /// — catching a misconfiguration at startup instead of at first
     /// use. It does not, and cannot, verify that the handler's own code
     /// actually behaves as declared; that remains the author's
     /// responsibility, covered by the application's own tests.
@@ -316,7 +316,7 @@ pub trait CommandHandler: Send + Sync {
 
 /// Async counterpart of [`CommandHandler`].
 ///
-/// Additive to `CommandHandler` (see DD-022) — it does not replace it.
+/// Additive to `CommandHandler` — it does not replace it.
 /// Implementations use this trait when their command body needs to perform
 /// async I/O (network calls, streaming, etc.). The signatures deliberately
 /// mirror `CommandHandler` exactly, `execute`/`validate` aside from the
@@ -339,10 +339,15 @@ pub trait CommandHandler: Send + Sync {
 /// # Why a separate trait instead of an async `CommandHandler`?
 ///
 /// Existing sync `CommandHandler` implementations (including downstream
-/// consumers) must keep compiling unchanged. See DD-022 for the full
-/// rationale, including why `tokio` is not a dependency of `dynamic-cli`
-/// itself and why driving the returned future via
-/// `futures::executor::block_on` at the dispatch site is safe.
+/// consumers) must keep compiling unchanged.
+///
+/// `dynamic-cli` does not depend on `tokio` or any other async runtime.
+/// The CLI and REPL dispatch loops are strictly sequential (each command
+/// runs to completion before the next input is read), so the dispatch
+/// site drives the returned future with `futures::executor::block_on`.
+/// The future borrows the execution context, so it could not be spawned
+/// onto a runtime anyway. A handler that needs a runtime, e.g. for
+/// network I/O, uses its own inside `execute`.
 ///
 /// # Example
 ///
@@ -395,7 +400,7 @@ pub trait AsyncCommandHandler: Send + Sync {
     /// Mirrors [`CommandHandler::expected_fault_tolerance`] exactly — same
     /// contract, same default (`None`), checked by
     /// `CommandRegistry::register_async` the same way `register_sync` checks
-    /// it for [`CommandHandler`] (DD-028).
+    /// it for [`CommandHandler`].
     ///
     /// Deliberately **not** an `async fn`, unlike `execute`/`validate`
     /// above: this method does no work of its own and is evaluated at

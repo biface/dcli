@@ -114,7 +114,7 @@ pub struct CliBuilder {
     /// REPL prompt (if None, will use config default or "cli")
     prompt: Option<String>,
 
-    /// Base override for the REPL's `\`-continuation prompt (DD-027, #68).
+    /// Base override for the REPL's `\`-continuation prompt (#68).
     /// Forwarded verbatim to [`ReplInterface::with_prompt_multiline`] when
     /// set; `None` keeps the "..." default. No effect in CLI one-shot mode.
     prompt_multiline: Option<String>,
@@ -272,7 +272,7 @@ impl CliBuilder {
         self
     }
 
-    /// Register an async command handler (DD-022)
+    /// Register an async command handler
     ///
     /// Additive counterpart of [`register_sync_handler`][Self::register_sync_handler].
     /// Associates an async handler with the command's implementation name
@@ -332,7 +332,8 @@ impl CliBuilder {
     /// The YAML config remains the sole source of truth for command
     /// definitions. Plugin handlers are matched by their `implementation`
     /// name, exactly as with [`register_sync_handler`][Self::register_sync_handler].
-    /// Plugins remain sync-only for now — out of scope for DD-022.
+    /// Plugins remain sync-only for now: `Plugin::handlers()` returns sync
+    /// handlers only.
     ///
     /// # Example
     ///
@@ -422,12 +423,12 @@ impl CliBuilder {
     }
 
     /// Override the base segment of the REPL's `\`-continuation prompt
-    /// (DD-027, #68).
+    /// (#68).
     ///
     /// Only used in REPL mode — no effect on `CliInterface::run()` (CLI
     /// one-shot) or `run_script()`/`:load`, which never accumulate
-    /// `\`-continued input (DD-027's abort-by-construction rule for
-    /// contexts without a live operator). Mirrors
+    /// `\`-continued input: without a live operator, nothing can answer
+    /// a continuation prompt. Mirrors
     /// [`ReplInterface::with_prompt_multiline`], to which the value is
     /// forwarded verbatim at `build()`/`run()` time — see that method for
     /// exactly how the suffix is appended. If not called, the base defaults
@@ -713,7 +714,7 @@ pub struct CliApp {
     /// REPL prompt
     prompt: String,
 
-    /// Base override for the REPL's `\`-continuation prompt (DD-027, #68).
+    /// Base override for the REPL's `\`-continuation prompt (#68).
     /// Forwarded to `ReplInterface::with_prompt_multiline` in `run_repl()`
     /// when set. Unused outside REPL mode.
     prompt_multiline: Option<String>,
