@@ -262,7 +262,7 @@ Static and WASM plugins, and directly-registered handlers, all coexist in
 the same application — the YAML configuration remains the single source of
 truth for command definitions either way.
 
-**[Full Plugin Guide →](PLUGIN_GUIDE.md)** ([Français](PLUGIN_GUIDE.fr.md)) —
+**[Full Plugin Guide →](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE)** (wiki) — the builtin plugins,
 the complete WASM ABI contract for third-party plugin authors, a worked
 example, and the architecture decision behind it
 ([DA-021](https://github.com/biface/dcli/issues/10)).
@@ -273,6 +273,7 @@ example, and the architecture decision behind it
 
 - **[API Reference](https://docs.rs/dynamic-cli)** - Complete API documentation
 - **[Configuration Syntax Reference](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE)** - Structure of the configuration file (wiki)
+- **[Plugin Guide](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE)** - Static, builtin and WASM plugins (wiki)
 - **[REPL Directives](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES)** - `:help`, `:load`, `:quit`, `:exit` and how to rename them (wiki)
 - **[Examples](examples/README.md)** - Working examples and code samples
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project

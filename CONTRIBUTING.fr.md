@@ -226,7 +226,7 @@ Les améliorations de documentation sont toujours les bienvenues ! Cela inclut :
 - README : `README.md` et `README.fr.md`
 - Ce fichier : `CONTRIBUTING.md` et `CONTRIBUTING.fr.md`
 - Code de Conduite : `CODE_OF_CONDUCT.md` et `CODE_OF_CONDUCT.fr.md`
-- Référence de syntaxe de la configuration et directives du REPL : le [wiki](https://github.com/biface/dcli/wiki) (dépôt `dcli.wiki`)
+- Référence de syntaxe de la configuration, directives du REPL et guide des plugins : le [wiki](https://github.com/biface/dcli/wiki) (dépôt `dcli.wiki`)
 
 ### Contribuer du Code
 

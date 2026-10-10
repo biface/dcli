@@ -270,9 +270,9 @@ coexistent tous dans la même application — la configuration YAML reste
 la seule source de vérité des définitions de commandes, quel que soit le
 mécanisme.
 
-**[Guide complet des plugins →](PLUGIN_GUIDE.fr.md)** ([English](PLUGIN_GUIDE.md)) —
-le contrat ABI WASM complet pour les auteurs de plugins tiers, un exemple
-concret, et la décision d'architecture associée
+**[Guide complet des plugins →](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE.fr)** (wiki) — les plugins
+intégrés, le contrat ABI WASM complet pour les auteurs de plugins tiers,
+un exemple concret, et la décision d'architecture associée
 ([DA-021](https://github.com/biface/dcli/issues/10)).
 
 ---
@@ -281,6 +281,7 @@ concret, et la décision d'architecture associée
 
 - **[Référence API](https://docs.rs/dynamic-cli)** - Documentation API complète
 - **[Référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE.fr)** - Structure du fichier de configuration (wiki)
+- **[Guide des plugins](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE.fr)** - Plugins statiques, intégrés et WASM (wiki)
 - **[Directives du REPL](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES.fr)** - `:help`, `:load`, `:quit`, `:exit` et comment les renommer (wiki)
 - **[Exemples](examples/README.md)** - Exemples fonctionnels et échantillons de code
 - **[Guide de Contribution](CONTRIBUTING.fr.md)** - Comment contribuer au projet
