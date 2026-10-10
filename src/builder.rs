@@ -237,11 +237,6 @@ impl CliBuilder {
     /// Associates a handler with the command's implementation name from the config.
     /// The name must match the `implementation` field in the command definition.
     ///
-    /// Renamed from `register_handler()` in v0.5.0 for symmetry with
-    /// [`register_async_handler`][Self::register_async_handler].
-    /// `register_handler()` remains available as a deprecated alias until
-    /// v1.0.0 (DD-022).
-    ///
     /// # Arguments
     ///
     /// * `name` - Implementation name from the configuration
@@ -275,21 +270,6 @@ impl CliBuilder {
     ) -> Self {
         self.handlers.insert(name.into(), handler);
         self
-    }
-
-    /// Deprecated alias for [`register_sync_handler`][Self::register_sync_handler].
-    /// Scheduled for removal in v1.0.0 alongside `CommandRegistry::register`.
-    #[deprecated(
-        since = "0.5.0",
-        note = "renamed to `register_sync_handler` for symmetry with \
-                `register_async_handler`; will be removed in 1.0.0"
-    )]
-    pub fn register_handler(
-        self,
-        name: impl Into<String>,
-        handler: Box<dyn CommandHandler>,
-    ) -> Self {
-        self.register_sync_handler(name.into(), handler)
     }
 
     /// Register an async command handler (DD-022)
@@ -1083,23 +1063,6 @@ mod tests {
         let builder = CliBuilder::new().register_sync_handler("test_handler", handler);
 
         assert_eq!(builder.handlers.len(), 1);
-    }
-
-    /// Deprecated-alias coverage (DD-022 companion issue): `register_handler()`
-    /// must keep behaving exactly like `register_sync_handler()` until it's
-    /// removed in v1.0.0. This is the only place in the crate allowed to
-    /// call it directly.
-    #[test]
-    #[allow(deprecated)]
-    fn test_deprecated_register_handler_alias_still_works() {
-        let handler = Box::new(TestHandler {
-            name: "test".to_string(),
-        });
-
-        let builder = CliBuilder::new().register_handler("test_handler", handler);
-
-        assert_eq!(builder.handlers.len(), 1);
-        assert!(builder.async_handlers.is_empty());
     }
 
     #[test]
