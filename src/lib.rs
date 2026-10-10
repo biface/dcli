@@ -74,6 +74,11 @@
 //! - [`parser`]: CLI and REPL argument parsing
 //! - [`validator`]: Argument validation
 //!
+//! ## Design decisions
+//!
+//! Design decisions are tracked as GitHub issues labelled `type: decision`:
+//! <https://github.com/biface/dcli/issues?q=label%3A%22type%3A+decision%22>.
+//!
 //! ## Module Status
 //!
 //! - ✅ Complete: error, config, context, executor, registry, parser, validator, interface, builder

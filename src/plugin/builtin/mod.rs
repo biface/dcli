@@ -11,7 +11,7 @@
 //! Each plugin here reuses the exact same handler logic as its
 //! `SystemPlugin` counterpart (`SystemHelpHandler`, `SystemVersionHandler`,
 //! `SystemExitHandler` in [`crate::plugin::system`]) — this is a pure
-//! internal refactor (#44 / DD-025). `SystemPlugin`'s public API, its
+//! internal refactor (#44). `SystemPlugin`'s public API, its
 //! `handlers()` output, and its existing test suite are unaffected.
 //!
 //! | Plugin          | Implementation name | Behaviour                                   |

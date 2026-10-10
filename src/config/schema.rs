@@ -149,7 +149,7 @@ pub struct CommandDefinition {
     /// registered handler in the CommandRegistry.
     pub implementation: String,
 
-    /// Whether the chain continues when *this* command fails (DD-026).
+    /// Whether the chain continues when *this* command fails.
     ///
     /// Governs the chain's behaviour when this command is one segment of a
     /// multi-command CLI invocation (or a chained `run_script()` line) and
@@ -167,7 +167,7 @@ pub struct CommandDefinition {
     pub continue_on_failure: bool,
 
     /// Whether *this* command requires every earlier command in the chain
-    /// to have succeeded before it is allowed to run (DD-026).
+    /// to have succeeded before it is allowed to run.
     ///
     /// Not to be confused with [`Self::required`], which is an unrelated,
     /// startup-time check ("a handler must be registered for this

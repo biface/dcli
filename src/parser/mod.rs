@@ -206,7 +206,7 @@ pub use repl_parser::{ParsedCommand, ReplParser};
 ///
 /// Wraps the output of [`CliParser::parse_typed`], exposing typed accessors
 /// so handlers never need to match on [`ParsedValue`] directly. Introduced
-/// in v0.6.0 (DD-024, #39) to replace `&HashMap<String, String>`, which
+/// in v0.6.0 (#39) to replace `&HashMap<String, String>`, which
 /// could not represent repeatable options.
 ///
 /// Lives directly in `parser` rather than nested under `cli_parser`: it is
@@ -240,10 +240,11 @@ impl ParsedArgs {
     /// represent [`ParsedValue::Repeated`] through this constructor.
     ///
     /// Used by the REPL dispatch path (`interface/repl.rs`), which relies
-    /// on [`crate::parser::repl_parser::ReplParser::parse_line`] — itself
-    /// untouched by DD-024, since repeatable options have no interactive
-    /// REPL-typing use case (see `DESIGN_DECISIONS.md`, DD-024 addendum,
-    /// 2026-07-24). Batch/scripted invocations are expected to go through
+    /// on [`crate::parser::repl_parser::ReplParser::parse_line`], which
+    /// only produces scalar values: repeatable options have no use case at
+    /// the interactive prompt so far, so that path was left scalar-only
+    /// when they were introduced. Batch/scripted invocations are expected
+    /// to go through
     /// [`CliParser::parse_typed`] directly instead (see issue #41,
     /// `ScriptLoaderPlugin`).
     pub fn from_scalars(values: HashMap<String, String>) -> Self {
@@ -283,10 +284,10 @@ impl ParsedArgs {
     /// Collapse back down to a scalar-only `HashMap<String, String>`
     ///
     /// Every [`ParsedValue::Scalar`] entry is kept as-is; any
-    /// [`ParsedValue::Repeated`] entry is silently dropped — mirroring the
-    /// same "no consumer yet" rationale as [`Self::from_scalars`] (see the
-    /// DD-024 addendum in `DESIGN_DECISIONS.md`). Used at the boundary of
-    /// subsystems that predate DD-024 and have not been extended to
+    /// [`ParsedValue::Repeated`] entry is silently dropped, for the same
+    /// reason as [`Self::from_scalars`]: nothing on the scalar side
+    /// consumes repeatable options yet. Used at the boundary of subsystems
+    /// that predate repeatable options (v0.6.0) and have not been extended to
     /// understand repeatable options, e.g. the WASM plugin ABI
     /// ([`crate::plugin::wasm::WasmHandler`]), which serializes arguments
     /// as flat `HashMap<String, String>` to the guest.

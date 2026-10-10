@@ -6,8 +6,8 @@
 //!
 //! # Filtering rule
 //!
-//! Unlike [`ArgumentDefinition::secure`][crate::config::schema::ArgumentDefinition]
-//! (DD-023), which relies on an explicit `secure: true` opt-in on a
+//! Unlike [`ArgumentDefinition::secure`][crate::config::schema::ArgumentDefinition],
+//! which relies on an explicit `secure: true` opt-in on a
 //! config-declared argument, environment variables have no such upfront
 //! declaration — the set of names is arbitrary and unknown ahead of
 //! time. An allow-list is therefore not viable here; this plugin instead
