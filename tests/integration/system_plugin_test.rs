@@ -1,4 +1,4 @@
-//! Integration test — SystemPlugin (Option A, DD-021)
+//! Integration test — SystemPlugin, Option A of DA-021 (#10)
 //!
 //! Exercises the full chain `CliBuilder -> build() -> CliApp -> run_cli()`
 //! with [`SystemPlugin`] registered alongside a directly-registered handler,

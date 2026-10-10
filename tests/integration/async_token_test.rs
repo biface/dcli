@@ -1,10 +1,10 @@
-//! Integration test — Async token fetch handler (DD-022 mockup)
+//! Integration test — Async token fetch handler, DA-022 (#8) mockup
 //!
 //! Exercises the full chain `CliBuilder -> build() -> CliApp -> run_cli()`
 //! with an [`AsyncCommandHandler`] that performs a genuinely non-blocking
 //! wait (via `futures_timer::Delay`, *not* `std::thread::sleep`) before
 //! returning a token — modeling `chrom-rs`'s confirmed need for async
-//! network I/O (DD-022).
+//! network I/O — DA-022 (#8).
 //!
 //! Unit tests in `src/executor/traits.rs` already cover `AsyncCommandHandler`
 //! in isolation (calling `.execute()` directly). This file instead verifies
@@ -50,7 +50,7 @@ impl ExecutionContext for TokenContext {
 /// Uses `futures_timer::Delay` rather than `std::thread::sleep` —
 /// deliberately. A thread sleep inside an `async fn` body blocks the
 /// executor thread exactly like a sync call would, which defeats the
-/// entire point of DD-022. `futures_timer` yields control back to the
+/// entire point of DA-022 (#8). `futures_timer` yields control back to the
 /// executor while waiting, the same way a real async network call would.
 struct TokenFetchHandler {
     delay: Duration,

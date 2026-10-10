@@ -570,7 +570,7 @@ mod tests {
         assert!(formatted.contains("Run --help run"));
     }
 
-    // ── format_error — Parse (DD-024 repeatable options, #37) ───────────
+    // ── format_error — Parse, DD-024 (#21) repeatable options, #37 ──────
 
     #[test]
     fn test_format_parse_unknown_option_parameter_with_suggestion() {

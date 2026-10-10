@@ -1170,7 +1170,7 @@ mod tests {
     }
 
     // ========================================================================
-    // DD-024: repeatable options with option_parameters (#38)
+    // DD-024 (#21): repeatable options with option_parameters (#38)
     // ========================================================================
 
     /// Helper: a command with a repeatable `--output` option, mirroring
@@ -1454,7 +1454,7 @@ mod tests {
         // parse() (Option A design: non-breaking wrapper) must keep
         // working for definitions with no repeatable options — and
         // silently drop Repeated entries rather than erroring, since no
-        // pre-DD-024 caller can represent them anyway.
+        // caller predating DD-024 (#21) can represent them anyway.
         let definition = create_repeatable_test_definition();
         let parser = CliParser::new(&definition);
 
@@ -1469,7 +1469,7 @@ mod tests {
     }
 
     // ========================================================================
-    // parse_typed_segment() tests (DD-026, #52 / #54)
+    // parse_typed_segment() tests — DD-026 (#52), #54
     // ========================================================================
 
     /// Helper: one positional argument (still open arity) *and* a
@@ -1540,9 +1540,9 @@ mod tests {
     #[test]
     fn test_parse_typed_segment_stops_after_repeatable_occurrence_with_zero_arity() {
         // Combines the zero-arity boundary with a completed repeatable
-        // occurrence beforehand — mirrors DD-026's own chrom-rs-motivated
-        // example (an "output"-shaped command whose last occurrence is
-        // immediately followed by the next chained command's name).
+        // occurrence beforehand — mirrors the chrom-rs-motivated example of
+        // DD-026 (#52): an "output"-shaped command whose last occurrence is
+        // immediately followed by the next chained command's name.
         let definition = create_repeatable_test_definition();
         let parser = CliParser::new(&definition);
 
@@ -1659,9 +1659,9 @@ mod tests {
     #[test]
     fn test_parse_typed_segment_too_many_arguments_still_reported_by_dispatch_path() {
         // parse_typed_segment() itself never raises too_many_arguments —
-        // it stops cleanly instead (DD-026's segmentation phase is
-        // responsible for turning a non-resolving leftover token back into
-        // that same error). This test only pins down the "never errors on
+        // it stops cleanly instead; the segmentation phase of DD-026 (#52)
+        // is responsible for turning a non-resolving leftover token back
+        // into that same error. This test only pins down the "never errors on
         // overflow" half: the segment boundary is reported via `consumed`,
         // not via Err(..).
         let definition = create_test_definition();

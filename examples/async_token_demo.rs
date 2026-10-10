@@ -1,7 +1,7 @@
 //! Runnable demo of an [`AsyncCommandHandler`] performing a genuinely
 //! non-blocking 10-second wait before returning a token — the literal
 //! scenario this mockup was built around, modeling `chrom-rs`'s confirmed
-//! need for async network I/O / streaming (DD-022).
+//! need for async network I/O / streaming — DA-022 (#8).
 //!
 //! The automated test suite uses a much shorter delay for speed — see
 //! `tests/integration/async_token_test.rs`. Run this binary instead to
@@ -33,7 +33,7 @@ impl ExecutionContext for DemoContext {
 /// (`futures_timer::Delay`, not `std::thread::sleep` — see
 /// `tests/integration/async_token_test.rs` for why that distinction
 /// matters: a thread sleep here would block the executor exactly like a
-/// sync call, defeating the entire point of DD-022).
+/// sync call, defeating the entire point of DA-022 (#8)).
 struct TokenFetchHandler;
 
 #[async_trait]

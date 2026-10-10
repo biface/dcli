@@ -1131,7 +1131,7 @@ mod tests {
     }
 
     // ============================================================================
-    // AsyncCommandHandler / register_async / get_handler_async TESTS (DD-022)
+    // AsyncCommandHandler / register_async / get_handler_async TESTS — DA-022 (#8)
     // ============================================================================
 
     #[test]
@@ -1332,7 +1332,7 @@ mod tests {
     }
 
     // ========================================================================
-    // Fault-tolerance consistency check (DD-028, #72)
+    // Fault-tolerance consistency check — DD-028 (#64), #72
     // ========================================================================
 
     /// Declares its failures must never be silently continued past.
@@ -1374,7 +1374,7 @@ mod tests {
     fn test_register_sync_accepts_handler_with_no_opinion() {
         // TestHandler never overrides expected_fault_tolerance() — the
         // overwhelmingly common case, and it must keep working exactly as
-        // before DD-028, regardless of the configured continue_on_failure.
+        // before DD-028 (#64), regardless of the configured continue_on_failure.
         let mut registry = CommandRegistry::new();
         let mut definition = create_test_definition("test", vec![]);
         definition.continue_on_failure = true;

@@ -630,7 +630,7 @@ mod tests {
     struct TestContext {
         executed_command: Option<String>,
         // Ordered record of every handler executed so far — additive,
-        // needed to assert chain execution order (DD-026, #52 / #55)
+        // needed to assert chain execution order — DD-026 (#52), #55 —
         // without disturbing `executed_command` (kept for any existing
         // single-dispatch assertions).
         executed_commands: Vec<String>,
@@ -957,7 +957,7 @@ mod tests {
     }
 
     // ========================================================================
-    // segment() / dispatch() chaining tests (DD-026, #52 / #55)
+    // segment() / dispatch() chaining tests — DD-026 (#52), #55
     // ========================================================================
 
     /// Register a command taking exactly `arity` required `String`
@@ -1051,7 +1051,7 @@ mod tests {
     #[test]
     fn test_segment_multi_command_chain_produces_three_segments() {
         // Generic three-command chain (structurally the same shape as
-        // DD-026's chrom-rs-motivated example — a couple of
+        // the chrom-rs-motivated example of DD-026 (#52) — a couple of
         // argument-taking commands followed by a zero-arity terminal
         // command — but with arbitrary names, since chrom-rs is only ever
         // an illustration, never the justification).
@@ -1164,12 +1164,12 @@ mod tests {
 
     #[test]
     fn test_segment_known_limitation_extra_token_matching_command_name_is_silently_absorbed() {
-        // DD-026's documented, accepted limitation: one token more than a
+        // Documented, accepted limitation of DD-026 (#52): one token more than a
         // command's declared arity, which happens to also be a
         // registered command name, is silently read as the start of the
         // next segment instead of raising too_many_arguments.
         // Deliberately reproduced and pinned down here as *expected*
-        // (not a bug to fix) — see DD-026's "Known limitation" note.
+        // (not a bug to fix) — see the "Known limitation" note of DD-026 (#52).
         let mut registry = CommandRegistry::new();
         register_arity_command(&mut registry, "greet", 1);
         register_arity_command(&mut registry, "run", 0);
@@ -1192,7 +1192,7 @@ mod tests {
     }
 
     // ========================================================================
-    // execute_chain() — continue_on_failure / requires_success (DD-026, #52 / #56)
+    // execute_chain() — continue_on_failure / requires_success — DD-026 (#52), #56
     // ========================================================================
 
     /// Register a zero-arity command with the given chain-policy fields,
