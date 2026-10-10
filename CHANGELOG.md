@@ -169,6 +169,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `validation`, an option's `required`) are no longer marked as
   required, and a command's `required` is described as what it does: a
   handler must be registered for the command.
+- **Plugin guide moved to the wiki and updated** (#89): `PLUGIN_GUIDE.md`
+  / `.fr.md` leave the repository for the [wiki](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE). The
+  guide had not changed since v0.4.0: it now documents the builtin
+  plugins of v0.7.0 (`HelpPlugin`, `VersionPlugin`, `ExitPlugin`,
+  `SysInfoPlugin`, `EnvPlugin`, `ConfigPlugin`) with their feature flags
+  and `implementation` names; its native-handler example takes
+  `&ParsedArgs` and compiles again; the registration examples pass the
+  configuration to plugins through `with_config()`, which `build()` does
+  not do; the `help` command example declares the `command` argument
+  that `system_help` reads.
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
