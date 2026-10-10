@@ -105,7 +105,7 @@ pub mod validator;
 
 // Core traits
 pub use context::{downcast_mut, downcast_ref, ExecutionContext};
-pub use executor::CommandHandler;
+pub use executor::{AsyncCommandHandler, CommandHandler};
 
 // Error handling
 pub use error::{DynamicCliError, Result};
@@ -168,7 +168,7 @@ pub use utils::{
 ///
 /// // Now you have access to:
 /// // - ExecutionContext, downcast_ref, downcast_mut
-/// // - CommandHandler
+/// // - CommandHandler, AsyncCommandHandler
 /// // - DynamicCliError, Result
 /// // - CommandRegistry
 /// // - ParsedCommand, CliParser, ReplParser
@@ -182,7 +182,7 @@ pub mod prelude {
     pub use crate::context::{downcast_mut, downcast_ref, ExecutionContext};
 
     // Command handling
-    pub use crate::executor::CommandHandler;
+    pub use crate::executor::{AsyncCommandHandler, CommandHandler};
 
     // Error handling
     pub use crate::error::{DynamicCliError, Result};
@@ -239,6 +239,7 @@ mod tests {
         // If this compiles, prelude imports are working
         let _: Option<&dyn ExecutionContext> = None;
         let _: Option<&dyn CommandHandler> = None;
+        let _: Option<&dyn AsyncCommandHandler> = None;
     }
 
     /// Verify that individual module imports work
@@ -263,6 +264,7 @@ mod tests {
         // These should be accessible from the crate root
         let _: Option<&dyn ExecutionContext> = None;
         let _: Option<&dyn CommandHandler> = None;
+        let _: Option<&dyn AsyncCommandHandler> = None;
         let _registry = CommandRegistry::new();
 
         // If this compiles, re-exports are working

@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   completes directive names and aliases under their configured names
   (`:he` → `:help`). Completion of commands and options is unchanged.
 
+#### Public API
+- **`AsyncCommandHandler` re-exported from the crate root and `prelude`**
+  (#80), alongside `CommandHandler`. Until v0.9.0 it was only reachable as
+  `dynamic_cli::executor::AsyncCommandHandler`, although the v0.5.0 notes
+  listed it in `prelude`. The `executor` path still works.
+
 ### Changed
 
 - **`DefaultHelpFormatter::format_app()` output** (#86): the `USAGE` line
