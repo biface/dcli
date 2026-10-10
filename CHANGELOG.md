@@ -158,6 +158,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`interface` module docs** (#85): new "REPL Directives" section; the
   REPL history and lifecycle rows of the CLI/REPL comparison now match
   the `:quit` / `:exit` behaviour.
+- **Configuration reference moved to the wiki** (#79):
+  `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md` leave the repository for the
+  [wiki](https://github.com/biface/dcli/wiki), where the REPL directives get their own page
+  (`REPL_DIRECTIVES`). The READMEs and `CONTRIBUTING.*` link to it.
+  The examples used `type:` for the type of an argument or an option,
+  which the loader rejects; they now use `arg_type:` and
+  `option_type:`. Fields with a default (`global_options`, a command's
+  `aliases`, `required`, `arguments` and `options`, an argument's
+  `validation`, an option's `required`) are no longer marked as
+  required, and a command's `required` is described as what it does: a
+  handler must be registered for the command.
 
 ### Ideas for Future Releases
 - Configuration versioning and migration tools

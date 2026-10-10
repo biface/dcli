@@ -87,7 +87,7 @@ global_options: []
 ```
 > Note :
 > 
-> The proper syntax for the configuration file is available in [the project repository](CONFIG_SYNTAX_REFERENCE.md).  
+> The proper syntax for the configuration file is available in the [configuration syntax reference](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE) on the wiki.  
 
 **2. Implement your command handlers**:
 
@@ -172,8 +172,8 @@ exhausted, the next recognized command name starts the next one.
 
 ```bash
 $ myapp configure model.yml configure scenario.yml solve
-# "configure" runs twice, then "solve" — see CONFIG_SYNTAX_REFERENCE.md
-# for the continue_on_failure / requires_success failure policy
+# "configure" runs twice, then "solve" — see the wiki's configuration
+# syntax reference for the continue_on_failure / requires_success policy
 ```
 
 Handlers can declare their own expectation about `continue_on_failure`
@@ -272,6 +272,8 @@ example, and the architecture decision behind it
 ## 📖 Documentation
 
 - **[API Reference](https://docs.rs/dynamic-cli)** - Complete API documentation
+- **[Configuration Syntax Reference](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE)** - Structure of the configuration file (wiki)
+- **[REPL Directives](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES)** - `:help`, `:load`, `:quit`, `:exit` and how to rename them (wiki)
 - **[Examples](examples/README.md)** - Working examples and code samples
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 
