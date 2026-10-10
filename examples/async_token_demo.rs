@@ -13,7 +13,6 @@
 
 use async_trait::async_trait;
 use dynamic_cli::config::schema::{CommandDefinition, Metadata};
-use dynamic_cli::executor::AsyncCommandHandler;
 use dynamic_cli::prelude::*;
 use std::any::Any;
 use std::time::{Duration, Instant};
