@@ -43,7 +43,8 @@ rustup component add rustfmt clippy
 ```
 
 **Versions recommandées :**
-- Rust : 1.75.0 ou ultérieur
+- Rust : 1.88.0 ou ultérieur — version minimale prise en charge
+  (`rust-version` dans `Cargo.toml`), vérifiée avec `cargo msrv find`
 - Cargo : Dernière version stable
 
 ### Démarrage Rapide
@@ -51,7 +52,7 @@ rustup component add rustfmt clippy
 ```bash
 # 1. Forkez le dépôt sur GitHub
 # 2. Clonez votre fork
-git clone https://github.com/biface/dcli.git
+git clone https://github.com/biface/dcli.git dynamic-cli
 cd dynamic-cli
 
 # 3. Ajoutez le remote upstream
