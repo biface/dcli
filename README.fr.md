@@ -403,6 +403,8 @@ Ce projet suit un Code de Conduite pour assurer un environnement accueillant :
 - ✅ Concentrez-vous sur ce qui est le mieux pour la communauté
 - ❌ Pas de harcèlement, trolling ou attaques personnelles
 
+**[Lisez le Code de Conduite complet →](CODE_OF_CONDUCT.fr.md)**
+
 **[Lisez le guide complet de contribution →](CONTRIBUTING.fr.md)**
 
 ---

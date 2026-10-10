@@ -21,22 +21,9 @@ First off, thank you for considering contributing to dynamic-cli! 🎉
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
-
-### Our Standards
-
-**Positive behaviors include:**
-- Using courteous and welcoming language
-- Being respectful of differing viewpoints and experiences
-- Constructive criticism helps us move forward and improve—let's embrace it
-- Focusing on what is best for the community
-- Showing empathy towards other community members
-
-**Unacceptable behaviors include:**
-- Trolling, insulting/derogatory comments, and personal attacks
-- Public or private harassment
-- Publishing others' private information without permission
-- Other conduct which could reasonably be considered inappropriate
+This project and everyone participating in it is governed by our
+[Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected
+to uphold it. It also explains how to report unacceptable behavior.
 
 ---
 
@@ -237,6 +224,7 @@ Documentation improvements are always welcome! This includes:
 - Examples: `examples/` directory
 - README: `README.md` and `README.fr.md`
 - This file: `CONTRIBUTING.md` and `CONTRIBUTING.fr.md`
+- Code of Conduct: `CODE_OF_CONDUCT.md` and `CODE_OF_CONDUCT.fr.md`
 
 ### Contributing Code
 
