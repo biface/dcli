@@ -67,9 +67,9 @@ use std::collections::HashMap;
 ///
 /// Private — never leaks into the public API. `get_handler_sync()` /
 /// `get_handler_async()` return `None` when queried against the wrong
-/// variant, so callers never need to know this enum exists. See DD-022 for
-/// the rationale behind unifying sync and async storage in one map instead
-/// of two parallel `HashMap`s.
+/// variant, so callers never need to know this enum exists. Sync and
+/// async handlers share one map rather than two parallel `HashMap`s, so a
+/// single lookup detects a name already taken by either kind.
 enum StoredHandler {
     Sync(Box<dyn CommandHandler>),
     Async(Box<dyn AsyncCommandHandler>),
@@ -197,14 +197,14 @@ impl CommandRegistry {
     }
 
     /// Checks a handler's declared [`expected_fault_tolerance()`][ceft]
-    /// against `definition.continue_on_failure` (DD-028).
+    /// against `definition.continue_on_failure`.
     ///
     /// Called by both `register_sync` and `register_async` after
     /// `check_name_available` has confirmed there is no conflict, and
     /// before the definition/handler pair is actually stored. Does nothing
     /// when the handler expresses no opinion (`None`, the default) —
-    /// existing handlers that never heard of DD-028 are entirely
-    /// unaffected.
+    /// handlers that do not override `expected_fault_tolerance()` are
+    /// entirely unaffected.
     ///
     /// [ceft]: crate::executor::CommandHandler::expected_fault_tolerance
     ///
@@ -242,7 +242,7 @@ impl CommandRegistry {
     /// - `Err(RegistryError)` if:
     ///   - A command with the same name is already registered (sync or async)
     ///   - An alias conflicts with an existing command or alias
-    ///   - The handler's declared `expected_fault_tolerance()` (DD-028)
+    ///   - The handler's declared `expected_fault_tolerance()`
     ///     contradicts `definition.continue_on_failure`
     ///
     /// # Errors
@@ -251,7 +251,7 @@ impl CommandRegistry {
     /// - [`RegistryError::DuplicateAlias`] if an alias is already in use
     /// - [`RegistryError::FaultToleranceMismatch`] if the handler's
     ///   [`expected_fault_tolerance()`][crate::executor::CommandHandler::expected_fault_tolerance]
-    ///   disagrees with `definition.continue_on_failure` (DD-028)
+    ///   disagrees with `definition.continue_on_failure`
     ///
     /// # Example
     ///
@@ -311,7 +311,7 @@ impl CommandRegistry {
         Ok(())
     }
 
-    /// Register a command with its async handler (DD-022)
+    /// Register a command with its async handler
     ///
     /// Additive counterpart of [`register_sync`][Self::register_sync] —
     /// same conflict-detection rules (checked against both sync and async
@@ -324,7 +324,7 @@ impl CommandRegistry {
     /// - [`RegistryError::DuplicateAlias`] if an alias is already in use
     /// - [`RegistryError::FaultToleranceMismatch`] if the handler's
     ///   [`expected_fault_tolerance()`][crate::executor::AsyncCommandHandler::expected_fault_tolerance]
-    ///   disagrees with `definition.continue_on_failure` (DD-028)
+    ///   disagrees with `definition.continue_on_failure`
     ///
     /// # Example
     ///
@@ -556,7 +556,7 @@ impl CommandRegistry {
         }
     }
 
-    /// Get the async handler of a command by name or alias (DD-022)
+    /// Get the async handler of a command by name or alias
     ///
     /// Additive counterpart of [`get_handler_sync`][Self::get_handler_sync].
     /// Returns `None` both when the name isn't registered at all, and when
@@ -1174,7 +1174,7 @@ mod tests {
         assert!(registry.get_handler_async("unknown").is_none());
     }
 
-    /// The core cross-accessor guarantee DD-022 depends on: querying an
+    /// The core cross-accessor guarantee of the unified storage: querying an
     /// async-registered command through the *sync* accessor returns `None`
     /// (not the wrong handler, not a panic) — dispatch sites rely on this
     /// to fall through from `get_handler_sync` to `get_handler_async`.

@@ -37,7 +37,7 @@ use std::process;
 const COMMANDS_HINT: &str = "Run with '--help' for available commands";
 
 /// One resolved, fully-parsed command within a (possibly single-command)
-/// chain (DD-026, #52) — the unit [`CliInterface::segment`] produces and
+/// chain (#52) — the unit [`CliInterface::segment`] produces and
 /// [`CliInterface::execute_segment`] consumes.
 ///
 /// `name` is owned rather than borrowed from the registry: `resolve_name`
@@ -171,13 +171,14 @@ impl CliInterface {
     }
 
     /// Resolve, parse, and execute an already-tokenized command line — one
-    /// or more chained commands (DD-026, #52).
+    /// or more chained commands (#52).
     ///
     /// Shared by [`run`][Self::run] (one dispatch from CLI args) and
     /// [`run_script`][Self::run_script] (one dispatch per script line) —
     /// the actual resolution/parsing/execution logic lives here exactly
-    /// once, per DD-024's "reuse the existing `ParsedArgs` path, no
-    /// duplicate parsing logic" requirement (see #41). `run_script()`
+    /// once, so script lines go through the same `ParsedArgs` path as
+    /// command-line arguments, with no duplicate parsing logic (see #41).
+    /// `run_script()`
     /// gains chaining for free through this shared method, with no code
     /// change of its own.
     ///
@@ -187,8 +188,8 @@ impl CliInterface {
     /// (`total == 1`) then executes through the exact pre-#55/#56 path —
     /// no chain-position wrapping, no skip bookkeeping, identical error
     /// variants for existing callers to match on. Two or more segments go
-    /// through [`Self::execute_chain`], which applies DD-026's
-    /// `continue_on_failure`/`requires_success` policy.
+    /// through [`Self::execute_chain`], which applies each command's
+    /// `continue_on_failure`/`requires_success` settings.
     fn dispatch(&mut self, args: &[String]) -> Result<()> {
         let segments = self.segment(args)?;
 
@@ -199,8 +200,8 @@ impl CliInterface {
         self.execute_chain(&segments)
     }
 
-    /// Execute two or more already-resolved segments applying DD-026's
-    /// chain failure policy (#56).
+    /// Execute two or more already-resolved segments, applying the chain
+    /// failure policy (#56).
     ///
     /// A running `chain_has_failure` flag, set on the first segment that
     /// fails (regardless of that segment's own `continue_on_failure`),
@@ -221,8 +222,8 @@ impl CliInterface {
     ///   is `false`, the chain stops here. Either way, only the *first*
     ///   failure's wrapped error is kept as the chain's outcome — a later
     ///   failure (whether it stops the chain or is itself absorbed) never
-    ///   overwrites it, matching DD-026's "the exit code reflects the
-    ///   triggering failure" rule.
+    ///   overwrites it, so the exit code always reflects the triggering
+    ///   failure.
     ///
     /// Deliberately not printed as it happens: unlike a skip, a failure's
     /// wrapped message reaches the user exactly once, through the normal
@@ -273,7 +274,7 @@ impl CliInterface {
 
     /// Resolve and parse a full, already-tokenized command line into one
     /// or more [`ResolvedSegment`]s, without executing any of them
-    /// (DD-026, #52 / #55).
+    /// (#52 / #55).
     ///
     /// For the current segment, the parser consumes its options and
     /// positional arguments up to the command's declared arity
@@ -291,10 +292,10 @@ impl CliInterface {
     /// `resolve_name`/`get_definition` are stateless lookups, so the same
     /// command name (or one of its aliases) may legitimately resolve more
     /// than once within a single chain — nothing here tracks "already
-    /// consumed" names, nor should it (DD-026's explicit acceptance
-    /// criterion for #55/#56).
+    /// consumed" names, nor should it: repeating a command within a chain
+    /// is supported on purpose (#55/#56).
     ///
-    /// **Known, accepted limitation (DD-026):** if a command line supplies
+    /// **Known, accepted limitation:** if a command line supplies
     /// one token more than that command's declared arity, and that
     /// leftover token happens to also be a registered command name, it is
     /// silently absorbed as the start of the next segment instead of
@@ -359,7 +360,7 @@ impl CliInterface {
     /// Execute one already-resolved, already-parsed segment.
     ///
     /// Sync handler tried first (unchanged behaviour); if absent, the
-    /// async path (DD-022) is driven via `block_on` — safe here because
+    /// async path is driven via `block_on` — safe here because
     /// `run()`/`run_script()` are strictly sequential, one-shot dispatch,
     /// per segment exactly as for a single command before chaining
     /// existed.
@@ -445,7 +446,7 @@ impl CliInterface {
     /// same quote-aware way as a typed REPL line (via
     /// [`ReplParser::tokenize`]), then dispatched through the exact same
     /// resolve → parse → execute path as [`run`][Self::run] — no
-    /// duplicate parsing logic, and repeatable options (DD-024) are fully
+    /// duplicate parsing logic, and repeatable options are fully
     /// preserved since dispatch goes through `parse_typed()` either way.
     ///
     /// # Error policy
@@ -571,8 +572,8 @@ fn wrap_line_error(line_number: usize, source: DynamicCliError) -> DynamicCliErr
     )))
 }
 
-/// Wrap a chain segment's failure with its 1-based position (DD-026,
-/// #52 / #56), reusing the existing [`ExecutionError::CommandFailed`]
+/// Wrap a chain segment's failure with its 1-based position (#52 / #56),
+/// reusing the existing [`ExecutionError::CommandFailed`]
 /// variant — same idiom as [`wrap_line_error`] — and the existing
 /// [`format_error`] for the inner message, so no change to
 /// `error/display.rs` is needed. Position (not name) is what
@@ -661,8 +662,8 @@ mod tests {
     }
 
     /// A handler that always fails, recording the attempt first — needed
-    /// to exercise `continue_on_failure`/`requires_success` (DD-026,
-    /// #52 / #56), which only ever activate downstream of a failure.
+    /// to exercise `continue_on_failure`/`requires_success` (#52 / #56),
+    /// which only ever activate downstream of a failure.
     struct FailingHandler {
         name: String,
     }

@@ -173,7 +173,8 @@ impl<'a> CliParser<'a> {
     /// Thin, non-breaking wrapper around [`Self::parse_typed`] for callers
     /// that only deal in scalar values. Any [`ParsedValue::Repeated`] entry
     /// (i.e. any `repeatable: true` option) is silently dropped from the
-    /// result — no command definition predating DD-024 can have one, so
+    /// result — no command definition written before repeatable options
+    /// existed (v0.6.0) can have one, so
     /// existing callers see no behaviour change. Once the dispatch layer
     /// is migrated to consume [`crate::parser::ParsedArgs`] directly
     /// (#39, in progress — the type exists but `interface/cli.rs` and
@@ -246,7 +247,7 @@ impl<'a> CliParser<'a> {
     ///
     /// Like [`Self::parse`], but preserves repeatable options as
     /// [`ParsedValue::Repeated`] instead of dropping them. This is the
-    /// method that actually implements DD-024 parsing; `parse()` is a
+    /// method that actually parses repeatable options; `parse()` is a
     /// filtering wrapper around it.
     ///
     /// # Arguments
@@ -310,7 +311,7 @@ impl<'a> CliParser<'a> {
     }
 
     /// Parse command-line arguments, stopping cleanly at a segment boundary
-    /// instead of erroring on positional-arity overflow (DD-026, #52).
+    /// instead of erroring on positional-arity overflow (#52).
     ///
     /// Shares [`Self::parse_typed`]'s token loop and every option-parsing
     /// helper it calls ([`Self::parse_long_option`], [`Self::parse_short_option`],
@@ -613,7 +614,7 @@ impl<'a> CliParser<'a> {
     /// non-`key=value` token ends the occurrence's span without error,
     /// leaving it for the caller (`parse_typed` / `parse_typed_segment`,
     /// #54) to treat as whatever it actually is — this command's next
-    /// positional argument, or, in a chained invocation (DD-026, #52),
+    /// positional argument, or, in a chained invocation (#52),
     /// the next segment's boundary token.
     ///
     /// On return, `index` points at the last token consumed (the

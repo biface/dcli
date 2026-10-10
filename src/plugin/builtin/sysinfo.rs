@@ -2,11 +2,11 @@
 //!
 //! Prints basic runtime/OS information — operating system, architecture,
 //! and available parallelism — using only `std`. No new dependency: this
-//! is deliberately a minimal baseline (#45 / DD-025). A richer variant
+//! is deliberately a minimal baseline (#45). A richer variant
 //! backed by the `sysinfo` crate is out of scope here; if pursued later,
 //! it stays under this same `sysinfo-plugin` feature flag rather than a
-//! second one, per the uniform feature-flag policy decided in the DD-025
-//! triage.
+//! second one: each official plugin is gated by a single feature flag of
+//! its own.
 //!
 //! Only available with the `sysinfo-plugin` feature.
 

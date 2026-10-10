@@ -2,7 +2,7 @@
 //!
 //! Contributes the same `system_version` handler as [`SystemPlugin`],
 //! reusing [`SystemVersionHandler`]'s logic internally — no duplicated
-//! logic (#44 / DD-025).
+//! logic (#44).
 //!
 //! [`SystemPlugin`]: crate::plugin::system::SystemPlugin
 //! [`SystemVersionHandler`]: crate::plugin::system::SystemVersionHandler

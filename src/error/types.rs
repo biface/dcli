@@ -226,7 +226,7 @@ pub enum ConfigError {
 /// These errors occur when analyzing arguments provided
 /// by the user in CLI or REPL mode.
 ///
-/// Marked `#[non_exhaustive]` (DD-024, #37): repeatable-option parsing
+/// Marked `#[non_exhaustive]` (#37): repeatable-option parsing
 /// added four variants in one release, and more argument-shape features
 /// are expected before v1.0.0. External `match` expressions must include
 /// a wildcard arm.
@@ -472,7 +472,7 @@ pub enum ParseError {
     /// and exactly the same `key=value` pairs — a pure equality check the
     /// framework can make without domain knowledge. Partially-overlapping
     /// occurrences (same discriminant, different values) are *not*
-    /// rejected here; that stays the handler's responsibility (DD-024).
+    /// rejected here; that stays the handler's responsibility.
     ///
     /// # Example
     ///
@@ -821,8 +821,8 @@ pub enum RegistryError {
         suggestion: Option<String>,
     },
 
-    /// A handler's declared `expected_fault_tolerance()` (DD-028)
-    /// contradicts the command's configured `continue_on_failure` (DD-026)
+    /// A handler's declared `expected_fault_tolerance()` contradicts the
+    /// command's configured `continue_on_failure`
     ///
     /// Raised by `CommandRegistry::register_sync`/`register_async` when the
     /// handler expresses an opinion (`Some(bool)`) that disagrees with the
@@ -1209,7 +1209,7 @@ impl ExecutionError {
     ///
     /// The suggestion interpolates the implementation name so the user
     /// knows exactly which `register_sync_handler()` or
-    /// `register_async_handler()` call is missing (DD-022).
+    /// `register_async_handler()` call is missing.
     ///
     /// # Example
     ///
@@ -1265,7 +1265,6 @@ impl RegistryError {
     }
 
     /// Create a fault-tolerance-mismatch error with an actionable suggestion
-    /// (DD-028)
     ///
     /// `expected` is what the handler's `expected_fault_tolerance()`
     /// returned; `configured` is the command's actual

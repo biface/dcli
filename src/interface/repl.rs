@@ -348,7 +348,7 @@ pub struct ReplInterface {
     prompt: String,
 
     /// Suffix appended after the app-name segment to build both `prompt`
-    /// and the default multi-line continuation prompt (DD-027, #67).
+    /// and the default multi-line continuation prompt (#67).
     ///
     /// Sourced from `config.metadata.prompt_suffix` when a config is
     /// supplied, falling back to [`crate::config::schema::default_prompt_suffix`] otherwise —
@@ -372,7 +372,7 @@ pub struct ReplInterface {
     help_formatter: Option<Box<dyn HelpFormatter>>,
 
     /// Base (app-name-equivalent) segment of the continuation prompt shown
-    /// while a `\`-continued command is being accumulated (DD-027, #67).
+    /// while a `\`-continued command is being accumulated (#67).
     ///
     /// `None` (the default) means the base falls back to `"..."`. Either
     /// way, `prompt_suffix` is always appended — this field overrides only
@@ -513,7 +513,7 @@ impl ReplInterface {
     }
 
     /// Override the base segment of the continuation prompt shown while a
-    /// `\`-continued command is being accumulated (DD-027, #67).
+    /// `\`-continued command is being accumulated (#67).
     ///
     /// `prompt` here plays the same role as the app-name segment passed to
     /// [`ReplInterface::new`] for the main prompt: only the base is
@@ -552,7 +552,7 @@ impl ReplInterface {
     }
 
     /// The prompt actually displayed while accumulating a `\`-continued
-    /// command (DD-027, #67).
+    /// command (#67).
     ///
     /// With an override set via
     /// [`with_prompt_multiline`][Self::with_prompt_multiline], the base is
@@ -560,10 +560,10 @@ impl ReplInterface {
     /// `"_ _ _"` + suffix `" $ "` → `"_ _ _ $ "`).
     ///
     /// Without an override, the default base `"..."` is followed by
-    /// `prompt_suffix` **with its leading whitespace stripped** — matching
-    /// DD-027's literal example (`"rpn > "` → `"...> "`): `"..."` takes the
-    /// app name's *and* its immediately following space's place, rather
-    /// than merely the app name's, so it reads as one continuous mark
+    /// `prompt_suffix` **with its leading whitespace stripped**, so that
+    /// `"rpn > "` becomes `"...> "`: `"..."` takes the place of the app
+    /// name *and* of the space right after it, rather than of the app name
+    /// alone, so it reads as one continuous mark
     /// against the separator glyph instead of leaving a stray gap
     /// (`"... > "`). This asymmetry is deliberate — an explicit override is
     /// the caller's own spacing choice and is never second-guessed.
@@ -928,13 +928,13 @@ impl ReplInterface {
     ///
     /// Enters an interactive loop that:
     /// 1. Displays the prompt (or the continuation prompt while
-    ///    accumulating a `\`-continued command, DD-027/#69)
+    ///    accumulating a `\`-continued command, #69)
     /// 2. Reads user input (with tab completion)
     /// 3. Parses and executes the command
     /// 4. Displays results or errors
     /// 5. Repeats until `:quit`, `:exit` or end of input
     ///
-    /// # Multi-line option accumulation (DD-027, #69)
+    /// # Multi-line option accumulation (#69)
     ///
     /// A line ending in a trailing `\` is not dispatched: the marker is
     /// stripped and the fragment is buffered, the prompt switches to
@@ -952,8 +952,9 @@ impl ReplInterface {
     ///
     /// This mechanism is entirely local to this loop: [`Self::execute_line`],
     /// [`ReplParser`], and `CliParser` are untouched, and non-interactive
-    /// paths (`run_script()`, `:load`) never go through it — see DD-027's
-    /// abort-by-construction rule for contexts without a live operator.
+    /// paths (`run_script()`, `:load`) never go through it: without a live
+    /// operator, nothing can answer a continuation prompt, so an incomplete
+    /// command there fails instead of waiting for more input.
     ///
     /// # Returns
     ///
@@ -1060,8 +1061,7 @@ impl ReplInterface {
         println!("Goodbye!");
     }
 
-    /// Feed one raw input line into the `\`-continuation buffer (DD-027,
-    /// #69).
+    /// Feed one raw input line into the `\`-continuation buffer (#69).
     ///
     /// Pure and I/O-free by design: [`run`][Self::run] is the only caller,
     /// but keeping this separate from the `rustyline`-driven loop makes the

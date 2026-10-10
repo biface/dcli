@@ -1,8 +1,8 @@
 //! Standalone `ExitPlugin`.
 //!
 //! Contributes the same `system_exit` handler as [`SystemPlugin`], reusing
-//! [`SystemExitHandler`]'s logic internally — no duplicated logic (#44 /
-//! DD-025). Supports the same shutdown-callback mechanism as
+//! [`SystemExitHandler`]'s logic internally — no duplicated logic (#44).
+//! Supports the same shutdown-callback mechanism as
 //! [`SystemPlugin::with_exit_fn`][crate::builtin::system::SystemPlugin::with_exit_fn].
 //!
 //! [`SystemPlugin`]: crate::builtin::system::SystemPlugin

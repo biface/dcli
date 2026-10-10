@@ -237,7 +237,7 @@ impl Plugin for SystemPlugin {
 /// Handler for `system_help` — prints app-level or per-command help.
 ///
 /// `pub(crate)` so [`crate::plugin::builtin::HelpPlugin`] can reuse the
-/// exact same logic without duplicating it (see #44 / DD-025).
+/// exact same logic without duplicating it (see #44).
 pub(crate) struct SystemHelpHandler {
     config: Option<CommandsConfig>,
 }
@@ -272,7 +272,7 @@ impl CommandHandler for SystemHelpHandler {
 /// Handler for `system_version` — prints the app version from config metadata.
 ///
 /// `pub(crate)` so [`crate::plugin::builtin::VersionPlugin`] can
-/// reuse the exact same logic without duplicating it (see #44 / DD-025).
+/// reuse the exact same logic without duplicating it (see #44).
 pub(crate) struct SystemVersionHandler {
     config: Option<CommandsConfig>,
 }
@@ -300,7 +300,7 @@ impl CommandHandler for SystemVersionHandler {
 /// callback calls `std::process::exit(0)`.
 ///
 /// `pub(crate)` so [`crate::plugin::builtin::ExitPlugin`] can reuse the
-/// exact same logic without duplicating it (see #44 / DD-025).
+/// exact same logic without duplicating it (see #44).
 pub(crate) struct SystemExitHandler {
     /// Shutdown callback — runs before the process exits.
     exit_fn: Arc<dyn Fn() + Send + Sync>,

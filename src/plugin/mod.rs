@@ -6,7 +6,7 @@
 //!
 //! # Design
 //!
-//! The plugin system follows the principle established by DD-001 and DD-002:
+//! The plugin system follows the same rules as the rest of the framework:
 //! - **The YAML config is the sole source of truth** for command definitions.
 //! - **Plugins supply handlers only** — identified by their `implementation`
 //!   name, exactly as [`CliBuilder::register_sync_handler`] does.
