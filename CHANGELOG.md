@@ -167,7 +167,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### REPL multi-line option accumulation (DD-027)
+#### REPL multi-line option accumulation ([DD-027](https://github.com/biface/dcli/issues/48))
 - **Trailing-`\` continuation in `ReplInterface::run()`** (#69): a line
   ending in `\` is buffered instead of dispatched; the first line
   without a trailing `\` completes the command, and every fragment
@@ -179,7 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   interactive terminal.
 - **`ReplInterface::with_prompt_multiline()` / `CliBuilder::prompt_multiline()`**
   (#67, #68, both additive fluent setters, mirroring the
-  `help_formatter()` precedent from DD-010): override the base segment
+  `help_formatter()` precedent from [DA-010](https://github.com/biface/dcli/issues/6)): override the base segment
   of the continuation prompt shown while accumulating. The default
   base is `"..."`, always followed by the configured `prompt_suffix`;
   an explicit override replaces only the base.
@@ -188,11 +188,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mechanism, the continuation-prompt derivation, and the deliberate
   no-configurable abort/continue policy (CLI/REPL parity).
 
-#### Registration-time fault-tolerance consistency check (DD-028)
+#### Registration-time fault-tolerance consistency check ([DD-028](https://github.com/biface/dcli/issues/64))
 - **`CommandHandler::expected_fault_tolerance()` /
   `AsyncCommandHandler::expected_fault_tolerance()`** (#71, both
   additive, default `None`): lets a handler author declare an
-  expectation about the command's `continue_on_failure` (DD-026).
+  expectation about the command's `continue_on_failure` ([DD-026](https://github.com/biface/dcli/issues/52)).
   Declared directly on each trait rather than via a shared supertrait
   — see Fixed below.
 - **`RegistryError::FaultToleranceMismatch`** (#72):
@@ -217,13 +217,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- `DESIGN_DECISIONS.md`: DD-028's originally-drafted `FaultToleranceHint`
-  shared supertrait is corrected in place, with the reasoning kept
+- [DD-028](https://github.com/biface/dcli/issues/64)'s originally-drafted `FaultToleranceHint` shared supertrait is
+  corrected in the decision issue, with the reasoning kept
   visible as a dated note rather than silently rewritten — a new
   supertrait bound on `CommandHandler`/`AsyncCommandHandler` would have
   broken every existing implementor despite being described as
   additive. Shipped instead as a directly-declared default method on
-  each trait, mirroring the precedent set by `validate()` (DD-022).
+  each trait, mirroring the precedent set by `validate()` ([DA-022](https://github.com/biface/dcli/issues/8)).
 - `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md`: the REPL prompt fields
   (`prompt`/`prompt_suffix`) and the `continue_on_failure`/
   `requires_success` command-chaining fields are now each documented
@@ -323,7 +323,7 @@ implemented; revisit only if a concrete need appears.
 ## [0.7.0] "Divide and Conquer" - 2026-08-23
 
 **Theme**: Static Plugin Library — Granular Plugins & Batch Execution
-**Decision**: [DD-025](https://github.com/biface/dcli/issues/25)
+**Decision**: [DT-025](https://github.com/biface/dcli/issues/25)
 
 ### Added
 
@@ -348,7 +348,7 @@ implemented; revisit only if a concrete need appears.
   sensitive under a case-insensitive deny-list (`SECRET`, `TOKEN`, `KEY`,
   `PASS`, `CREDENTIAL`, `AUTH`, `PRIVATE`). A hidden variable's *name* is
   still shown — only its value is withheld. An allow-list mechanism
-  (`ArgumentDefinition::secure`, DD-023) isn't viable here: unlike a
+  (`ArgumentDefinition::secure`, [DD-023](https://github.com/biface/dcli/issues/17)) isn't viable here: unlike a
   config-declared argument, environment variable names are arbitrary and
   unknown ahead of time, so there is nothing to declare against.
 - **`ConfigPlugin`** (`src/plugin/builtin/config.rs`, feature
@@ -365,7 +365,7 @@ implemented; revisit only if a concrete need appears.
   file of command lines through the same resolve → parse → execute path as
   `run()` — one non-blank, non-comment (`#`-prefixed) line per command,
   tokenized quote-aware via the existing `ReplParser::tokenize()`, parsed
-  via `parse_typed()` so DD-024 repeatable options are fully preserved in
+  via `parse_typed()` so [DD-024](https://github.com/biface/dcli/issues/21) repeatable options are fully preserved in
   batch scripts. `ScriptErrorPolicy::{Abort, Continue}` controls what
   happens when a line fails; `ScriptOutcome{lines_executed,
   lines_succeeded, failures}` reports the outcome, with every failure
@@ -374,7 +374,7 @@ implemented; revisit only if a concrete need appears.
   already-running REPL session, closing the gap where `run_script()` only
   works as a one-shot replacement for `run_cli()`/`run_repl()`.
   Deliberately stays on the REPL's existing scalar-only parse path
-  (DD-024 addendum) rather than `run_script()`'s typed path — REPL's
+  ([DD-024](https://github.com/biface/dcli/issues/21) addendum) rather than `run_script()`'s typed path — REPL's
   scalar-only scoping was a deliberate prior decision, not reopened here.
   No error-policy parameter: a failing line is displayed inline (matching
   how the REPL already surfaces errors for typed lines) and the load
@@ -427,11 +427,11 @@ implemented; revisit only if a concrete need appears.
 existing bugs fixed (`sub`/`div` operand order, clippy drift) are example-
 and tooling-only, not public API changes.
 
-**Roadmap follow-up**: `DD-027` ("Multi-line option accumulation in REPL
-mode") was extracted from the DD-025 triage as a separate, not-yet-
-scheduled design decision — the REPL's scalar-only scoping (DD-024
+**Roadmap follow-up**: [DD-027](https://github.com/biface/dcli/issues/48) ("Multi-line option accumulation in REPL
+mode") was extracted from the [DT-025](https://github.com/biface/dcli/issues/25) triage as a separate, not-yet-
+scheduled design decision — the REPL's scalar-only scoping ([DD-024](https://github.com/biface/dcli/issues/21)
 addendum) that `:load` deliberately respects above is exactly the
-boundary DD-027 will revisit.
+boundary [DD-027](https://github.com/biface/dcli/issues/48) will revisit.
 
 ---
 
@@ -466,7 +466,7 @@ boundary DD-027 will revisit.
 - **New `ParseError` variants** (`src/error/types.rs`): `UnknownOptionParameter`,
   `MissingRequiredOptionParameter`, `UnknownDiscriminant`,
   `DuplicateOptionOccurrence` — each with an actionable `suggestion`
-  pointing at `--help`, consistent with the DD-011 convention.
+  pointing at `--help`, consistent with the [DD-011](https://github.com/biface/dcli/issues/7) convention.
 - **Parser support** (`src/parser/cli_parser.rs`): new `OptionOccurrence`
   and `ParsedValue::{Scalar, Repeated}` types; `--output csv file=... [k=v ...]`
   accumulates into `Vec<OptionOccurrence>` in command-line order. Two
@@ -526,11 +526,11 @@ boundary DD-027 will revisit.
 
   For handlers that never use repeatable options, migration is close to a
   find-and-replace: `args.get("x")` → `args.get_scalar("x")`. Subsystems
-  that predate DD-024 and still expect a flat `HashMap<String, String>`
+  that predate [DD-024](https://github.com/biface/dcli/issues/21) and still expect a flat `HashMap<String, String>`
   (e.g. the WASM plugin ABI in `src/plugin/wasm.rs`, which serializes
   arguments across the guest boundary) bridge via
   `args.to_scalar_map()` rather than being rewritten — repeatable options
-  are silently dropped for those consumers, matching the pre-DD-024
+  are silently dropped for those consumers, matching the pre-[DD-024](https://github.com/biface/dcli/issues/21)
   behaviour they were built against.
 
 - All in-crate examples (`examples/*.rs`) and the `README.md` / `README.fr.md`
@@ -539,7 +539,7 @@ boundary DD-027 will revisit.
 **Deviation from the v0.5.0 roadmap note**: this signature change was
 previously expected to land at v1.0.0, batched with the removal of the
 `register()` / `get_handler()` / `register_handler()` deprecated aliases.
-It ships here instead, at v0.6.0, since DD-024 is itself a breaking change
+It ships here instead, at v0.6.0, since [DD-024](https://github.com/biface/dcli/issues/21) is itself a breaking change
 and batching it further only delays real-world validation against
 `chrom-rs`. The deprecated-alias removal is unaffected and still targets
 v1.0.0.
@@ -550,8 +550,7 @@ v1.0.0.
   resolution=...` / `--output plot file=...` worked example.
 - **`README.md`** / **`.fr.md`**: install snippet bumped to `0.6.0`;
   quick-start handler example migrated to `ParsedArgs`.
-- **`DESIGN_DECISIONS.md`**: DD-024 moved from "decided — implementation
-  pending" to closed.
+- [DD-024](https://github.com/biface/dcli/issues/21): decision issue closed.
 
 **Breaking Changes**: Yes — every existing `CommandHandler` /
 `AsyncCommandHandler` implementation must migrate both `execute()` and
@@ -567,7 +566,7 @@ scheduled for removal at **v1.0.0**, unaffected by this release.
 ## [0.5.0] "Beyond Blocking" - 2026-07-11
 
 **Theme**: Async Command Handlers
-**Decision**: [DD-022](https://github.com/biface/dcli/issues/8)
+**Decision**: [DA-022](https://github.com/biface/dcli/issues/8)
 
 ### Added
 
@@ -621,7 +620,7 @@ scheduled for removal at **v1.0.0**, unaffected by this release.
 - Downstream consumers (including `chrom-rs`) should migrate to the `_sync`
   names now: `cargo clippy -- -D warnings` turns the deprecation into a
   build error, so the old names cannot be used silently going forward.
-- Tracked for removal alongside DD-024's planned `CommandHandler::execute`
+- Tracked for removal alongside [DD-024](https://github.com/biface/dcli/issues/21)'s planned `CommandHandler::execute`
   signature change in the **v1.0.0 API cleanup** tracking issue.
 
 ### Documentation
@@ -655,7 +654,7 @@ scheduled for removal at **v1.0.0**, unaffected by this release.
 deprecations, not removals — both names work until v1.0.0)
 
 **Roadmap follow-up**: `CommandHandler::execute`'s signature is expected to
-change under DD-024 (v0.6.0, repeatable options), batched with the removal
+change under [DD-024](https://github.com/biface/dcli/issues/21) (v0.6.0, repeatable options), batched with the removal
 of the deprecated names above at v1.0.0. Concurrent/cancellable async
 execution — explicitly out of scope here, since `ExecutionContext` is
 borrowed non-`'static` — would require its own future design decision if
@@ -666,7 +665,7 @@ ever confirmed as a need.
 ## [0.4.0] "Plugin System" - 2026-06-19
 
 **Theme**: Plugin System
-**Decision**: [DD-021](https://github.com/biface/dcli/issues/10)
+**Decision**: [DA-021](https://github.com/biface/dcli/issues/10)
 
 ### Added
 
