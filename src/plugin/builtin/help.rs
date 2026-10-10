@@ -13,7 +13,7 @@ use crate::plugin::Plugin;
 
 /// Standalone builtin providing only the `help` command.
 ///
-/// Use this instead of [`SystemPlugin`][crate::builtin::system::SystemPlugin]
+/// Use this instead of [`SystemPlugin`][crate::plugin::system::SystemPlugin]
 /// when an application wants `help` without also registering `version` and
 /// `exit`.
 ///

@@ -122,7 +122,7 @@ enum StoredHandler {
 pub struct CommandRegistry {
     /// Map of command names to their data
     /// Key: canonical command name
-    /// Value: (CommandDefinition, Box<dyn CommandHandler>)
+    /// Value: `(CommandDefinition, StoredHandler)`
     commands: HashMap<String, (CommandDefinition, StoredHandler)>,
 
     /// Map of aliases to canonical command names

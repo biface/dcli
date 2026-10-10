@@ -3,10 +3,10 @@
 //! Contributes the same `system_exit` handler as [`SystemPlugin`], reusing
 //! [`SystemExitHandler`]'s logic internally — no duplicated logic (#44).
 //! Supports the same shutdown-callback mechanism as
-//! [`SystemPlugin::with_exit_fn`][crate::builtin::system::SystemPlugin::with_exit_fn].
+//! [`SystemPlugin::with_exit_fn`][crate::plugin::system::SystemPlugin::with_exit_fn].
 //!
-//! [`SystemPlugin`]: crate::builtin::system::SystemPlugin
-//! [`SystemExitHandler`]: crate::builtin::system::SystemExitHandler
+//! [`SystemPlugin`]: crate::plugin::system::SystemPlugin
+//! [`SystemExitHandler`]: crate::plugin::system::SystemExitHandler
 
 use crate::executor::CommandHandler;
 use crate::plugin::system::SystemExitHandler;
@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 /// Standalone builtin providing only the `exit` command.
 ///
-/// Use this instead of [`SystemPlugin`][crate::builtin::system::SystemPlugin]
+/// Use this instead of [`SystemPlugin`][crate::plugin::system::SystemPlugin]
 /// when an application wants `exit` without also registering `help` and
 /// `version`.
 ///

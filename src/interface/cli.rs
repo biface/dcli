@@ -460,7 +460,7 @@ impl CliInterface {
     ///
     /// Every failure — whether it aborts the run or not — is reported
     /// with its 1-based line number, wrapped in
-    /// [`ExecutionError::CommandFailed`][crate::error::ExecutionError::CommandFailed]
+    /// [`ExecutionError::CommandFailed`]
     /// (reusing the existing error hierarchy; no new enum variant, so no
     /// breaking change to `ExecutionError`'s non-`#[non_exhaustive]`
     /// shape).
@@ -615,7 +615,7 @@ pub struct ScriptOutcome {
     pub lines_succeeded: usize,
     /// `(1-based line number, wrapped error)` for every line that failed.
     /// Always empty when `policy` was
-    /// [`ScriptErrorPolicy::Abort`][ScriptErrorPolicy::Abort] and the run
+    /// [`ScriptErrorPolicy::Abort`] and the run
     /// completed (an abort returns `Err` instead of populating this).
     pub failures: Vec<(usize, DynamicCliError)>,
 }

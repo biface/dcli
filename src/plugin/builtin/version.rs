@@ -14,7 +14,7 @@ use crate::plugin::Plugin;
 
 /// Standalone builtin providing only the `version` command.
 ///
-/// Use this instead of [`SystemPlugin`][crate::builtin::system::SystemPlugin]
+/// Use this instead of [`SystemPlugin`][crate::plugin::system::SystemPlugin]
 /// when an application wants `version` without also registering `help` and
 /// `exit`.
 ///

@@ -1,7 +1,7 @@
 //! Numeric range validation functions
 //!
 //! This module provides functions to validate numeric values according to
-//! [`ValidationRule::Range`] constraints.
+//! [`ValidationRule::Range`](crate::config::schema::ValidationRule::Range) constraints.
 //!
 //! # Functions
 //!
