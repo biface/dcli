@@ -1,4 +1,4 @@
-//! Integration test — WasmPlugin (Option C, DD-021)
+//! Integration test — WasmPlugin, Option C of DA-021 (#10)
 //!
 //! Exercises the full chain `CliBuilder -> register_wasm_plugin() -> build()
 //! -> CliApp -> run_cli()` using only the crate's public API, with real

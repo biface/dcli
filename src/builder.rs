@@ -1083,7 +1083,7 @@ mod tests {
     #[test]
     fn test_builder_without_prompt_multiline_defaults_to_none() {
         // No-op when never called — CliApp/ReplInterface fall back to the
-        // "..." default (DD-027, #67), no breaking change for existing
+        // "..." default — DD-027 (#48), #67 — no breaking change for existing
         // callers of CliBuilder that never set this.
         let builder = CliBuilder::new().prompt("myapp");
 
@@ -1386,7 +1386,7 @@ mod tests {
     }
 
     // ============================================================================
-    // async_handlers / register_async_handler / build() TESTS (DD-022)
+    // async_handlers / register_async_handler / build() TESTS — DA-022 (#8)
     // ============================================================================
 
     #[test]

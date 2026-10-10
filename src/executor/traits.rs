@@ -862,7 +862,7 @@ mod tests {
     fn test_no_generic_methods_documentation() {}
 
     // ============================================================================
-    // expected_fault_tolerance() TESTS (DD-028)
+    // expected_fault_tolerance() TESTS — DD-028 (#64)
     // ============================================================================
 
     /// A handler whose author never expressed an opinion — the common case.
@@ -902,13 +902,13 @@ mod tests {
 
     #[test]
     fn test_expected_fault_tolerance_defaults_to_none() {
-        // Every pre-existing handler that never heard of DD-028 keeps
+        // Every pre-existing handler written before DD-028 (#64) keeps
         // compiling and behaving exactly as before — no supertrait, no
         // required impl, nothing to add.
         let handler = FaultAgnosticCommand;
         assert_eq!(handler.expected_fault_tolerance(), None);
 
-        // HelloCommand and ValidatedCommand, defined above DD-028 existed,
+        // HelloCommand and ValidatedCommand, defined before DD-028 (#64),
         // are just as unaffected.
         assert_eq!(HelloCommand.expected_fault_tolerance(), None);
         assert_eq!(ValidatedCommand.expected_fault_tolerance(), None);
@@ -933,7 +933,7 @@ mod tests {
     }
 
     // ============================================================================
-    // AsyncCommandHandler TESTS (DD-022)
+    // AsyncCommandHandler TESTS — DA-022 (#8)
     // ============================================================================
 
     /// Async command that writes to the test context, mirroring `HelloCommand`.
@@ -1052,7 +1052,7 @@ mod tests {
     #[test]
     fn test_async_trait_object_usage() {
         // Verify that AsyncCommandHandler can be used as a trait object —
-        // the core object-safety guarantee DD-022 depends on.
+        // the core object-safety guarantee DA-022 (#8) depends on.
         let handler: Box<dyn AsyncCommandHandler> = Box::new(AsyncHelloCommand);
         let mut context = TestContext::default();
         let args = scalar_args([("name", "TraitObject")]);
@@ -1083,7 +1083,7 @@ mod tests {
     }
 
     // ============================================================================
-    // expected_fault_tolerance() TESTS — async mirror (DD-028)
+    // expected_fault_tolerance() TESTS — async mirror, DD-028 (#64)
     // ============================================================================
 
     /// Async handler whose author declares its failures must never be
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn test_async_expected_fault_tolerance_defaults_to_none() {
-        // AsyncHelloCommand, defined before DD-028 existed, keeps compiling
+        // AsyncHelloCommand, defined before DD-028 (#64), keeps compiling
         // and behaving exactly as before — no supertrait, nothing to add.
         assert_eq!(AsyncHelloCommand.expected_fault_tolerance(), None);
     }

@@ -64,7 +64,8 @@ use crate::executor::CommandHandler;
 // Sub-modules
 pub mod system;
 
-// Standalone, single-command plugins split out of `SystemPlugin` (#44 / DD-025).
+// Standalone, single-command plugins split out of `SystemPlugin`:
+// DT-025 (#25), #44.
 // Each of `HelpPlugin`, `VersionPlugin`, `ExitPlugin` contributes exactly one
 // handler, reusing `system`'s handler logic internally — no duplication.
 pub mod builtin;
