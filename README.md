@@ -395,6 +395,8 @@ This project follows a Code of Conduct to ensure a welcoming environment:
 - ✅ Focus on what's best for the community
 - ❌ No harassment, trolling or personal attacks
 
+**[Read the full Code of Conduct →](CODE_OF_CONDUCT.md)**
+
 **[Read the complete contributing guide →](CONTRIBUTING.md)**
 
 ---
