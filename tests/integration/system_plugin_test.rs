@@ -39,7 +39,7 @@ impl ExecutionContext for RecordingContext {
 }
 
 /// A user-defined handler, registered alongside `SystemPlugin`, to verify
-/// the two registration paths (`register_handler` and `register_plugin`)
+/// the two registration paths (`register_sync_handler` and `register_plugin`)
 /// coexist without interference.
 struct GreetHandler {
     greeted: Arc<Mutex<Vec<String>>>,

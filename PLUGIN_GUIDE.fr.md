@@ -29,7 +29,7 @@ En d'autres termes, un plugin — statique ou WASM — ne déclare jamais ses pr
 
 ## Le contrat YAML commun
 
-Qu'un handler provienne d'un plugin statique, d'un plugin WASM, ou d'un appel direct à `CliBuilder::register_handler()`, chacun respecte le même formalisme d'enregistrement dans le fichier de configuration YAML.
+Qu'un handler provienne d'un plugin statique, d'un plugin WASM, ou d'un appel direct à `CliBuilder::register_sync_handler()`, chacun respecte le même formalisme d'enregistrement dans le fichier de configuration YAML.
 
 Une entrée de commande nomme une `implementation`, et *quelque chose* doit fournir un handler sous ce nom exact au moment où `CliBuilder::build()` s'exécute. Pour plus d'éléments sur la configuration YAML, voir [La syntaxe de configuration](CONFIG_SYNTAX_REFERENCE.fr.md).
 
@@ -84,7 +84,7 @@ let app = CliBuilder::new()
     .build()?;
 ```
 
-`register_plugin()` peut être appelé plusieurs fois, et librement combiné avec `register_handler()` pour les handlers qui ne proviennent pas d'un plugin.
+`register_plugin()` peut être appelé plusieurs fois, et librement combiné avec `register_sync_handler()` pour les handlers qui ne proviennent pas d'un plugin.
 
 ### `SystemPlugin` — l'implémentation de référence
 
