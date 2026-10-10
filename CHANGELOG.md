@@ -148,6 +148,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spaces before `[options]` for a command with options but no arguments
   (`list  [options]`). The line now uses single spaces only.
 
+### Documentation
+
+- **REPL directives** (#85): `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md` gain
+  a "REPL Directives" section covering the default directives, the
+  `directives:` syntax, the merge rule, the validation rules, `:quit`
+  versus `:exit`, the help listing and completion. Command Definition now
+  states that command names and aliases may not start with `:`.
+- **`interface` module docs** (#85): new "REPL Directives" section; the
+  REPL history and lifecycle rows of the CLI/REPL comparison now match
+  the `:quit` / `:exit` behaviour.
+
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
 - Subcommand support (git-style: `myapp config set key value`)
