@@ -9,7 +9,7 @@
 //! The plugin system follows the principle established by DD-001 and DD-002:
 //! - **The YAML config is the sole source of truth** for command definitions.
 //! - **Plugins supply handlers only** — identified by their `implementation`
-//!   name, exactly as [`CliBuilder::register_handler`] does.
+//!   name, exactly as [`CliBuilder::register_sync_handler`] does.
 //! - **The framework controls registration** — the plugin declares what it
 //!   provides via [`Plugin::handlers`]; the framework validates and registers.
 //!   The plugin never receives a `&mut CommandRegistry`.
@@ -98,7 +98,7 @@ pub use system::SystemPlugin;
 /// - [`Plugin::handlers`] returns `(implementation_name, handler)` pairs.
 /// - Each `implementation_name` must match the `implementation` field of a
 ///   command declared in the YAML config — exactly as with
-///   [`CliBuilder::register_handler`].
+///   [`CliBuilder::register_sync_handler`].
 /// - The YAML config remains the sole source of truth for command definitions.
 ///   A plugin cannot inject commands that are not declared in the config.
 ///

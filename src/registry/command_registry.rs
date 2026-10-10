@@ -231,10 +231,6 @@ impl CommandRegistry {
     /// This method registers a command definition along with its handler.
     /// It also registers all aliases for the command.
     ///
-    /// Renamed from `register()` in v0.5.0 for symmetry with
-    /// [`register_async`][Self::register_async]. `register()` remains
-    /// available as a deprecated alias until v1.0.0 (DD-022).
-    ///
     /// # Arguments
     ///
     /// * `definition` - The command definition from the configuration
@@ -313,24 +309,6 @@ impl CommandRegistry {
             (definition, StoredHandler::Sync(handler)),
         );
         Ok(())
-    }
-
-    /// Deprecated alias for [`register_sync`][Self::register_sync].
-    ///
-    /// Kept for backward compatibility with pre-0.5.0 consumers (e.g.
-    /// `chrom-rs`). Scheduled for removal in v1.0.0, batched with the other
-    /// breaking changes tracked in the v1.0.0 API cleanup issue.
-    #[deprecated(
-        since = "0.5.0",
-        note = "renamed to `register_sync` for symmetry with `register_async`; \
-                will be removed in 1.0.0"
-    )]
-    pub fn register(
-        &mut self,
-        definition: CommandDefinition,
-        handler: Box<dyn CommandHandler>,
-    ) -> Result<()> {
-        self.register_sync(definition, handler)
     }
 
     /// Register a command with its async handler (DD-022)
@@ -524,10 +502,6 @@ impl CommandRegistry {
     /// an *async* handler (query [`get_handler_async`][Self::get_handler_async]
     /// instead in that case) — dispatch sites try both in sequence.
     ///
-    /// Renamed from `get_handler()` in v0.5.0 for symmetry with
-    /// [`get_handler_async`][Self::get_handler_async]. `get_handler()`
-    /// remains available as a deprecated alias until v1.0.0 (DD-022).
-    ///
     /// # Arguments
     ///
     /// * `name` - The command name or alias
@@ -580,17 +554,6 @@ impl CommandRegistry {
             StoredHandler::Sync(h) => Some(h.as_ref()),
             StoredHandler::Async(_) => None,
         }
-    }
-
-    /// Deprecated alias for [`get_handler_sync`][Self::get_handler_sync].
-    /// Scheduled for removal in v1.0.0.
-    #[deprecated(
-        since = "0.5.0",
-        note = "renamed to `get_handler_sync` for symmetry with `get_handler_async`; \
-                will be removed in 1.0.0"
-    )]
-    pub fn get_handler(&self, name: &str) -> Option<&dyn CommandHandler> {
-        self.get_handler_sync(name)
     }
 
     /// Get the async handler of a command by name or alias (DD-022)
@@ -828,24 +791,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(registry.len(), 1);
         assert!(!registry.is_empty());
-    }
-
-    /// Deprecated-alias coverage (DD-022 companion issue): `register()` and
-    /// `get_handler()` must keep behaving exactly like `register_sync()` /
-    /// `get_handler_sync()` until they're removed in v1.0.0. This is the
-    /// only place in the crate allowed to call them directly.
-    #[test]
-    #[allow(deprecated)]
-    fn test_deprecated_register_alias_still_works() {
-        let mut registry = CommandRegistry::new();
-        let definition = create_test_definition("legacy", vec!["old"]);
-
-        let result = registry.register(definition, Box::new(TestHandler));
-
-        assert!(result.is_ok());
-        assert!(registry.get_handler("legacy").is_some());
-        assert!(registry.get_handler("old").is_some());
-        assert_eq!(registry.resolve_name("old"), Some("legacy"));
     }
 
     #[test]

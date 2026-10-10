@@ -44,7 +44,7 @@ impl ExecutionContext for TestContext {
 }
 
 /// A user-defined handler, registered alongside a WASM plugin, to verify
-/// `register_wasm_plugin` and `register_handler` coexist in `build()`.
+/// `register_wasm_plugin` and `register_sync_handler` coexist in `build()`.
 struct NativeHandler;
 
 impl CommandHandler for NativeHandler {
@@ -289,7 +289,7 @@ fn wasm_plugin_guest_error_with_message_propagates_via_full_chain() {
 // Tests — coexistence with a native handler
 // ============================================================================
 
-/// `register_wasm_plugin` and `register_handler` coexist in the same
+/// `register_wasm_plugin` and `register_sync_handler` coexist in the same
 /// `CliApp`, each dispatching to its own implementation correctly.
 #[test]
 fn wasm_plugin_coexists_with_native_handler() {

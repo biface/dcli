@@ -116,6 +116,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   must add the field and patterns must list it or use `..`; code matching
   the old message text must drop the sentence.
 
+### Removed
+
+- **The aliases deprecated in v0.5.0** (#87). They were kept for
+  backward compatibility and are now gone; calling them is a compile
+  error. Migration is a rename, signatures are unchanged:
+
+  | Removed                          | Use instead                           |
+  |----------------------------------|---------------------------------------|
+  | `CliBuilder::register_handler()` | `CliBuilder::register_sync_handler()` |
+  | `CommandRegistry::register()`    | `CommandRegistry::register_sync()`    |
+  | `CommandRegistry::get_handler()` | `CommandRegistry::get_handler_sync()` |
+
 ### Fixed
 
 - **`--help` / `-h` in the REPL without a custom formatter** (#76): the

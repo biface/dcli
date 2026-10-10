@@ -273,7 +273,7 @@ pub trait CommandHandler: Send + Sync {
     /// Declare an expectation about this command's configured
     /// `continue_on_failure` (DD-026), if the handler's author has one.
     ///
-    /// Purely informational at the trait level: `CommandRegistry::register`
+    /// Purely informational at the trait level: `CommandRegistry::register_sync`
     /// compares this value (when `Some`) against the `continue_on_failure`
     /// the YAML config actually declares for this command, and rejects
     /// registration on a contradiction (`RegistryError::FaultToleranceMismatch`,
