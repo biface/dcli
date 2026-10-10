@@ -1,7 +1,7 @@
 # Configuration File Syntax Reference - dynamic-cli
 
 **Version**: 1.0  
-**Last Updated**: 2026-09-01  
+**Last Updated**: 2026-10-10  
 **Format**: YAML or JSON
 
 ---
@@ -13,6 +13,7 @@
 - [Root Structure](#root-structure)
 - [Metadata Section](#metadata-section)
   - [Multi-line Continuation (REPL)](#multi-line-continuation-repl)
+- [REPL Directives](#repl-directives)
 - [Global Options](#global-options)
 - [Commands Section](#commands-section)
 - [Command Definition](#command-definition)
@@ -101,9 +102,13 @@ global_options:    # Options available for ALL commands
 
 commands:          # List of available commands
   # ...
+
+directives:        # Optional: overrides of the REPL directives
+  # ...
 ```
 
 **All three sections are required**, even if `global_options` is empty.
+`directives` is optional: see [REPL Directives](#repl-directives).
 
 ---
 
@@ -212,9 +217,131 @@ scheduled to change; revisit only if a concrete need appears.
 In CLI one-shot mode, the invoking shell has already collapsed any
 `\`-continued line before `dynamic-cli` ever sees its `argv` — nothing
 to implement there. `run_script()` and the REPL's `:load`
-meta-command are **not** affected: each line is dispatched
+directive are **not** affected: each line is dispatched
 independently, and a trailing `\` in a script line is read like any
 other token.
+
+---
+
+## REPL Directives
+
+In the REPL, a line starting with `:` is a **directive** handled by the
+framework itself; any other line is an application command. The set of
+directives is fixed by the version of `dynamic-cli`. The optional
+`directives:` section of the configuration can rename a directive and
+replace its aliases and description, for instance to translate them. It
+cannot add a directive, remove one or change its arguments.
+
+Directives exist only in the REPL. In CLI mode, use `--help` / `-h` as
+before; they also keep working in the REPL.
+
+### Default Directives
+
+| `implementation` | Typed as          | Aliases    | Action                                                  |
+|------------------|-------------------|------------|---------------------------------------------------------|
+| `repl_help`      | `:help [command]` | `:h`, `:?` | Show the application help, or the help of one command   |
+| `repl_load`      | `:load <path>`    | —          | Run every line of a script file in the current session  |
+| `repl_quit`      | `:quit`           | `:q`       | Save the session history, then leave the REPL           |
+| `repl_exit`      | `:exit`           | —          | Leave the REPL without saving the session history       |
+
+### Structure
+
+```yaml
+directives:                      # Optional
+  - implementation: string       # Required: directive to override (see table above)
+    name: string                 # Required: new name, typed after ':'
+    aliases: [string]            # Optional: new aliases (default: [])
+    description: string          # Required: text shown by :help
+```
+
+### Fields
+
+| Field            | Type   | Required | Description                                                         |
+|------------------|--------|----------|---------------------------------------------------------------------|
+| `implementation` | string | ✅ Yes   | Directive to override: `repl_help`, `repl_load`, `repl_quit` or `repl_exit` |
+| `name`           | string | ✅ Yes   | Name typed after `:`, written without the `:`                       |
+| `aliases`        | array  | ❌ No    | Other names typed after `:`; replaces the default aliases           |
+| `description`    | string | ✅ Yes   | Description shown in the help listing                               |
+
+### Merge Rule
+
+Entries are matched to directives by `implementation`:
+
+- an entry replaces the `name`, the `aliases` and the `description` of its
+  directive — all three, so an entry without `aliases` leaves the
+  directive with no alias at all;
+- a directive without an entry keeps its defaults;
+- the arguments of a directive (`[command]`, `<path>`) are part of its
+  action and cannot be configured.
+
+### Example
+
+French names for `:help` and `:quit`; `:load` and `:exit` keep their
+defaults:
+
+```yaml
+directives:
+  - implementation: repl_help
+    name: aide
+    aliases: [a, "?"]
+    description: "Afficher l'aide, ou l'aide d'une commande"
+  - implementation: repl_quit
+    name: quitter
+    aliases: [q]
+    description: "Enregistrer l'historique et quitter"
+```
+
+In the REPL, `:aide`, `:a` and `:?` now show the help, `:quitter` and
+`:q` leave it. `:help` and `:h` are no longer recognised: the error
+lists the available directives.
+
+### Validation Rules
+
+An unknown `implementation` fails as soon as the file is loaded. The other
+rules are checked by the configuration validator, which
+`CliBuilder::build()` always runs:
+
+- `implementation` must be one of the four values above;
+- each `implementation` appears at most once;
+- `name` and every alias are non-empty, contain no whitespace and do not
+  start with `:` (the REPL adds it);
+- names and aliases are unique across all directives **after the
+  merge**, defaults included: an override cannot take `q` while `:quit`
+  keeps it as its alias.
+
+Directive names are never compared with command names, since a directive
+is always typed with its `:`. Conversely, **command names and aliases may
+not start with `:`** (see [Command Definition](#command-definition)).
+
+### Behaviour
+
+- **`:quit` and `:exit`**: `:quit` writes the session history to disk,
+  then leaves; `:exit` leaves without writing it. End of input (Ctrl-D)
+  behaves like `:quit`. Any other way out — a handler calling
+  `std::process::exit`, a crash, the process being killed — leaves the
+  history file as it was at the start of the session.
+- **Names typed without `:`**: `quit` or `exit` alone is looked up as an
+  application command. When the word is a directive name or alias (as
+  configured) and the application has no command of that name, the error
+  suggests the directive (`:quit`).
+  The [Complete Example](#complete-example) below declares its own `exit`
+  command: there, `exit` runs that command and `:exit` the directive.
+- **`:load` scripts**: each line runs as if typed, directives included,
+  except `:quit` and `:exit`, which are reported and skipped.
+- **Help listing**: `:help` (and `--help` in the REPL) shows the
+  application help followed by a `DIRECTIVES` section, under the
+  effective names:
+
+  ```text
+  DIRECTIVES:
+      :help [command]      Show the application help, or the help of a command [aliases: :h, :?]
+      :load <path>         Run every line of a script file
+      :quit                Save the session history and leave [aliases: :q]
+      :exit                Leave without saving the session history
+  ```
+
+- **Completion**: after a leading `:`, Tab completes directive names and
+  aliases, under their configured names.
 
 ---
 
@@ -416,12 +543,14 @@ Detailed breakdown of a single command.
 - Primary identifier for the command
 - Used in CLI: `myapp <name>`
 - Convention: lowercase, no spaces, use hyphens for multi-word (e.g., `run-simulation`)
+- May not start with `:`, which marks [REPL directives](#repl-directives)
 
 **`aliases`** (array of strings, required):
 - Alternative names for the same command
 - Can be empty: `aliases: []`
 - Example: `aliases: ["quit", "q", "exit"]`
 - All aliases invoke the same handler
+- Like `name`, an alias may not start with `:`
 
 **`description`** (string, required):
 - User-facing help text
@@ -584,7 +713,7 @@ concrete need appears.
 - [`CliInterface::run()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run)
   (CLI one-shot) and `run_script()` inherit chaining automatically —
   both dispatch through the same internal resolution path.
-- The REPL's `:load` meta-command does **not** chain: each loaded line
+- The REPL's `:load` directive does **not** chain: each loaded line
   still goes through the REPL's own single-command path, unchanged.
 
 #### Example

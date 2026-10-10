@@ -1,7 +1,7 @@
 # Référence de Syntaxe - Fichier de Configuration dynamic-cli
 
 **Version** : 1.0  
-**Dernière mise à jour** : 2026-09-01  
+**Dernière mise à jour** : 2026-10-10  
 **Format** : YAML ou JSON
 
 ---
@@ -13,6 +13,7 @@
 - [Structure racine](#structure-racine)
 - [Section metadata](#section-metadata)
   - [Continuation multi-lignes (REPL)](#continuation-multi-lignes-repl)
+- [Directives du REPL](#directives-du-repl)
 - [Options globales](#options-globales)
 - [Section commands](#section-commands)
 - [Définition de commande](#définition-de-commande)
@@ -101,9 +102,13 @@ global_options:    # Options disponibles pour TOUTES les commandes
 
 commands:          # Liste des commandes disponibles
   # ...
+
+directives:        # Facultatif : redéfinition des directives du REPL
+  # ...
 ```
 
 **Les trois sections sont obligatoires**, même si `global_options` est vide.
+`directives` est facultative : voir [Directives du REPL](#directives-du-repl).
 
 ---
 
@@ -216,9 +221,135 @@ comportement d'abandon, pour une parité CLI/REPL. Non planifié pour
 interactif). En mode CLI en une fois, le shell appelant a déjà fusionné
 toute ligne continuée par `\` avant que `dynamic-cli` ne voie son
 `argv` — rien à implémenter dans ce cas. `run_script()` et la
-méta-commande `:load` du REPL ne sont **pas** concernés : chaque ligne
+directive `:load` du REPL ne sont **pas** concernés : chaque ligne
 est exécutée indépendamment, et un `\` en fin de ligne de script est
 lu comme n'importe quel autre jeton.
+
+---
+
+## Directives du REPL
+
+Dans le REPL, une ligne qui commence par `:` est une **directive** traitée
+par le framework lui-même ; toute autre ligne est une commande de
+l'application. L'ensemble des directives est fixé par la version de
+`dynamic-cli`. La section facultative `directives:` de la configuration
+permet de renommer une directive et de remplacer ses alias et sa
+description, par exemple pour les traduire. Elle ne permet ni d'ajouter
+une directive, ni d'en retirer une, ni de modifier ses arguments.
+
+Les directives n'existent que dans le REPL. En mode CLI, `--help` / `-h`
+s'utilisent comme avant ; ils restent aussi disponibles dans le REPL.
+
+### Directives par défaut
+
+| `implementation` | Saisie            | Alias      | Action                                                     |
+|------------------|-------------------|------------|------------------------------------------------------------|
+| `repl_help`      | `:help [command]` | `:h`, `:?` | Afficher l'aide de l'application, ou celle d'une commande  |
+| `repl_load`      | `:load <path>`    | —          | Exécuter chaque ligne d'un fichier de script dans la session |
+| `repl_quit`      | `:quit`           | `:q`       | Enregistrer l'historique de la session, puis quitter le REPL |
+| `repl_exit`      | `:exit`           | —          | Quitter le REPL sans enregistrer l'historique de la session |
+
+### Structure
+
+```yaml
+directives:                      # Facultatif
+  - implementation: string       # Obligatoire : directive à redéfinir (voir le tableau ci-dessus)
+    name: string                 # Obligatoire : nouveau nom, saisi après ':'
+    aliases: [string]            # Facultatif : nouveaux alias (défaut : [])
+    description: string          # Obligatoire : texte affiché par :help
+```
+
+### Champs
+
+| Champ            | Type   | Obligatoire | Description                                                       |
+|------------------|--------|-------------|-------------------------------------------------------------------|
+| `implementation` | string | ✅ Oui      | Directive à redéfinir : `repl_help`, `repl_load`, `repl_quit` ou `repl_exit` |
+| `name`           | string | ✅ Oui      | Nom saisi après `:`, écrit sans le `:`                            |
+| `aliases`        | array  | ❌ Non      | Autres noms saisis après `:` ; remplacent les alias par défaut    |
+| `description`    | string | ✅ Oui      | Description affichée dans la liste de l'aide                      |
+
+### Règle de fusion
+
+Les entrées sont rattachées aux directives par `implementation` :
+
+- une entrée remplace le `name`, les `aliases` et la `description` de sa
+  directive — les trois : une entrée sans `aliases` laisse donc la
+  directive sans aucun alias ;
+- une directive sans entrée garde ses valeurs par défaut ;
+- les arguments d'une directive (`[command]`, `<path>`) font partie de
+  son action et ne sont pas configurables.
+
+### Exemple
+
+Noms français pour `:help` et `:quit` ; `:load` et `:exit` gardent leurs
+valeurs par défaut :
+
+```yaml
+directives:
+  - implementation: repl_help
+    name: aide
+    aliases: [a, "?"]
+    description: "Afficher l'aide, ou l'aide d'une commande"
+  - implementation: repl_quit
+    name: quitter
+    aliases: [q]
+    description: "Enregistrer l'historique et quitter"
+```
+
+Dans le REPL, `:aide`, `:a` et `:?` affichent maintenant l'aide, `:quitter`
+et `:q` quittent. `:help` et `:h` ne sont plus reconnus : l'erreur liste
+les directives disponibles.
+
+### Règles de validation
+
+Un `implementation` inconnu échoue dès le chargement du fichier. Les
+autres règles sont vérifiées par le validateur de configuration, que
+`CliBuilder::build()` exécute toujours :
+
+- `implementation` doit être l'une des quatre valeurs ci-dessus ;
+- chaque `implementation` apparaît au plus une fois ;
+- `name` et chaque alias sont non vides, sans espace et ne commencent pas
+  par `:` (le REPL l'ajoute) ;
+- noms et alias sont uniques sur l'ensemble des directives **après la
+  fusion**, valeurs par défaut comprises : une redéfinition ne peut pas
+  prendre `q` tant que `:quit` le garde comme alias.
+
+Les noms de directive ne sont jamais comparés aux noms de commande,
+puisqu'une directive se saisit toujours avec son `:`. À l'inverse, **les
+noms et alias de commande ne peuvent pas commencer par `:`** (voir
+[Définition de commande](#définition-de-commande)).
+
+### Comportement
+
+- **`:quit` et `:exit`** : `:quit` écrit l'historique de la session sur
+  disque, puis quitte ; `:exit` quitte sans l'écrire. La fin de saisie
+  (Ctrl-D) se comporte comme `:quit`. Toute autre sortie — un handler qui
+  appelle `std::process::exit`, un plantage, un arrêt forcé du processus —
+  laisse le fichier d'historique tel qu'il était au début de la session.
+- **Noms saisis sans `:`** : `quit` ou `exit` seul est cherché parmi les
+  commandes de l'application. Quand le mot est un nom ou un alias de
+  directive (tel que configuré) et que l'application n'a pas de commande
+  de ce nom, l'erreur suggère la directive (`:quit`). L'[exemple
+  complet](#exemple-complet) ci-dessous déclare sa propre commande
+  `quitter` : `quitter` y exécute cette commande, `:quit` la directive
+  (ou `:quitter` avec la redéfinition de l'exemple ci-dessus).
+- **Scripts `:load`** : chaque ligne s'exécute comme si elle était
+  saisie, directives comprises, sauf `:quit` et `:exit`, qui sont
+  signalées et ignorées.
+- **Liste de l'aide** : `:help` (et `--help` dans le REPL) affiche l'aide
+  de l'application suivie d'une section `DIRECTIVES`, sous les noms
+  effectifs :
+
+  ```text
+  DIRECTIVES:
+      :help [command]      Show the application help, or the help of a command [aliases: :h, :?]
+      :load <path>         Run every line of a script file
+      :quit                Save the session history and leave [aliases: :q]
+      :exit                Leave without saving the session history
+  ```
+
+- **Complétion** : après un `:` initial, Tab complète les noms et alias
+  de directive, sous leurs noms configurés.
 
 ---
 
@@ -420,12 +551,14 @@ Détail complet d'une commande individuelle.
 - Identifiant principal de la commande
 - Utilisé en CLI : `monapp <nom>`
 - Convention : minuscules, pas d'espaces, utiliser des traits d'union pour les mots multiples (ex : `lancer-simulation`)
+- Ne peut pas commencer par `:`, qui signale les [directives du REPL](#directives-du-repl)
 
 **`aliases`** (liste de chaînes de caractères, obligatoire) :
 - Noms alternatifs pour la même commande
 - Peut être vide : `aliases: []`
 - Exemple : `aliases: ["quitter", "q", "sortir"]`
 - Tous les alias invoquent le même handler
+- Comme `name`, un alias ne peut pas commencer par `:`
 
 **`description`** (chaîne de caractères, obligatoire) :
 - Texte d'aide pour l'utilisateur
@@ -602,7 +735,7 @@ besoin concret se présente.
 - [`CliInterface::run()`](https://docs.rs/dynamic-cli/latest/dynamic_cli/interface/struct.CliInterface.html#method.run)
   (CLI en une fois) et `run_script()` héritent automatiquement du
   chaînage — les deux passent par le même chemin de résolution interne.
-- La méta-commande `:load` du REPL ne chaîne **pas** : chaque ligne
+- La directive `:load` du REPL ne chaîne **pas** : chaque ligne
   chargée passe toujours par le chemin mono-commande propre au REPL,
   inchangé.
 
