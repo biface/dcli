@@ -452,9 +452,9 @@ impl CommandHandler for WasmHandler {
         // ExecutionContext is intentionally not forwarded to the guest —
         // see the module-level "Known limitation" section.
         //
-        // The WASM ABI (DD-021) predates repeatable options (DD-024) and
-        // has not been extended to represent them across the host/guest
-        // boundary; any `ParsedValue::Repeated` entry is silently dropped
+        // The WASM ABI of DA-021 (#10) predates the repeatable options of
+        // DD-024 (#21) and has not been extended to represent them across
+        // the host/guest boundary; any `ParsedValue::Repeated` entry is silently dropped
         // by `to_scalar_map()`, same rationale as the REPL path.
         self.call_guest(&args.to_scalar_map())
     }

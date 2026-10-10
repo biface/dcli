@@ -1122,15 +1122,15 @@ impl ReplInterface {
         }
 
         // Sync tried first (unchanged behaviour), then async via `block_on`
-        // (DD-022). Safe here because the REPL loop is strictly sequential
+        // per DA-022 (#8). Safe here because the REPL loop is strictly sequential
         // — one command finishes (readline blocks regardless) before the
         // next line is even read, so there is no other async task waiting
         // that `block_on` could starve.
         //
         // Wrapped via `from_scalars`: `ReplParser::parse_line` still
-        // produces a plain `HashMap<String, String>` (DD-024 addendum —
-        // repeatable options have no interactive REPL-typing use case, see
-        // `DESIGN_DECISIONS.md`). Every handler receives `&ParsedArgs`
+        // produces a plain `HashMap<String, String>`: repeatable options
+        // have no interactive REPL-typing use case, see DD-024 (#21). Every
+        // handler receives `&ParsedArgs`
         // regardless of dispatch path (#39); the REPL path just never
         // populates `ParsedValue::Repeated` entries.
         let parsed_args = ParsedArgs::from_scalars(parsed.arguments);
@@ -1963,14 +1963,14 @@ mod tests {
     }
 
     // ========================================================================
-    // No accidental scope leak from CLI chaining (DD-026, #52 / #56)
+    // No accidental scope leak from CLI chaining — DD-026 (#52), #56
     // ========================================================================
 
     #[test]
     fn test_repl_line_is_never_chained_across_multiple_commands() {
         // execute_line() (and, through it, :load) goes through
         // ReplParser::parse_line() -> CliParser::parse() (the scalar,
-        // pre-DD-026 method) — never CliInterface::dispatch()'s
+        // method predating DD-026 (#52)) — never CliInterface::dispatch()'s
         // segmentation. A line naming two registered commands back to
         // back must therefore still be read as ONE command whose arity
         // is exceeded by the second name, exactly as before chaining
@@ -2028,7 +2028,7 @@ mod tests {
     }
 
     // ========================================================================
-    // Prompt suffix bugfix + multi-line continuation prompt (DD-027, #67)
+    // Prompt suffix bugfix + multi-line continuation prompt — DD-027 (#48), #67
     // ========================================================================
 
     #[test]
@@ -2059,7 +2059,7 @@ mod tests {
 
     #[test]
     fn test_effective_prompt_multiline_default_derivation() {
-        // The exact example from DD-027's closing checklist: default
+        // The exact example from the closing checklist of DD-027 (#48): default
         // suffix " > " -> multi-line default "...> ".
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
@@ -2103,7 +2103,7 @@ mod tests {
     }
 
     // ========================================================================
-    // `\`-continuation accumulation logic (DD-027, #69)
+    // `\`-continuation accumulation logic — DD-027 (#48), #69
     // ========================================================================
 
     #[test]
@@ -2126,8 +2126,8 @@ mod tests {
 
     #[test]
     fn test_accumulate_line_multi_fragment_reconstruction() {
-        // Three lines: two continued, one final — mirrors the DD-027
-        // example of a command whose options span several REPL lines.
+        // Three lines: two continued, one final — mirrors the example in
+        // DD-027 (#48) of a command whose options span several REPL lines.
         let mut buffer: Vec<String> = Vec::new();
 
         assert_eq!(
@@ -2186,8 +2186,8 @@ mod tests {
     fn test_load_line_ending_in_backslash_is_not_continued() {
         // :load bypasses run()'s accumulation buffer entirely — each script
         // line goes straight to handle_line(), one at a time. A trailing
-        // `\` in a script has no special meaning there (DD-027 scopes
-        // continuation to the interactive `run()` loop only).
+        // `\` in a script has no special meaning there: DD-027 (#48) scopes
+        // continuation to the interactive `run()` loop only.
         let registry = create_test_registry();
         let context = Box::new(TestContext::default());
         let mut repl =

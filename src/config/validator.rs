@@ -533,7 +533,7 @@ fn validate_options(options: &[OptionDefinition], context: &str) -> Result<()> {
             .into());
         }
 
-        // --- DD-024: repeatable options and their option_parameters shapes ---
+        // --- DD-024 (#21): repeatable options and their option_parameters shapes ---
         if opt.repeatable {
             // Rule: a repeatable option's absence already means zero
             // occurrences, so a default value would be ambiguous — reject
@@ -1118,7 +1118,7 @@ mod tests {
         assert!(result.is_err());
     }
 
-    // ── DD-024: repeatable options / option_parameters ──────────────────────
+    // ── DD-024 (#21): repeatable options / option_parameters ────────────────
 
     #[test]
     fn test_validate_repeatable_requires_non_empty_choices() {

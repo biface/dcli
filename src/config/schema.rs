@@ -546,7 +546,7 @@ mod tests {
         assert!(cmd.required);
         assert_eq!(cmd.implementation, "test_handler");
         // continue_on_failure / requires_success absent from YAML: both
-        // must default to false (DD-026, #53).
+        // must default to false — DD-026 (#52), #53.
         assert!(!cmd.continue_on_failure);
         assert!(!cmd.requires_success);
     }
@@ -589,8 +589,8 @@ mod tests {
 
     #[test]
     fn test_command_definition_requires_success_distinct_from_required() {
-        // Guards against the two fields being confused with one another
-        // (DD-026): `required` is the pre-existing "handler must be
+        // Guards against the two fields being confused with one another,
+        // see DD-026 (#52): `required` is the pre-existing "handler must be
         // registered at startup" check; `requires_success` is the new,
         // unrelated per-invocation chain guard.
         let yaml = r#"
