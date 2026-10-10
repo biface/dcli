@@ -144,7 +144,7 @@
 //! # Error Handling
 //!
 //! All parsing functions return [`Result<T>`] where errors are instances
-//! of [`ParseError`]. Common error scenarios:
+//! of [`ParseError`](crate::error::ParseError). Common error scenarios:
 //!
 //! - **Unknown command**: User typed a non-existent command
 //!   ```text
@@ -289,7 +289,7 @@ impl ParsedArgs {
     /// consumes repeatable options yet. Used at the boundary of subsystems
     /// that predate repeatable options (v0.6.0) and have not been extended to
     /// understand repeatable options, e.g. the WASM plugin ABI
-    /// ([`crate::plugin::wasm::WasmHandler`]), which serializes arguments
+    /// (`WasmHandler`, in `plugin::wasm`), which serializes arguments
     /// as flat `HashMap<String, String>` to the guest.
     pub fn to_scalar_map(&self) -> HashMap<String, String> {
         self.0

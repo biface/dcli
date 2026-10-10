@@ -314,12 +314,12 @@ impl<'a> CliParser<'a> {
     /// instead of erroring on positional-arity overflow (#52).
     ///
     /// Shares [`Self::parse_typed`]'s token loop and every option-parsing
-    /// helper it calls ([`Self::parse_long_option`], [`Self::parse_short_option`],
-    /// [`Self::parse_repeatable_occurrence`]) unchanged. The only
+    /// helper it calls (`parse_long_option()`, `parse_short_option()`,
+    /// `parse_repeatable_occurrence()`) unchanged. The only
     /// difference is what happens when a bare (non-flag) token is reached
     /// once `positional_index` has already reached
     /// `self.definition.arguments.len()`: where [`Self::parse_typed`]
-    /// calls [`Self::parse_positional_argument`] and gets back
+    /// calls `parse_positional_argument()` and gets back
     /// [`crate::error::ParseError::too_many_arguments`], this method stops
     /// the loop immediately instead — without consuming that token,
     /// without erroring — then runs the same finishing steps
@@ -327,7 +327,7 @@ impl<'a> CliParser<'a> {
     /// `validate_required_options`) on whatever was accumulated so far.
     ///
     /// [`Self::parse_typed`] itself is not modified by this method's
-    /// existence: it keeps calling [`Self::parse_positional_argument`]
+    /// existence: it keeps calling `parse_positional_argument()`
     /// directly and erroring immediately on overflow, so [`Self::parse`]
     /// and any existing caller keep today's exact behaviour.
     ///

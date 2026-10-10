@@ -411,7 +411,7 @@ impl ReplInterface {
     /// * `prompt`         — Prompt prefix (e.g., `"myapp"`). The displayed
     ///   prompt is `prompt` followed by `config.metadata.prompt_suffix`
     ///   (e.g., `"myapp > "`) when `config` is supplied, or by
-    ///   [`crate::config::schema::default_prompt_suffix`] (`"myapp > "`) otherwise — the suffix is
+    ///   `default_prompt_suffix()` (`"myapp > "`) otherwise — the suffix is
     ///   never hardcoded independently of the config.
     /// * `config`         — Application configuration for completion, help,
     ///   and the prompt suffix. Pass `None` to disable all three.
@@ -518,7 +518,7 @@ impl ReplInterface {
     /// `prompt` here plays the same role as the app-name segment passed to
     /// [`ReplInterface::new`] for the main prompt: only the base is
     /// supplied, `prompt_suffix` (from the config, or the default) is
-    /// always appended after it by [`effective_prompt_multiline`][Self::effective_prompt_multiline].
+    /// always appended after it by `effective_prompt_multiline()`.
     /// When this setter is never called, the base defaults to `"..."`.
     ///
     /// Purely additive — consuming `self` and returning `Self` like every
@@ -938,7 +938,7 @@ impl ReplInterface {
     ///
     /// A line ending in a trailing `\` is not dispatched: the marker is
     /// stripped and the fragment is buffered, the prompt switches to
-    /// [`effective_prompt_multiline`][Self::effective_prompt_multiline],
+    /// `effective_prompt_multiline()`,
     /// and another line is read. The first line that does *not* end in `\`
     /// completes the buffer — every fragment plus this final one are
     /// joined with a single space and dispatched exactly once, with the
@@ -950,7 +950,7 @@ impl ReplInterface {
     /// the normal prompt, mirroring the familiar shell convention of
     /// abandoning a continued line on interrupt.
     ///
-    /// This mechanism is entirely local to this loop: [`Self::execute_line`],
+    /// This mechanism is entirely local to this loop: `execute_line()`,
     /// [`ReplParser`], and `CliParser` are untouched, and non-interactive
     /// paths (`run_script()`, `:load`) never go through it: without a live
     /// operator, nothing can answer a continuation prompt, so an incomplete

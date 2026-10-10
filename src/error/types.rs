@@ -141,7 +141,7 @@ pub enum ConfigError {
     #[error("Invalid configuration schema: {reason} (at {path:?})")]
     InvalidSchema {
         reason: String,
-        /// Path in the config (e.g., "commands[0].options[2].type")
+        /// Path in the config (e.g., `"commands[0].options[2].type"`)
         path: Option<String>,
         /// Actionable hint surfaced to the user (not part of the Display string)
         suggestion: Option<String>,
