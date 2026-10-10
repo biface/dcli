@@ -155,10 +155,11 @@ Commandes disponibles :
 monapp > :quit
 ```
 
-**Commandes multi-lignes en REPL** (v0.9.0+) — terminez une ligne par
-`\` pour continuer une commande sur la ligne suivante, à la manière
-d'un shell ; le prompt de continuation (`...` par défaut) dérive du
-prompt de votre application :
+**Commandes multi-lignes en REPL** (v0.9.0+,
+[DD-027](https://github.com/biface/dcli/issues/48)) — terminez une ligne par `\` pour
+continuer une commande sur la ligne suivante, à la manière d'un shell ;
+le prompt de continuation (`...` par défaut) dérive du prompt de votre
+application :
 
 ```bash
 monapp > saluer Bob \
@@ -166,7 +167,8 @@ monapp > saluer Bob \
 BONJOUR, BOB !
 ```
 
-**Chaînage de commandes** (v0.8.0+) — chaînez plusieurs commandes en une
+**Chaînage de commandes** (v0.8.0+,
+[DD-026](https://github.com/biface/dcli/issues/52)) — chaînez plusieurs commandes en une
 seule invocation, sans séparateur : une fois les arguments d'une commande
 épuisés, le prochain nom de commande reconnu démarre la commande
 suivante.
@@ -179,9 +181,10 @@ $ monapp configurer modele.yml configurer scenario.yml resoudre
 ```
 
 Un handler peut déclarer sa propre attente sur `continue_on_failure`
-via `expected_fault_tolerance()` (v0.9.0+) — une contradiction avec la
-configuration YAML est détectée au démarrage, pas au premier usage
-dans une chaîne.
+via `expected_fault_tolerance()` (v0.9.0+,
+[DD-028](https://github.com/biface/dcli/issues/64)) — une contradiction avec la
+configuration YAML est détectée au démarrage, pas au premier usage dans
+une chaîne.
 
 **Mode lot** — exécutez tout un fichier de commandes, une par ligne (les
 lignes vides et les commentaires préfixés par `#` sont ignorés) :
@@ -270,7 +273,7 @@ mécanisme.
 **[Guide complet des plugins →](PLUGIN_GUIDE.fr.md)** ([English](PLUGIN_GUIDE.md)) —
 le contrat ABI WASM complet pour les auteurs de plugins tiers, un exemple
 concret, et la décision d'architecture associée
-([DD-021](https://github.com/biface/dcli/issues/10)).
+([DA-021](https://github.com/biface/dcli/issues/10)).
 
 ---
 
