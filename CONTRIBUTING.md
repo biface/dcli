@@ -102,7 +102,7 @@ We use several tools to maintain code quality:
 cargo fmt
 
 # Check for common errors
-cargo clippy --all-features -- -D warnings
+cargo clippy --all-features --all-targets -- -D warnings
 
 # Run all tests
 cargo test --all-features
@@ -113,6 +113,33 @@ cargo doc --no-deps --open
 # Run benchmarks
 cargo bench
 ```
+
+### Pre-push Hook
+
+The repository ships a `pre-push` hook in `.githooks/` that runs the two
+checks CI fails on most often, before anything reaches GitHub:
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-features --all-targets -- -D warnings
+```
+
+Git never enables a hook on its own, so this is an opt-in step, once per
+clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+From then on, `git push` stops if either check fails and prints the
+command to fix. To skip it for one push: `git push --no-verify`. The
+first run compiles every feature, `wasm-plugins` included, so it takes a
+while; later runs reuse the build cache.
+
+**RustRover:** to run the same checks from the IDE, add a *Shell Script*
+run configuration (*Run → Edit Configurations… → + → Shell Script*) with
+*Script path* set to `.githooks/pre-push` and *Working directory* set to
+the project root.
 
 ### Project Structure
 
@@ -300,7 +327,7 @@ git checkout -b fix/issue-number
 cargo test --all-features
 
 # Run clippy
-cargo clippy --all-features -- -D warnings
+cargo clippy --all-features --all-targets -- -D warnings
 
 # Format code
 cargo fmt
@@ -632,7 +659,7 @@ cargo doc --all-features --no-deps
 
 **Checklist:**
 - [ ] Code follows style guidelines (`cargo fmt`)
-- [ ] No clippy warnings (`cargo clippy --all-features -- -D warnings`)
+- [ ] No clippy warnings (`cargo clippy --all-features --all-targets -- -D warnings`)
 - [ ] All tests pass (`cargo test --all-features`)
 - [ ] Documentation is updated
 - [ ] New tests added for new features

@@ -103,7 +103,7 @@ Nous utilisons plusieurs outils pour maintenir la qualité du code :
 cargo fmt
 
 # Vérifier les erreurs courantes
-cargo clippy --all-features -- -D warnings
+cargo clippy --all-features --all-targets -- -D warnings
 
 # Exécuter tous les tests
 cargo test --all-features
@@ -114,6 +114,35 @@ cargo doc --no-deps --open
 # Exécuter les benchmarks
 cargo bench
 ```
+
+### Hook pre-push
+
+Le dépôt fournit dans `.githooks/` un hook `pre-push` qui lance les deux
+contrôles sur lesquels la CI échoue le plus souvent, avant que quoi que
+ce soit n'atteigne GitHub :
+
+```bash
+cargo fmt --all --check
+cargo clippy --all-features --all-targets -- -D warnings
+```
+
+Git n'active jamais un hook de lui-même : c'est donc une étape
+volontaire, une fois par clone :
+
+```bash
+git config core.hooksPath .githooks
+```
+
+Ensuite, `git push` s'arrête si l'un des contrôles échoue et affiche la
+commande à corriger. Pour l'ignorer le temps d'un push :
+`git push --no-verify`. Le premier passage compile toutes les features,
+`wasm-plugins` compris, et prend donc un moment ; les suivants
+réutilisent le cache de compilation.
+
+**RustRover :** pour lancer les mêmes contrôles depuis l'IDE, ajoutez une
+configuration d'exécution *Shell Script* (*Run → Edit Configurations… →
++ → Shell Script*) avec *Script path* positionné sur `.githooks/pre-push`
+et *Working directory* sur la racine du projet.
 
 ### Structure du Projet
 
@@ -301,7 +330,7 @@ git checkout -b fix/numero-issue
 cargo test --all-features
 
 # Exécuter clippy
-cargo clippy --all-features -- -D warnings
+cargo clippy --all-features --all-targets -- -D warnings
 
 # Formater le code
 cargo fmt
@@ -633,7 +662,7 @@ cargo doc --all-features --no-deps
 
 **Checklist :**
 - [ ] Le code suit les directives de style (`cargo fmt`)
-- [ ] Aucun avertissement clippy (`cargo clippy --all-features -- -D warnings`)
+- [ ] Aucun avertissement clippy (`cargo clippy --all-features --all-targets -- -D warnings`)
 - [ ] Tous les tests passent (`cargo test --all-features`)
 - [ ] La documentation est mise à jour
 - [ ] Nouveaux tests ajoutés pour nouvelles fonctionnalités
