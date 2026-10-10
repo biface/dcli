@@ -9,8 +9,13 @@
 //! - The trait is public and `dyn`-compatible so users can supply custom implementations.
 //! - The default implementation outputs English-only text; custom implementations
 //!   choose their own language.
-//! - The formatter is instantiated lazily — only when `--help` is detected —
-//!   and outputs to the terminal only.
+//! - The formatter is instantiated lazily — only when help is requested
+//!   (`--help`, `-h`, or the `:help` directive in the REPL) — and outputs
+//!   to the terminal only.
+//! - In the REPL, the application help is followed by the list of
+//!   directives, rendered by [`HelpFormatter::format_directives`]. That
+//!   method has a default implementation, so a custom formatter only needs
+//!   [`HelpFormatter::format_app`] and [`HelpFormatter::format_command`].
 //!
 //! # Extension point
 //!
