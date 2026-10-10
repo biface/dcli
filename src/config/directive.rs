@@ -32,6 +32,21 @@
 //! directive selected by `implementation`; `aliases` defaults to an empty
 //! list. Directives without an entry keep their defaults.
 //! [`effective_directives`] computes the resulting table.
+//!
+//! # Validation
+//!
+//! The configuration validator rejects:
+//!
+//! - an unknown `implementation` (already at load time);
+//! - two entries for the same `implementation`;
+//! - an empty name or alias, one containing whitespace, or one starting
+//!   with `:`;
+//! - a name or alias used twice in the effective table, defaults included:
+//!   an override cannot take `q` while `:quit` keeps it as its alias.
+//!
+//! Directive names are never compared with command names, since a
+//! directive is always typed with its `:`. Command names and aliases, for
+//! their part, may not start with `:`.
 
 // Design: DA-030 (#92). The directive set is an enum rather than a trait:
 // commands are an open set supplied by the application, directives a closed
