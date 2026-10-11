@@ -1,0 +1,119 @@
+name: Publish to crates.io
+
+# -----------------------------------------------------------------------------
+# Publishes dynamic-cli to crates.io when a final release tag vX.Y.Z is pushed.
+#
+# Release sequence: PR update/X.Y.Z -> staging/X.Y.Z -> master, then the
+# vX.Y.Z tag on master. The GitHub release is published by hand from the
+# Release Drafter draft, selecting the existing tag.
+#
+# Authentication uses crates.io Trusted Publishing (OIDC): no crates.io token
+# is stored in the repository. One-time setup:
+#   - crates.io, dynamic-cli -> Settings -> Trusted Publishing:
+#     owner "biface", repository "dcli", workflow "publish.yml",
+#     environment "crates-io";
+#   - GitHub, Settings -> Environments: "crates-io", with a required
+#     reviewer as the last stop before an irreversible publish.
+# -----------------------------------------------------------------------------
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # Verify — the tag, its branch, and the checks CI runs on branches only
+  # ────────────────────────────────────────────────────────────────────────────
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # full history, for the ancestry check below
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target/
+          key: ${{ runner.os }}-publish-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-publish-
+
+      - name: Tag matches the version in Cargo.toml
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "dynamic-cli") | .version')"
+          if [ "${tag}" != "v${version}" ]; then
+            echo "::error::tag ${tag} does not match Cargo.toml version ${version}"
+            exit 1
+          fi
+          echo "tag ${tag} matches Cargo.toml version ${version}"
+
+      - name: Tagged commit is on master
+        run: |
+          git fetch --no-tags origin master
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/master; then
+            echo "::error::${GITHUB_REF_NAME} (${GITHUB_SHA}) is not on master"
+            exit 1
+          fi
+          echo "${GITHUB_REF_NAME} is on master"
+
+      - name: cargo fmt --check
+        run: cargo fmt --all --check
+
+      - name: cargo clippy — all features, all targets
+        run: cargo clippy --all-features --all-targets -- -D warnings
+
+      - name: cargo test — all features
+        run: cargo test --all-features
+
+      - name: cargo doc — no warnings
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: "-D warnings"
+
+      - name: cargo publish --dry-run
+        run: cargo publish --dry-run
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Publish — Trusted Publishing, behind the crates-io environment
+  # ────────────────────────────────────────────────────────────────────────────
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    needs: verify
+    environment: crates-io
+    permissions:
+      contents: read
+      id-token: write   # OIDC token exchanged for a crates.io token
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.97.0
+
+      - name: Authenticate with crates.io
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+
+      - name: cargo publish
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
