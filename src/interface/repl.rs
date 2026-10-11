@@ -2464,8 +2464,23 @@ mod tests {
         assert_eq!(hint, "Usage: :load <path>");
     }
 
+    // rustyline's `save_history()` sets the process-wide umask to 0o177
+    // while it creates the history file. A directory created meanwhile by
+    // another test thread, such as a `tempfile::tempdir()`, loses its
+    // search bit, and creating a file inside it fails with EACCES. The
+    // tests below create a directory or save the history, so each one holds
+    // this lock for its whole body.
+    static HISTORY_FILE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn history_file_lock() -> std::sync::MutexGuard<'static, ()> {
+        HISTORY_FILE_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
     #[test]
     fn test_end_session_with_save_writes_history_file() {
+        let _lock = history_file_lock();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("history");
         let mut repl = repl_with(None, None);
@@ -2480,6 +2495,7 @@ mod tests {
 
     #[test]
     fn test_end_session_without_save_leaves_history_file_unchanged() {
+        let _lock = history_file_lock();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("history");
         std::fs::write(&path, "previous\n").unwrap();
@@ -2494,6 +2510,7 @@ mod tests {
 
     #[test]
     fn test_drop_does_not_write_history_file() {
+        let _lock = history_file_lock();
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("history");
         let mut repl = repl_with(None, None);
