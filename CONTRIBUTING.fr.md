@@ -145,10 +145,41 @@ configuration d'exécution *Shell Script* (*Run → Edit Configurations… →
 + → Shell Script*) avec *Script path* positionné sur `.githooks/pre-push`
 et *Working directory* sur la racine du projet.
 
+### Chaîne de contrôle dans RustRover
+
+`.run/` contient des configurations d'exécution RustRover partagées
+(*Cargo Command*), une par étape de la chaîne de contrôle locale.
+RustRover les charge à l'ouverture du projet ; elles apparaissent dans
+la liste des configurations, numérotées dans l'ordre de la chaîne :
+
+| Configuration | Lance `cargo …` |
+|---|---|
+| `1. Clean` | `clean` |
+| `2. Check` | `check` |
+| `3. Build` | `build --all-targets --all-features` |
+| `4. Format` | `fmt` |
+| `5. Clippy` | `clippy --all-targets --all-features -- -D warnings` |
+| `6. Test` | `test --all-features` |
+
+Chaque configuration lance la précédente comme tâche *Before launch* :
+`6. Test` exécute donc toute la chaîne, de `cargo clean` aux tests, et
+s'arrête à la première étape en échec. Pour ne lancer que le début de la
+chaîne, choisissez l'étape où vous voulez vous arrêter (`5. Clippy`
+exécute les étapes 1 à 5). `4. Format` réécrit les sources, contrairement
+au hook `pre-push` qui se contente de les vérifier. Comme la chaîne
+commence par `cargo clean`, un passage complet recompile toutes les
+features, `wasm-plugins` compris.
+
+Pour modifier une configuration pour vous seul, copiez-la dans RustRover
+en laissant *Store as project file* décoché : `.run/` reste ainsi
+partagé.
+
 ### Structure du Projet
 
 ```
 dynamic-cli/
+├── .githooks/              # Hook pre-push optionnel
+├── .run/                   # Configurations d'exécution RustRover partagées
 ├── src/
 │   ├── lib.rs              # Point d'entrée de la bibliothèque
 │   ├── error/              # Types d'erreurs et gestion
@@ -159,6 +190,8 @@ dynamic-cli/
 │   ├── parser/             # Parsing CLI et REPL
 │   ├── validator/          # Validation d'arguments
 │   ├── interface/          # Interfaces CLI et REPL
+│   ├── help/               # Mise en forme de l'aide
+│   ├── plugin/             # Trait Plugin, plugins intégrés, chargeur WASM
 │   ├── builder.rs          # API Builder
 │   └── utils.rs            # Fonctions utilitaires
 ├── examples/               # Exemples d'applications
@@ -668,7 +701,7 @@ cargo doc --all-features --no-deps
 - [ ] La documentation est mise à jour
 - [ ] Nouveaux tests ajoutés pour nouvelles fonctionnalités
 - [ ] Messages de commit clairs
-- [ ] Branche à jour avec main
+- [ ] Branche à jour avec master
 
 ### Template de PR
 
@@ -720,9 +753,9 @@ Décrivez comment vous avez testé vos changements :
 - Supprimez votre branche de fonctionnalité
 - Mettez à jour votre fork :
   ```bash
-  git checkout main
-  git pull upstream main
-  git push origin main
+  git checkout master
+  git pull upstream master
+  git push origin master
   ```
 
 ### Publication d'une version (mainteneurs)
@@ -740,6 +773,14 @@ Une version sort en trois étapes :
    Publishing une fois l'environnement `crates-io` approuvé. La release
    GitHub est ensuite publiée depuis le brouillon de Release Drafter, sur
    le tag existant.
+
+La publication repose sur une configuration faite une fois pour toutes.
+Sur crates.io, *dynamic-cli* → *Settings* → *Trusted Publishing* :
+propriétaire `biface`, dépôt `dcli`, workflow `publish.yml`,
+environnement `crates-io`. Le champ environnement doit contenir
+exactement le nom de l'environnement GitHub ; toute autre valeur fait
+échouer la demande de jeton avec une erreur 400. Sur GitHub,
+*Settings* → *Environments* → `crates-io`, avec un reviewer requis.
 
 ---
 

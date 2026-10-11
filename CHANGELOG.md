@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Maintenance
+
+- **Control chain in RustRover** (#102): `.run/` holds shared run
+  configurations, one per step — clean, check, build, fmt, clippy,
+  test. Each runs the previous one first, so `6. Test` runs the whole
+  chain and stops at the first failing step. See `CONTRIBUTING.md`.
+- **Packaging**: `.run/` and `.codecov.yml` are no longer included in
+  the published crate.
+
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
 - Subcommand support (git-style: `myapp config set key value`)

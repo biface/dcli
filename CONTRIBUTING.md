@@ -142,10 +142,39 @@ run configuration (*Run → Edit Configurations… → + → Shell Script*) with
 *Script path* set to `.githooks/pre-push` and *Working directory* set to
 the project root.
 
+### Control Chain in RustRover
+
+`.run/` holds shared RustRover run configurations (*Cargo Command*), one
+per step of the local control chain. RustRover picks them up when the
+project opens; they appear in the run configuration list, numbered in
+chain order:
+
+| Configuration | Runs `cargo …` |
+|---|---|
+| `1. Clean` | `clean` |
+| `2. Check` | `check` |
+| `3. Build` | `build --all-targets --all-features` |
+| `4. Format` | `fmt` |
+| `5. Clippy` | `clippy --all-targets --all-features -- -D warnings` |
+| `6. Test` | `test --all-features` |
+
+Each configuration runs the previous one as a *Before launch* task, so
+`6. Test` runs the whole chain from `cargo clean` to the tests, and
+stops at the first failing step. To stop the chain earlier, launch the
+step where it should end (`5. Clippy` runs steps 1 to 5).
+`4. Format` rewrites the sources, unlike the `pre-push` hook, which only
+checks them. Since the chain starts with `cargo clean`, a full run
+rebuilds every feature, `wasm-plugins` included.
+
+To change a configuration for yourself only, copy it in RustRover and
+leave *Store as project file* unchecked, so `.run/` stays shared.
+
 ### Project Structure
 
 ```
 dynamic-cli/
+├── .githooks/              # Opt-in pre-push hook
+├── .run/                   # Shared RustRover run configurations
 ├── src/
 │   ├── lib.rs              # Library entry point
 │   ├── error/              # Error types and handling
@@ -156,6 +185,8 @@ dynamic-cli/
 │   ├── parser/             # CLI and REPL parsing
 │   ├── validator/          # Argument validation
 │   ├── interface/          # CLI and REPL interfaces
+│   ├── help/               # Help formatting
+│   ├── plugin/             # Plugin trait, builtin plugins, WASM loader
 │   ├── builder.rs          # Builder API
 │   └── utils.rs            # Utility functions
 ├── examples/               # Example applications
@@ -665,7 +696,7 @@ cargo doc --all-features --no-deps
 - [ ] Documentation is updated
 - [ ] New tests added for new features
 - [ ] Commit messages are clear
-- [ ] Branch is up to date with main
+- [ ] Branch is up to date with master
 
 ### PR Template
 
@@ -717,9 +748,9 @@ Describe how you tested your changes:
 - Delete your feature branch
 - Update your fork:
   ```bash
-  git checkout main
-  git pull upstream main
-  git push origin main
+  git checkout master
+  git pull upstream master
+  git push origin master
   ```
 
 ### Releases (maintainers)
@@ -736,6 +767,13 @@ A version goes out in three steps:
    and docs again, then publishes to crates.io through Trusted Publishing
    once the `crates-io` environment is approved. The GitHub release is
    then published from the Release Drafter draft, on the existing tag.
+
+Publication relies on a one-time setup. On crates.io, *dynamic-cli* →
+*Settings* → *Trusted Publishing*: owner `biface`, repository `dcli`,
+workflow `publish.yml`, environment `crates-io`. The environment field
+must hold exactly the name of the GitHub environment; any other value
+makes the token request fail with a 400. On GitHub, *Settings* →
+*Environments* → `crates-io`, with a required reviewer.
 
 ---
 
