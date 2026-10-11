@@ -12,9 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Ideas for Future Releases
 - Configuration versioning and migration tools
 - Subcommand support (git-style: `myapp config set key value`)
-- Advanced REPL features (multi-line editing, syntax highlighting)
+- REPL syntax highlighting
 - Integration with system package managers
-- Command pipelines and composition
+- Command pipelines (one command's output as the next one's input)
 - Remote command execution
 - Configuration profiles (dev, prod, test)
 - Telemetry and metrics collection
@@ -1150,16 +1150,23 @@ dynamic-cli/
 
 ## Version Roadmap Summary
 
-| Version   | Theme                    | Key Features                        | Effort    | Status               |
-|-----------|--------------------------|-------------------------------------|-----------|----------------------|
-| **0.1.0** | Initial Release          | Complete framework                  | -         | ✅ Released           |
-| **0.2.0** | Help & Errors            | Built-in help, better errors        | 3-4 weeks | ✅ Released           |
-| **0.3.0** | Shell Completions        | REPL completion, secure history     | 3-4 weeks | ✅ Released           |
-| **0.4.0** | Plugin System            | Extensible handlers                 | 4-6 weeks | ✅ Released           |
-| **0.5.0** | Async Support            | Async handlers (optional)           | 4-6 weeks | ✅ Released           |
-| **0.6.0** | Advanced Options         | Repeatable options, typed sub-params| 4-6 weeks | ✅ Released           |
-| **0.7.0** | Static Plugin Library    | Granular plugins, batch execution   | —         | ✅ Released           |
-| **1.0.0** | Stable                   | Production-ready, locked API        | -         | 🔵 Planned            |
+| Version    | Theme                         | Key Features                                             | Effort    | Status           |
+|------------|-------------------------------|----------------------------------------------------------|-----------|------------------|
+| **0.1.0**  | Initial Release               | Complete framework                                       | -         | ✅ Released      |
+| **0.2.0**  | Help & Errors                 | Built-in help, better errors                             | 3-4 weeks | ✅ Released      |
+| **0.3.0**  | Shell Completions             | REPL completion, secure history                          | 3-4 weeks | ✅ Released      |
+| **0.4.0**  | Plugin System                 | Extensible handlers                                      | 4-6 weeks | ✅ Released      |
+| **0.5.0**  | Async Support                 | Async handlers (optional)                                | 4-6 weeks | ✅ Released      |
+| **0.6.0**  | Advanced Options              | Repeatable options, typed sub-params                     | 4-6 weeks | ✅ Released      |
+| **0.7.0**  | Static Plugin Library         | Granular plugins, batch execution                        | —         | ✅ Released      |
+| **0.8.0**  | CLI: repeatable commands      | Multi-command chaining                                   | —         | ✅ Released      |
+| **0.9.0**  | Framework Hardening           | REPL multi-line input, fault-tolerance check             | —         | ✅ Released      |
+| **0.10.0** | Checkpoint: stabilize version | REPL directives, API cleanup, reference docs on the wiki | —         | ✅ Released      |
+| **0.11.0** | Granular Help                 | Option- and argument-level help                          | —         | 🔵 Planned       |
+| **0.12.0** | Guided REPL                   | Input help for commands with many options                | —         | 🔵 Planned       |
+| **0.13.0** | Localised Interface           | Framework messages translated from the configuration     | —         | 🔵 Planned       |
+|    ...     | ...                           | ...                                                      | —         | ...              |
+| **1.0.0**  | Stable                        | Production-ready, locked API                             | -         | ⬜ Not scheduled |
 
 ---
 
