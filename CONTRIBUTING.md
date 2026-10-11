@@ -722,6 +722,21 @@ Describe how you tested your changes:
   git push origin main
   ```
 
+### Releases (maintainers)
+
+A version goes out in three steps:
+
+1. PR `update/X.Y.Z` → `staging/X.Y.Z`, a copy of `master` used to run
+   CI on the merged state.
+2. PR `staging/X.Y.Z` → `master`, with the version's milestone; merging
+   it closes the issues listed in its description.
+3. Tag `vX.Y.Z` on `master`. The tag triggers
+   `.github/workflows/publish.yml`, which checks that the tag matches the
+   version in `Cargo.toml` and sits on `master`, runs fmt, clippy, tests
+   and docs again, then publishes to crates.io through Trusted Publishing
+   once the `crates-io` environment is approved. The GitHub release is
+   then published from the Release Drafter draft, on the existing tag.
+
 ---
 
 ## Community

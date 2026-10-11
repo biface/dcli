@@ -725,6 +725,22 @@ Décrivez comment vous avez testé vos changements :
   git push origin main
   ```
 
+### Publication d'une version (mainteneurs)
+
+Une version sort en trois étapes :
+
+1. PR `update/X.Y.Z` → `staging/X.Y.Z`, copie de `master` qui sert à
+   faire tourner la CI sur l'état fusionné.
+2. PR `staging/X.Y.Z` → `master`, avec le milestone de la version ; sa
+   fusion ferme les issues listées dans sa description.
+3. Tag `vX.Y.Z` sur `master`. Le tag déclenche
+   `.github/workflows/publish.yml`, qui vérifie que le tag correspond à
+   la version de `Cargo.toml` et se trouve sur `master`, relance fmt,
+   clippy, tests et documentation, puis publie sur crates.io par Trusted
+   Publishing une fois l'environnement `crates-io` approuvé. La release
+   GitHub est ensuite publiée depuis le brouillon de Release Drafter, sur
+   le tag existant.
+
 ---
 
 ## Communauté
