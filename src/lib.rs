@@ -66,13 +66,18 @@
 //!
 //! The framework is organized into modules:
 //!
+//! - [`builder`]: [`CliBuilder`] and [`CliApp`], the application entry point
 //! - [`error`]: Error types and handling
-//! - [`config`]: Configuration file loading and validation
+//! - [`config`]: Configuration file loading and validation, REPL directives
 //! - [`context`]: Execution context trait
 //! - [`executor`]: Command execution
 //! - [`registry`]: Command and handler registry
 //! - [`parser`]: CLI and REPL argument parsing
 //! - [`validator`]: Argument validation
+//! - [`interface`]: CLI one-shot and REPL front ends
+//! - [`help`]: Help formatting
+//! - [`plugin`]: Plugin trait, builtin plugins and WASM loader
+//! - [`utils`]: Shared helpers
 //!
 //! ## Design decisions
 //!

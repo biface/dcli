@@ -447,7 +447,7 @@ impl CliInterface {
     /// [`ReplParser::tokenize`]), then dispatched through the exact same
     /// resolve → parse → execute path as [`run`][Self::run] — no
     /// duplicate parsing logic, and repeatable options are fully
-    /// preserved since dispatch goes through `parse_typed()` either way.
+    /// preserved since dispatch goes through `parse_typed_segment()` either way.
     ///
     /// # Error policy
     ///

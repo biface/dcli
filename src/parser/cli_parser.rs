@@ -175,11 +175,10 @@ impl<'a> CliParser<'a> {
     /// (i.e. any `repeatable: true` option) is silently dropped from the
     /// result — no command definition written before repeatable options
     /// existed (v0.6.0) can have one, so
-    /// existing callers see no behaviour change. Once the dispatch layer
-    /// is migrated to consume [`crate::parser::ParsedArgs`] directly
-    /// (#39, in progress — the type exists but `interface/cli.rs` and
-    /// `interface/repl.rs` still call this method, not `parse_typed`),
-    /// this method can be removed.
+    /// existing callers see no behaviour change. The REPL parses its
+    /// lines through this method
+    /// ([`ReplParser::parse_line`](crate::parser::ReplParser::parse_line));
+    /// the CLI interface uses [`Self::parse_typed_segment`] instead.
     ///
     /// # Arguments
     ///
