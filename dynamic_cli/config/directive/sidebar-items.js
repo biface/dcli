@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DIRECTIVE_PREFIX"],"enum":["ReplDirective"],"fn":["effective_directives"],"struct":["DirectiveDefinition"]};

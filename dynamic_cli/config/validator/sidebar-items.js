@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["check_name_conflicts","validate_argument_names","validate_argument_ordering","validate_argument_types","validate_argument_validation_rules","validate_command","validate_config","validate_option_flags","validate_options"]};
+window.SIDEBAR_ITEMS = {"fn":["check_name_conflicts","reserved_prefix_error","validate_argument_names","validate_argument_ordering","validate_argument_types","validate_argument_validation_rules","validate_command","validate_config","validate_directive_token","validate_directives","validate_option_flags","validate_options"]};

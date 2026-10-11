@@ -173,12 +173,12 @@
 <a href=#173 id=173 data-nosnippet>173</a>    /// Thin, non-breaking wrapper around [`Self::parse_typed`] for callers
 <a href=#174 id=174 data-nosnippet>174</a>    /// that only deal in scalar values. Any [`ParsedValue::Repeated`] entry
 <a href=#175 id=175 data-nosnippet>175</a>    /// (i.e. any `repeatable: true` option) is silently dropped from the
-<a href=#176 id=176 data-nosnippet>176</a>    /// result — no command definition predating DD-024 can have one, so
-<a href=#177 id=177 data-nosnippet>177</a>    /// existing callers see no behaviour change. Once the dispatch layer
-<a href=#178 id=178 data-nosnippet>178</a>    /// is migrated to consume [`crate::parser::ParsedArgs`] directly
-<a href=#179 id=179 data-nosnippet>179</a>    /// (#39, in progress — the type exists but `interface/cli.rs` and
-<a href=#180 id=180 data-nosnippet>180</a>    /// `interface/repl.rs` still call this method, not `parse_typed`),
-<a href=#181 id=181 data-nosnippet>181</a>    /// this method can be removed.
+<a href=#176 id=176 data-nosnippet>176</a>    /// result — no command definition written before repeatable options
+<a href=#177 id=177 data-nosnippet>177</a>    /// existed (v0.6.0) can have one, so
+<a href=#178 id=178 data-nosnippet>178</a>    /// existing callers see no behaviour change. The REPL parses its
+<a href=#179 id=179 data-nosnippet>179</a>    /// lines through this method
+<a href=#180 id=180 data-nosnippet>180</a>    /// ([`ReplParser::parse_line`](crate::parser::ReplParser::parse_line));
+<a href=#181 id=181 data-nosnippet>181</a>    /// the CLI interface uses [`Self::parse_typed_segment`] instead.
 <a href=#182 id=182 data-nosnippet>182</a>    ///
 <a href=#183 id=183 data-nosnippet>183</a>    /// # Arguments
 <a href=#184 id=184 data-nosnippet>184</a>    ///
@@ -246,7 +246,7 @@
 <a href=#246 id=246 data-nosnippet>246</a>    ///
 <a href=#247 id=247 data-nosnippet>247</a>    /// Like [`Self::parse`], but preserves repeatable options as
 <a href=#248 id=248 data-nosnippet>248</a>    /// [`ParsedValue::Repeated`] instead of dropping them. This is the
-<a href=#249 id=249 data-nosnippet>249</a>    /// method that actually implements DD-024 parsing; `parse()` is a
+<a href=#249 id=249 data-nosnippet>249</a>    /// method that actually parses repeatable options; `parse()` is a
 <a href=#250 id=250 data-nosnippet>250</a>    /// filtering wrapper around it.
 <a href=#251 id=251 data-nosnippet>251</a>    ///
 <a href=#252 id=252 data-nosnippet>252</a>    /// # Arguments
@@ -310,15 +310,15 @@
 <a href=#310 id=310 data-nosnippet>310</a>    }
 <a href=#311 id=311 data-nosnippet>311</a>
 <a href=#312 id=312 data-nosnippet>312</a>    <span class="doccomment">/// Parse command-line arguments, stopping cleanly at a segment boundary
-<a href=#313 id=313 data-nosnippet>313</a>    /// instead of erroring on positional-arity overflow (DD-026, #52).
+<a href=#313 id=313 data-nosnippet>313</a>    /// instead of erroring on positional-arity overflow (#52).
 <a href=#314 id=314 data-nosnippet>314</a>    ///
 <a href=#315 id=315 data-nosnippet>315</a>    /// Shares [`Self::parse_typed`]'s token loop and every option-parsing
-<a href=#316 id=316 data-nosnippet>316</a>    /// helper it calls ([`Self::parse_long_option`], [`Self::parse_short_option`],
-<a href=#317 id=317 data-nosnippet>317</a>    /// [`Self::parse_repeatable_occurrence`]) unchanged. The only
+<a href=#316 id=316 data-nosnippet>316</a>    /// helper it calls (`parse_long_option()`, `parse_short_option()`,
+<a href=#317 id=317 data-nosnippet>317</a>    /// `parse_repeatable_occurrence()`) unchanged. The only
 <a href=#318 id=318 data-nosnippet>318</a>    /// difference is what happens when a bare (non-flag) token is reached
 <a href=#319 id=319 data-nosnippet>319</a>    /// once `positional_index` has already reached
 <a href=#320 id=320 data-nosnippet>320</a>    /// `self.definition.arguments.len()`: where [`Self::parse_typed`]
-<a href=#321 id=321 data-nosnippet>321</a>    /// calls [`Self::parse_positional_argument`] and gets back
+<a href=#321 id=321 data-nosnippet>321</a>    /// calls `parse_positional_argument()` and gets back
 <a href=#322 id=322 data-nosnippet>322</a>    /// [`crate::error::ParseError::too_many_arguments`], this method stops
 <a href=#323 id=323 data-nosnippet>323</a>    /// the loop immediately instead — without consuming that token,
 <a href=#324 id=324 data-nosnippet>324</a>    /// without erroring — then runs the same finishing steps
@@ -326,7 +326,7 @@
 <a href=#326 id=326 data-nosnippet>326</a>    /// `validate_required_options`) on whatever was accumulated so far.
 <a href=#327 id=327 data-nosnippet>327</a>    ///
 <a href=#328 id=328 data-nosnippet>328</a>    /// [`Self::parse_typed`] itself is not modified by this method's
-<a href=#329 id=329 data-nosnippet>329</a>    /// existence: it keeps calling [`Self::parse_positional_argument`]
+<a href=#329 id=329 data-nosnippet>329</a>    /// existence: it keeps calling `parse_positional_argument()`
 <a href=#330 id=330 data-nosnippet>330</a>    /// directly and erroring immediately on overflow, so [`Self::parse`]
 <a href=#331 id=331 data-nosnippet>331</a>    /// and any existing caller keep today's exact behaviour.
 <a href=#332 id=332 data-nosnippet>332</a>    ///
@@ -613,7 +613,7 @@
 <a href=#613 id=613 data-nosnippet>613</a>    /// non-`key=value` token ends the occurrence's span without error,
 <a href=#614 id=614 data-nosnippet>614</a>    /// leaving it for the caller (`parse_typed` / `parse_typed_segment`,
 <a href=#615 id=615 data-nosnippet>615</a>    /// #54) to treat as whatever it actually is — this command's next
-<a href=#616 id=616 data-nosnippet>616</a>    /// positional argument, or, in a chained invocation (DD-026, #52),
+<a href=#616 id=616 data-nosnippet>616</a>    /// positional argument, or, in a chained invocation (#52),
 <a href=#617 id=617 data-nosnippet>617</a>    /// the next segment's boundary token.
 <a href=#618 id=618 data-nosnippet>618</a>    ///
 <a href=#619 id=619 data-nosnippet>619</a>    /// On return, `index` points at the last token consumed (the
@@ -1169,7 +1169,7 @@
 <a href=#1169 id=1169 data-nosnippet>1169</a>    }
 <a href=#1170 id=1170 data-nosnippet>1170</a>
 <a href=#1171 id=1171 data-nosnippet>1171</a>    <span class="comment">// ========================================================================
-<a href=#1172 id=1172 data-nosnippet>1172</a>    // DD-024: repeatable options with option_parameters (#38)
+<a href=#1172 id=1172 data-nosnippet>1172</a>    // DD-024 (#21): repeatable options with option_parameters (#38)
 <a href=#1173 id=1173 data-nosnippet>1173</a>    // ========================================================================
 <a href=#1174 id=1174 data-nosnippet>1174</a>
 <a href=#1175 id=1175 data-nosnippet>1175</a>    </span><span class="doccomment">/// Helper: a command with a repeatable `--output` option, mirroring
@@ -1453,7 +1453,7 @@
 <a href=#1453 id=1453 data-nosnippet>1453</a>        <span class="comment">// parse() (Option A design: non-breaking wrapper) must keep
 <a href=#1454 id=1454 data-nosnippet>1454</a>        // working for definitions with no repeatable options — and
 <a href=#1455 id=1455 data-nosnippet>1455</a>        // silently drop Repeated entries rather than erroring, since no
-<a href=#1456 id=1456 data-nosnippet>1456</a>        // pre-DD-024 caller can represent them anyway.
+<a href=#1456 id=1456 data-nosnippet>1456</a>        // caller predating DD-024 (#21) can represent them anyway.
 <a href=#1457 id=1457 data-nosnippet>1457</a>        </span><span class="kw">let </span>definition = create_repeatable_test_definition();
 <a href=#1458 id=1458 data-nosnippet>1458</a>        <span class="kw">let </span>parser = CliParser::new(<span class="kw-2">&amp;</span>definition);
 <a href=#1459 id=1459 data-nosnippet>1459</a>
@@ -1468,7 +1468,7 @@
 <a href=#1468 id=1468 data-nosnippet>1468</a>    }
 <a href=#1469 id=1469 data-nosnippet>1469</a>
 <a href=#1470 id=1470 data-nosnippet>1470</a>    <span class="comment">// ========================================================================
-<a href=#1471 id=1471 data-nosnippet>1471</a>    // parse_typed_segment() tests (DD-026, #52 / #54)
+<a href=#1471 id=1471 data-nosnippet>1471</a>    // parse_typed_segment() tests — DD-026 (#52), #54
 <a href=#1472 id=1472 data-nosnippet>1472</a>    // ========================================================================
 <a href=#1473 id=1473 data-nosnippet>1473</a>
 <a href=#1474 id=1474 data-nosnippet>1474</a>    </span><span class="doccomment">/// Helper: one positional argument (still open arity) *and* a
@@ -1539,9 +1539,9 @@
 <a href=#1539 id=1539 data-nosnippet>1539</a>    <span class="attr">#[test]
 <a href=#1540 id=1540 data-nosnippet>1540</a>    </span><span class="kw">fn </span>test_parse_typed_segment_stops_after_repeatable_occurrence_with_zero_arity() {
 <a href=#1541 id=1541 data-nosnippet>1541</a>        <span class="comment">// Combines the zero-arity boundary with a completed repeatable
-<a href=#1542 id=1542 data-nosnippet>1542</a>        // occurrence beforehand — mirrors DD-026's own chrom-rs-motivated
-<a href=#1543 id=1543 data-nosnippet>1543</a>        // example (an "output"-shaped command whose last occurrence is
-<a href=#1544 id=1544 data-nosnippet>1544</a>        // immediately followed by the next chained command's name).
+<a href=#1542 id=1542 data-nosnippet>1542</a>        // occurrence beforehand — mirrors the chrom-rs-motivated example of
+<a href=#1543 id=1543 data-nosnippet>1543</a>        // DD-026 (#52): an "output"-shaped command whose last occurrence is
+<a href=#1544 id=1544 data-nosnippet>1544</a>        // immediately followed by the next chained command's name.
 <a href=#1545 id=1545 data-nosnippet>1545</a>        </span><span class="kw">let </span>definition = create_repeatable_test_definition();
 <a href=#1546 id=1546 data-nosnippet>1546</a>        <span class="kw">let </span>parser = CliParser::new(<span class="kw-2">&amp;</span>definition);
 <a href=#1547 id=1547 data-nosnippet>1547</a>
@@ -1658,9 +1658,9 @@
 <a href=#1658 id=1658 data-nosnippet>1658</a>    <span class="attr">#[test]
 <a href=#1659 id=1659 data-nosnippet>1659</a>    </span><span class="kw">fn </span>test_parse_typed_segment_too_many_arguments_still_reported_by_dispatch_path() {
 <a href=#1660 id=1660 data-nosnippet>1660</a>        <span class="comment">// parse_typed_segment() itself never raises too_many_arguments —
-<a href=#1661 id=1661 data-nosnippet>1661</a>        // it stops cleanly instead (DD-026's segmentation phase is
-<a href=#1662 id=1662 data-nosnippet>1662</a>        // responsible for turning a non-resolving leftover token back into
-<a href=#1663 id=1663 data-nosnippet>1663</a>        // that same error). This test only pins down the "never errors on
+<a href=#1661 id=1661 data-nosnippet>1661</a>        // it stops cleanly instead; the segmentation phase of DD-026 (#52)
+<a href=#1662 id=1662 data-nosnippet>1662</a>        // is responsible for turning a non-resolving leftover token back
+<a href=#1663 id=1663 data-nosnippet>1663</a>        // into that same error. This test only pins down the "never errors on
 <a href=#1664 id=1664 data-nosnippet>1664</a>        // overflow" half: the segment boundary is reported via `consumed`,
 <a href=#1665 id=1665 data-nosnippet>1665</a>        // not via Err(..).
 <a href=#1666 id=1666 data-nosnippet>1666</a>        </span><span class="kw">let </span>definition = create_test_definition();

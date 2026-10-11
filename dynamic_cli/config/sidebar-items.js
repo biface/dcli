@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["loader","schema","validator"]};
+window.SIDEBAR_ITEMS = {"mod":["directive","loader","schema","validator"]};

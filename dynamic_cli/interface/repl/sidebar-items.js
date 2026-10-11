@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["DcliCompleter","DcliHelper","ReplInterface"]};
+window.SIDEBAR_ITEMS = {"enum":["SessionControl"],"struct":["DcliCompleter","DcliHelper","ReplInterface"]};

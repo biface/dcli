@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["DefaultHelpFormatter"],"trait":["HelpFormatter"]};
+window.SIDEBAR_ITEMS = {"fn":["command_help_footer","directive_section"],"struct":["DefaultHelpFormatter"],"trait":["HelpFormatter"]};
