@@ -39,18 +39,19 @@ Ajoutez à votre `Cargo.toml` :
 
 ```toml
 [dependencies]
-dynamic-cli = "0.9.0"
+dynamic-cli = "0.10.0"
 
 # Optionnel — plugins WASM sandboxés (voir Système de Plugins ci-dessous)
-# dynamic-cli = { version = "0.9.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.10.0", features = ["wasm-plugins"] }
 ```
 
-> **Mise à jour depuis 0.8.x ?** Cargo considère un bump mineur en `0.x`
+> **Mise à jour depuis 0.9.x ?** Cargo considère un bump mineur en `0.x`
 > comme un changement incompatible au sens du semver, donc `cargo update`
-> seul ne récupérera pas `0.9.0` — augmentez explicitement la contrainte
-> de version. Cette release est entièrement additive (voir
-> [`CHANGELOG.md`](CHANGELOG.md)) ; aucune modification de code n'est
-> nécessaire de votre côté.
+> seul ne récupérera pas `0.10.0` — augmentez explicitement la contrainte
+> de version. Cette release contient des changements incompatibles et
+> demande Rust 1.88 ou plus récent : les sections *Breaking* de
+> [`CHANGELOG.md`](CHANGELOG.md) détaillent chaque changement et sa
+> migration.
 
 ### Exemple Basique
 
@@ -88,7 +89,7 @@ global_options: []
 
 > Note :
 > 
->  La syntaxe du fichier de configuration est disponible dans la [référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE.fr) du wiki.
+>  La syntaxe du fichier de configuration est disponible dans la [référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/R%C3%A9f%C3%A9rence-de-Syntaxe) du wiki.
 
 **2. Implémentez vos gestionnaires de commandes** :
 
@@ -154,6 +155,12 @@ Commandes disponibles :
   saluer [nom] - Saluer quelqu'un
 monapp > :quit
 ```
+
+**Directives du REPL** (v0.10.0+,
+[DA-030](https://github.com/biface/dcli/issues/92)) — les actions du framework commencent
+par `:` (`:help`, `:load`, `:quit`, `:exit`) et n'entrent donc jamais en
+collision avec vos commandes ; la section `directives:` de la configuration
+permet de les renommer. Voir la page [Directives du REPL](https://github.com/biface/dcli/wiki/Directives-REPL) du wiki.
 
 **Commandes multi-lignes en REPL** (v0.9.0+,
 [DD-027](https://github.com/biface/dcli/issues/48)) — terminez une ligne par `\` pour
@@ -280,9 +287,9 @@ un exemple concret, et la décision d'architecture associée
 ## 📖 Documentation
 
 - **[Référence API](https://docs.rs/dynamic-cli)** - Documentation API complète
-- **[Référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE.fr)** - Structure du fichier de configuration (wiki)
-- **[Guide des plugins](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE.fr)** - Plugins statiques, intégrés et WASM (wiki)
-- **[Directives du REPL](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES.fr)** - `:help`, `:load`, `:quit`, `:exit` et comment les renommer (wiki)
+- **[Référence de syntaxe de la configuration](https://github.com/biface/dcli/wiki/R%C3%A9f%C3%A9rence-de-Syntaxe)** - Structure du fichier de configuration (wiki)
+- **[Guide des plugins](https://github.com/biface/dcli/wiki/Guide-des-Plugins)** - Plugins statiques, intégrés et WASM (wiki)
+- **[Directives du REPL](https://github.com/biface/dcli/wiki/Directives-REPL** - `:help`, `:load`, `:quit`, `:exit` et comment les renommer (wiki)
 - **[Exemples](examples/README.md)** - Exemples fonctionnels et échantillons de code
 - **[Guide de Contribution](CONTRIBUTING.fr.md)** - Comment contribuer au projet
 
