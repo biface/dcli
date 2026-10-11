@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Ideas for Future Releases
+- Configuration versioning and migration tools
+- Subcommand support (git-style: `myapp config set key value`)
+- Advanced REPL features (multi-line editing, syntax highlighting)
+- Integration with system package managers
+- Command pipelines and composition
+- Remote command execution
+- Configuration profiles (dev, prod, test)
+- Telemetry and metrics collection
+
+---
+
+## [0.10.0] "Point of Order" - 2026-10-11
+
+**Theme**: Checkpoint: stabilize version — REPL directives, API cleanup,
+reference documentation moved to the wiki
 **Decision**: [DA-030](https://github.com/biface/dcli/issues/92)
 
 ### Added
@@ -27,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `implementation`; `aliases` defaults to an empty list, directives without
   an entry keep their defaults. An unknown `implementation` fails at load
   time and the error lists the accepted values.
+- **`validate_config()` validates the `directives:` section** (#93): a
+  directive overridden twice, an empty name or alias, one containing
+  whitespace or starting with `:`, and a name or alias shared by two
+  directives once the defaults are merged are all reported as
+  `ConfigError::InvalidSchema` with the path of the offending entry.
 
 #### REPL directives
 - **The REPL dispatches `:`-prefixed directives** (#94) through the
@@ -80,12 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   must add `directives: vec![]`.
 - **`validate_config()` rejects command names and aliases starting with
   `:`**, now reserved for REPL directives (#93). A `:` elsewhere in a name
-  (`db:migrate`) is still accepted.
-- **`validate_config()` validates the `directives:` section** (#93): a
-  directive overridden twice, an empty name or alias, one containing
-  whitespace or starting with `:`, and a name or alias shared by two
-  directives once the defaults are merged are all reported as
-  `ConfigError::InvalidSchema` with the path of the offending entry.
+  (`db:migrate`) is still accepted. Rename such commands and aliases; the
+  validator reports each one with its path.
 - **`CliBuilder::build()` validates the configuration** (#96): it now runs
   `validate_config()` right after obtaining the configuration, whether it
   comes from `config_file()` or `config()`, and before checking the
@@ -104,10 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   callback), a panic or a signal leave the history file as it was at
   startup. `ReplInterface` no longer implements `Drop`, so dropping it
   writes nothing; until v0.9.0 the history was saved on every normal exit
-  and again on drop.
+  and again on drop. Users keep their history by leaving with `:quit` or
+  Ctrl-D; an `exit` command backed by `ExitPlugin`'s default callback now
+  ends the process without saving it.
 - **`:load` scripts cannot leave the session** (#94): a `:quit` or `:exit`
   line in a loaded script, under any of its names, is reported and skipped;
-  the other lines still run.
+  the other lines still run. Remove such lines from scripts meant for
+  `:load`.
 - **`ParseError::UnknownCommand` gains a public field** `hint:
   Option<String>` (#86). Its `Display` is now `Unknown command: '<cmd>'`,
   without the `Type 'help' for available commands.` sentence; the hint is
@@ -115,8 +135,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `unknown_command_with_suggestions()` leaves it `None`. Struct literals
   must add the field and patterns must list it or use `..`; code matching
   the old message text must drop the sentence.
+- **Minimum supported Rust version raised to 1.88** (`rust-version` in
+  `Cargo.toml`, was 1.70), measured with `cargo msrv find`. Cargo refuses
+  to build this release with an older toolchain; upgrade it, or stay on
+  0.9.0.
 
-### Removed
+### Removed — Breaking
 
 - **The aliases deprecated in v0.5.0** (#87). They were kept for
   backward compatibility and are now gone; calling them is a compile
@@ -150,11 +174,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
-- **REPL directives** (#85): `CONFIG_SYNTAX_REFERENCE.md` / `.fr.md` gain
-  a "REPL Directives" section covering the default directives, the
-  `directives:` syntax, the merge rule, the validation rules, `:quit`
-  versus `:exit`, the help listing and completion. Command Definition now
-  states that command names and aliases may not start with `:`.
+- **REPL directives** (#85): the configuration reference documents the
+  default directives, the `directives:` syntax, the merge rule, the
+  validation rules, `:quit` versus `:exit`, the help listing and
+  completion, now on the wiki's `REPL_DIRECTIVES` page (#79). Command
+  Definition states that command names and aliases may not start with
+  `:`.
 - **`interface` module docs** (#85): new "REPL Directives" section; the
   REPL history and lifecycle rows of the CLI/REPL comparison now match
   the `:quit` / `:exit` behaviour.
@@ -179,16 +204,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   configuration to plugins through `with_config()`, which `build()` does
   not do; the `help` command example declares the `command` argument
   that `system_help` reads.
+- **Design-decision references** (#88): the rustdoc no longer cites
+  decision identifiers; the crate documentation points once to the
+  decision issues instead. The CHANGELOG, the READMEs and the wiki link
+  each decision to its issue under its current identifier. `cargo doc`
+  builds without warnings again (27 broken or private intra-doc links
+  fixed).
+- **`SystemPlugin::with_config()`**: its documentation said that
+  `CliBuilder::build()` attaches the configuration to the plugin, which it
+  never did; it now says to call `with_config()` before
+  `register_plugin()`, as `HelpPlugin::with_config()` already did. Other
+  outdated passages fixed in `CliParser::parse()`, `ParsedArgs` and the
+  crate's module list.
+- **Code of Conduct** (#91): `CODE_OF_CONDUCT.md` / `.fr.md` added, linked
+  from the READMEs and `CONTRIBUTING.*`.
 
-### Ideas for Future Releases
-- Configuration versioning and migration tools
-- Subcommand support (git-style: `myapp config set key value`)
-- Advanced REPL features (multi-line editing, syntax highlighting)
-- Integration with system package managers
-- Command pipelines and composition
-- Remote command execution
-- Configuration profiles (dev, prod, test)
-- Telemetry and metrics collection
+### Maintenance
+
+- **Decision issues** (#90): identifiers now carry their category — `DA`
+  architecture, `DD` design, `DT` technical, `DQ` quality — on one shared
+  counter; numbers are unchanged. One issue template per category.
+- **`pre-push` hook** (#82): `.githooks/pre-push` runs `cargo fmt --all
+  --check` and `cargo clippy --all-features --all-targets -- -D warnings`.
+  Opt-in with `git config core.hooksPath .githooks`; see `CONTRIBUTING.md`.
+- **Publication workflow**: `.github/workflows/publish.yml` publishes to
+  crates.io on a `vX.Y.Z` tag through Trusted Publishing, after checking
+  the tag against `Cargo.toml` and `master` and running fmt, clippy, tests
+  and docs, and once the `crates-io` environment is approved.
+  `CONTRIBUTING.md` describes the release steps.
 
 ---
 
@@ -1183,6 +1226,6 @@ at your option.
 
 ---
 
-**Last Updated**: 2026-08-23  
-**Current Version**: 0.7.0  
-**Next Release**: 1.0.0 (planned Q2 2027)
+**Last Updated**: 2026-10-11  
+**Current Version**: 0.10.0  
+**Next Release**: 0.11.0 (milestone `v0.11.0 · Granular Help`)
