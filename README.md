@@ -40,17 +40,18 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-dynamic-cli = "0.9.0"
+dynamic-cli = "0.10.0"
 
 # Optional — sandboxed WASM plugins (see Plugin System below)
-# dynamic-cli = { version = "0.9.0", features = ["wasm-plugins"] }
+# dynamic-cli = { version = "0.10.0", features = ["wasm-plugins"] }
 ```
 
-> **Upgrading from 0.8.x?** Cargo treats a `0.x` minor bump as a
-> semver-incompatible change, so `cargo update` alone won't pull `0.9.0`
-> in — bump the version requirement explicitly. This release is fully
-> additive (see [`CHANGELOG.md`](CHANGELOG.md)); no code changes are
-> required on your side.
+> **Upgrading from 0.9.x?** Cargo treats a `0.x` minor bump as a
+> semver-incompatible change, so `cargo update` alone won't pull `0.10.0`
+> in — bump the version requirement explicitly. This release contains
+> breaking changes and requires Rust 1.88 or later: see the *Breaking*
+> sections of [`CHANGELOG.md`](CHANGELOG.md) for each change and its
+> migration.
 
 ### Basic Example
 
@@ -87,7 +88,7 @@ global_options: []
 ```
 > Note :
 > 
-> The proper syntax for the configuration file is available in the [configuration syntax reference](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE) on the wiki.  
+> The proper syntax for the configuration file is available in the [configuration syntax reference](https://github.com/biface/dcli/wiki/Syntax-Reference) on the wiki.  
 
 **2. Implement your command handlers**:
 
@@ -153,6 +154,12 @@ Available commands:
   greet [name] - Greet someone
 myapp > :quit
 ```
+
+**REPL directives** (v0.10.0+,
+[DA-030](https://github.com/biface/dcli/issues/92)) — framework actions start with
+`:` (`:help`, `:load`, `:quit`, `:exit`), so they never collide with your
+commands; the `directives:` section of the configuration can rename them.
+See the wiki's [REPL Directives](https://github.com/biface/dcli/wiki/REPL-Directives) page.
 
 **Multi-line commands in REPL** (v0.9.0+,
 [DD-027](https://github.com/biface/dcli/issues/48)) — end a line with `\` to continue a
@@ -272,9 +279,9 @@ example, and the architecture decision behind it
 ## 📖 Documentation
 
 - **[API Reference](https://docs.rs/dynamic-cli)** - Complete API documentation
-- **[Configuration Syntax Reference](https://github.com/biface/dcli/wiki/CONFIG_SYNTAX_REFERENCE)** - Structure of the configuration file (wiki)
-- **[Plugin Guide](https://github.com/biface/dcli/wiki/PLUGIN_GUIDE)** - Static, builtin and WASM plugins (wiki)
-- **[REPL Directives](https://github.com/biface/dcli/wiki/REPL_DIRECTIVES)** - `:help`, `:load`, `:quit`, `:exit` and how to rename them (wiki)
+- **[Configuration Syntax Reference](https://github.com/biface/dcli/wiki/Syntax-Reference)** - Structure of the configuration file (wiki)
+- **[Plugin Guide](https://github.com/biface/dcli/wiki/Plugin-Guide)** - Static, builtin and WASM plugins (wiki)
+- **[REPL Directives](https://github.com/biface/dcli/wiki/REPL-Directives)** - `:help`, `:load`, `:quit`, `:exit` and how to rename them (wiki)
 - **[Examples](examples/README.md)** - Working examples and code samples
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute to the project
 
