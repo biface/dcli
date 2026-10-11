@@ -211,7 +211,7 @@ pub use repl_parser::{ParsedCommand, ReplParser};
 ///
 /// Lives directly in `parser` rather than nested under `cli_parser`: it is
 /// the shared type consumed by every handler regardless of dispatch path
-/// (CLI one-shot via [`CliParser::parse_typed`], or REPL via
+/// (CLI via [`CliParser::parse_typed_segment`], or REPL via
 /// [`ParsedArgs::from_scalars`]) — not a CLI-specific detail.
 ///
 /// # Example
@@ -243,10 +243,10 @@ impl ParsedArgs {
     /// on [`crate::parser::repl_parser::ReplParser::parse_line`], which
     /// only produces scalar values: repeatable options have no use case at
     /// the interactive prompt so far, so that path was left scalar-only
-    /// when they were introduced. Batch/scripted invocations are expected
-    /// to go through
-    /// [`CliParser::parse_typed`] directly instead (see issue #41,
-    /// `ScriptLoaderPlugin`).
+    /// when they were introduced. Scripts run with
+    /// [`CliInterface::run_script`](crate::interface::CliInterface::run_script)
+    /// go through the CLI dispatch path and keep repeatable options; the
+    /// REPL `:load` directive replays its lines through this scalar path.
     pub fn from_scalars(values: HashMap<String, String>) -> Self {
         Self(
             values
